@@ -1,9 +1,12 @@
 # Core benchmarks (A, B, C, D, E, F)
-anthropic>=0.89.0
-httpx>=0.28.0
+anthropic==0.89.0
+httpx==0.28.1
 
 # External classifier validation (classifier_validation.py)
-torch>=2.11.0
-transformers>=5.5.0
-scikit-learn>=1.8.0
-numpy>=2.4.0
+torch==2.11.0
+transformers==5.5.0
+scikit-learn==1.8.0
+numpy==2.4.4
+
+# Dataset extraction (optional — data/extract_wildchat_defi.py)
+datasets==4.8.4

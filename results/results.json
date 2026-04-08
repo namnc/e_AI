@@ -1,28 +1,115 @@
 {
-  "D2": {
-    "avg_score": 3.6,
-    "n": 5,
-    "details": [
-      {
-        "score": 4,
-        "reason": "Covers the core topic of adjusting collateral but misses specific numerical outcomes and gas costs."
-      },
-      {
-        "score": 4,
-        "reason": "Covers the core topic of minimizing slippage but lacks specific details on how to optimally split the swap between Uniswap and Curve."
-      },
-      {
-        "score": 3,
-        "reason": "The answer provides a general overview and steps but lacks specific information about gas costs and details on the profit potential from the imbalance."
-      },
-      {
-        "score": 4,
-        "reason": "The answer provides relevant advice on unstaking tokens due to an exploit, but it lacks specific details about governance responses or exact exit timelines."
-      },
-      {
-        "score": 3,
-        "reason": "The answer discusses the potential margin call but does not provide specific advice on whether to add margin, close, or set a stop loss."
-      }
-    ]
-  }
+  "F": [
+    {
+      "type": "swap_frontrun",
+      "trade_size": "$50,000",
+      "damage_no_protection": "$50-$1,000",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$250",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization), ~75% (covers alone)"
+    },
+    {
+      "type": "swap_frontrun",
+      "trade_size": "$100,000",
+      "damage_no_protection": "$100-$2,000",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$500",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization), ~75% (covers alone)"
+    },
+    {
+      "type": "swap_frontrun",
+      "trade_size": "$500,000",
+      "damage_no_protection": "$500-$10,000",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$2,500",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization), ~75% (covers alone)"
+    },
+    {
+      "type": "swap_frontrun",
+      "trade_size": "$1,250,000",
+      "damage_no_protection": "$1,250-$25,000",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$6,250",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization), ~75% (covers alone)"
+    },
+    {
+      "type": "swap_frontrun",
+      "trade_size": "$5,000,000",
+      "damage_no_protection": "$5,000-$100,000",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$25,000",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization), ~75% (covers alone)"
+    },
+    {
+      "type": "liquidation",
+      "position": "$100,000",
+      "damage_no_protection": "$1,500",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$375",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization)"
+    },
+    {
+      "type": "liquidation",
+      "position": "$500,000",
+      "damage_no_protection": "$8,750",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$2,188",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization)"
+    },
+    {
+      "type": "liquidation",
+      "position": "$1,000,000",
+      "damage_no_protection": "$17,500",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$4,375",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization)"
+    },
+    {
+      "type": "liquidation",
+      "position": "$2,500,000",
+      "damage_no_protection": "$45,000",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$11,250",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization)"
+    },
+    {
+      "type": "liquidation",
+      "position": "$10,000,000",
+      "damage_no_protection": "$175,000",
+      "damage_sanitized": "$0",
+      "damage_with_covers": "$43,750",
+      "defense_cost": "$0.012",
+      "reduction": "100% (sanitization)"
+    },
+    {
+      "type": "strategy_theft",
+      "damage_no_protection": "$10,000-$100,000",
+      "damage_decomposed": "$0",
+      "defense_cost": "$0.012",
+      "reduction": "100% (decomposition keeps strategy local)"
+    },
+    {
+      "type": "strategy_theft",
+      "damage_no_protection": "$50,000-$500,000",
+      "damage_decomposed": "$0",
+      "defense_cost": "$0.012",
+      "reduction": "100% (decomposition keeps strategy local)"
+    },
+    {
+      "type": "strategy_theft",
+      "damage_no_protection": "$100,000-$1,000,000",
+      "damage_decomposed": "$0",
+      "defense_cost": "$0.012",
+      "reduction": "100% (decomposition keeps strategy local)"
+    }
+  ]
 }

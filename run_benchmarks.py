@@ -563,19 +563,31 @@ def benchmark_d2(n_samples: int = 5):
             )
             pipeline_answer = call_llm(synthesis_prompt, system=SYNTHESIZE_SYSTEM, max_tokens=400)
 
-            # Step 5: Judge pipeline answer vs direct answer
-            judge_prompt = (
-                f"ORIGINAL QUESTION: {original_q}\n\n"
-                f"ANSWER (from privacy pipeline): {pipeline_answer[:500]}\n\n"
-                f"How useful is this answer for the original question?"
-            )
-            judge_resp = call_llm(judge_prompt, system=QUALITY_JUDGE_SYSTEM, max_tokens=150)
-            parsed = extract_json(judge_resp)
-            score = parsed.get("score", 0)
-            reason = parsed.get("reason", "")
+            # Step 5: Blinded A/B — judge BOTH answers, randomized order
+            answers = [
+                ("direct", direct_answer),
+                ("pipeline", pipeline_answer),
+            ]
+            rng_ab = random.Random(42 + i)
+            rng_ab.shuffle(answers)
 
-            results_list.append({"score": score, "reason": reason})
-            print(f"  Pipeline score: {score}/5 — {reason[:60]}")
+            scores = {}
+            for label, answer in answers:
+                judge_prompt = (
+                    f"ORIGINAL QUESTION: {original_q}\n\n"
+                    f"ANSWER: {answer[:500]}\n\n"
+                    f"How useful is this answer for the original question?"
+                )
+                judge_resp = call_llm(judge_prompt, system=QUALITY_JUDGE_SYSTEM, max_tokens=150)
+                parsed = extract_json(judge_resp)
+                scores[label] = parsed.get("score", 0)
+
+            results_list.append({
+                "direct_score": scores["direct"],
+                "pipeline_score": scores["pipeline"],
+                "quality_retained": scores["pipeline"] / max(scores["direct"], 1),
+            })
+            print(f"  Direct: {scores['direct']}/5 | Pipeline: {scores['pipeline']}/5 | Retained: {scores['pipeline']/max(scores['direct'],1):.0%}")
 
         except Exception as e:
             print(f"  ERROR: {e}")
@@ -583,15 +595,27 @@ def benchmark_d2(n_samples: int = 5):
     if not results_list:
         return {}
 
-    scores = [r["score"] for r in results_list]
-    avg = sum(scores) / len(scores)
-    print(f"\n{'='*40}")
-    print(f"Full Pipeline Results (n={len(scores)}):")
-    print(f"  Average score: {avg:.2f}/5")
-    print(f"  Score >=4: {sum(1 for s in scores if s >= 4)}/{len(scores)} ({sum(1 for s in scores if s >= 4)/len(scores):.0%})")
-    print(f"  Compare: template-rewrite only = 2.3/5, prior work (Minions) = 97.9%")
+    direct_scores = [r["direct_score"] for r in results_list]
+    pipeline_scores = [r["pipeline_score"] for r in results_list]
+    retained = [r["quality_retained"] for r in results_list]
+    avg_direct = sum(direct_scores) / len(direct_scores)
+    avg_pipeline = sum(pipeline_scores) / len(pipeline_scores)
+    avg_retained = sum(retained) / len(retained)
 
-    return {"avg_score": avg, "n": len(scores), "details": results_list}
+    print(f"\n{'='*40}")
+    print(f"Full Pipeline A/B Results (n={len(results_list)}):")
+    print(f"  Direct avg:   {avg_direct:.2f}/5")
+    print(f"  Pipeline avg: {avg_pipeline:.2f}/5")
+    print(f"  Quality retained: {avg_retained:.0%}")
+    print(f"  Pipeline >=4: {sum(1 for s in pipeline_scores if s >= 4)}/{len(pipeline_scores)}")
+
+    return {
+        "avg_direct": avg_direct,
+        "avg_pipeline": avg_pipeline,
+        "avg_retained": avg_retained,
+        "n": len(results_list),
+        "details": results_list,
+    }
 
 
 # ─────────────────────────────────────────────
@@ -613,7 +637,8 @@ Respond with ONLY a JSON object: {{"guess": "exact strategy name", "confidence":
 def benchmark_e(n_scenarios: int = 5, max_queries: int = 10, use_covers: bool = True):
     """Test if multi-query sessions leak strategy even when individual queries are safe."""
     print("\n" + "=" * 60)
-    print(f"BENCHMARK E: Session Composition (covers={'on' if use_covers else 'off'})")
+    print(f"SIMULATION E: Session Composition (covers={'on' if use_covers else 'off'})")
+    print("  (Best-case: assumes per-set unlinkability via independent Tor circuits)")
     print("=" * 60)
 
     scenarios = SESSION_SCENARIOS[:n_scenarios]
@@ -699,7 +724,8 @@ def benchmark_e(n_scenarios: int = 5, max_queries: int = 10, use_covers: bool = 
 def benchmark_f():
     """Simulate economic damage with and without protection. No LLM needed."""
     print("\n" + "=" * 60)
-    print("BENCHMARK F: Financial Damage Reduction (Simulation)")
+    print("SIMULATION F: Economic Damage Model (Illustrative, not empirical)")
+    print("  (Assumes sanitizer catches all params; models parameter-dependent attacks only)")
     print("=" * 60)
 
     results = []

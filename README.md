@@ -121,11 +121,16 @@ The `results/*.md` files contain earlier in-conversation results generated with 
 
 ## Caveats
 
-- **Same-model bias — addressed**: Trained independent DistilBERT classifier; result (25-34%) consistent with LLM adversary
-- **Benchmark D/D2**: Template rewriting alone degrades quality to 2.3/5 (FAIL). Full pipeline (decompose → covers → synthesize) scores 3.6/5 with 7B model (MARGINAL); 14B+ expected to reach 4+/5
-- **Local model capability gap**: 7B models leak private parameters 30% of the time during decomposition. Need 14B+ for production
-- **Small sample sizes**: n=10-40 per benchmark — larger-scale validation needed
-- **No real user queries**: We scanned 1M WildChat conversations and found <40 real DeFi queries (0.004% hit rate) — almost all about coding, not personal positions. Real DeFi position queries are inherently private and do not appear in public datasets at usable scale. Our 216-query synthetic benchmark (`data/benchmark_dataset.jsonl`) includes forum-sourced phrasings from Aave governance but has not been validated for realism by independent DeFi users
+**This is a research prototype, not an audit-complete privacy tool.**
+
+- **Classifier validation is partially external**: DistilBERT trains on data from the same `cover_generator` — it tests whether a second model exploits this generator's artifacts, not robustness against truly external distributions or human adversaries
+- **Benchmark B leakage detection is string-matching only**: Misses paraphrases ("large position"), abstractions ("near liquidation"), and derived disclosures. A stronger detector (NER, entailment-based) is needed
+- **Benchmarks E and F are simulations, not attack benchmarks**: E assumes per-set unlinkability (best case). F hard-codes adversary profit reduction from k=4 as 75% — an assumption, not a measurement
+- **Benchmark D2 is a blinded A/B comparison** (direct vs pipeline answer, randomized order, same judge). Previous versions had a methodological bug where the direct answer was unused
+- **Local model capability gap**: 7B models leak private parameters 30% during decomposition. Need 14B+ for production
+- **Small sample sizes**: n=5-40 per benchmark — larger-scale validation needed
+- **No real user queries**: 216-query synthetic benchmark includes forum-sourced phrasings but has not been validated by independent DeFi users. Real DeFi position queries are inherently private (0.004% hit rate in 1M WildChat conversations)
+- **Requirements pinned to exact versions** for reproducibility. Results may differ with other package versions or LLM backends
 
 ## Contributing
 

@@ -389,7 +389,10 @@ def classify_domain(query: str) -> str:
         scores[domain] = score
 
     if max(scores.values()) == 0:
-        return "lending"  # default fallback
+        # Round-robin fallback across top-4 to avoid lending bias
+        import hashlib
+        h = int(hashlib.sha256(query.encode()).hexdigest()[:8], 16)
+        return TOP_DOMAINS[h % len(TOP_DOMAINS)]
 
     return max(scores, key=scores.get)
 
@@ -642,7 +645,9 @@ def generate_per_provider(
     for attempt in range(max_retries):
         result = {}
         for i, provider in enumerate(providers):
-            provider_seed = base_seed + hash(provider) + attempt * 1000
+            import hashlib
+            provider_hash = int(hashlib.sha256(provider.encode()).hexdigest()[:8], 16)
+            provider_seed = base_seed + provider_hash + attempt * 1000
             shuffled, real_index = generate_cover_set(
                 query, k=k, seed=provider_seed, presanitized=presanitized
             )
