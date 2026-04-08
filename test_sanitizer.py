@@ -196,6 +196,27 @@ def test_cardinal_no_false_positives():
     assert "three ways" in sanitize_query("There are three ways to do this")
     assert "five protocols" in sanitize_query("I checked five protocols")
 
+def test_no_false_positives_on_benign_numbers():
+    """Numbers followed by common English words should not be stripped."""
+    # These were reported as false positives in audit
+    r = sanitize_query("What happens after 2 weeks in the unstaking queue?")
+    assert "2 weeks" in r, f"False positive: '2 weeks' stripped from '{r}'"
+
+    r = sanitize_query("How does Uniswap V3 compare to V2 on gas costs?")
+    assert "V3" in r, f"False positive: 'V3' stripped from '{r}'"
+
+    r = sanitize_query("What is 2FA and should I enable it on my wallet?")
+    assert "2FA" in r.upper(), f"False positive: '2FA' stripped from '{r}'"
+
+    r = sanitize_query("Is 10 basis points a typical fee?")
+    assert "basis" in r, f"False positive: 'basis' stripped from '{r}'"
+
+    r = sanitize_query("I have 3 pools on Uniswap")
+    assert "3 pools" in r, f"False positive: '3 pools' stripped from '{r}'"
+
+    r = sanitize_query("There are 5 options for bridging")
+    assert "5 options" in r, f"False positive: '5 options' stripped from '{r}'"
+
 
 # ─────────────────────────────────────────────
 # Full query integration tests

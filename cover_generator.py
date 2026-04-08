@@ -241,12 +241,19 @@ DOMAIN_ONTOLOGY = {
 # Sanitization patterns
 # ---------------------------------------------------------------------------
 
-_AMOUNT_PATTERNS = [
+# Amount patterns applied with re.IGNORECASE (safe for these patterns)
+_AMOUNT_PATTERNS_ICASE = [
     r'\$[\d,]+(?:\.\d+)?[KkMmBb]?',                    # $1,000, $1.5M
-    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s*[A-Z]{2,10}\b',     # 500 ARB, 1.8M USDC, 200 OP — any 2-10 char uppercase symbol
     r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of)\b',   # 1.8M worth, 500K of
     r'[\d,]+(?:\.\d+)?\s*(?:tokens?|coins?)',
     r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
+]
+# Amount + UPPERCASE token symbol — CASE SENSITIVE
+# The token part MUST be uppercase (3+ chars to avoid "2FA", "V3", "5G").
+# Single digit is allowed because "3 BTC" is a real amount.
+_AMOUNT_PATTERNS_CSENSE = [
+    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{3,10}\b',           # 3 BTC, 500 ARB, 1.8M USDC — 3+ uppercase chars
+    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2}(?=\s|$)',          # 50 OP — requires space before 2-char symbol (avoids "2FA")
 ]
 _ADDRESS_PATTERN = r'0x[a-fA-F0-9]{3,}'
 _ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
@@ -335,9 +342,13 @@ def sanitize_query(query: str) -> str:
     # Remove hex addresses
     result = re.sub(_ADDRESS_PATTERN, '', result)
 
-    # Remove amounts (do this before percent to avoid partial matches)
-    for pat in _AMOUNT_PATTERNS:
+    # Remove amounts — split into case-insensitive (dollar amounts, suffixed numbers)
+    # and case-sensitive (number + UPPERCASE token symbol) to avoid false positives
+    # on phrases like "2 weeks", "V3", "2FA", "10 basis points"
+    for pat in _AMOUNT_PATTERNS_ICASE:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
+    for pat in _AMOUNT_PATTERNS_CSENSE:
+        result = re.sub(pat, '', result)  # NO re.IGNORECASE — token must be uppercase
 
     # Remove health factor values
     result = re.sub(_HF_PATTERN, 'health factor', result, flags=re.IGNORECASE)
@@ -731,5 +742,16 @@ def generate_per_provider(
         if not collision:
             return result
 
-    # After max retries, return best effort (should be rare with diverse vocabulary)
-    return result
+    # After max retries, raise — do not silently return colliding sets
+    colliding_pairs = []
+    providers_list = list(all_sets.keys())
+    for i in range(len(providers_list)):
+        for j in range(i + 1, len(providers_list)):
+            common = all_sets[providers_list[i]] & all_sets[providers_list[j]]
+            if common:
+                colliding_pairs.append((providers_list[i], providers_list[j], len(common)))
+    raise RuntimeError(
+        f"Could not achieve zero intersection after {max_retries} retries. "
+        f"Collisions: {colliding_pairs}. Reduce k or number of providers, "
+        f"or expand the domain vocabulary."
+    )
