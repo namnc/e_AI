@@ -243,12 +243,13 @@ DOMAIN_ONTOLOGY = {
 
 _AMOUNT_PATTERNS = [
     r'\$[\d,]+(?:\.\d+)?[KkMmBb]?',                    # $1,000, $1.5M
-    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s*(?:ETH|BTC|USDC|USDT|DAI|WETH|WBTC|stETH|LINK|AAVE|UNI|CRV|GLP|SOL|ENS)',
-    r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:USDC|USDT|DAI|ETH|BTC|in|worth)',  # 1.8M USDC, 500K worth
+    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s*[A-Z]{2,10}\b',     # 500 ARB, 1.8M USDC, 200 OP — any 2-10 char uppercase symbol
+    r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of)\b',   # 1.8M worth, 500K of
     r'[\d,]+(?:\.\d+)?\s*(?:tokens?|coins?)',
     r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
 ]
 _ADDRESS_PATTERN = r'0x[a-fA-F0-9]{3,}'
+_ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
 _PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%'
 _HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*\d+(?:\.\d+)?'
 _LEVERAGE_PATTERN = r'\b\d+x\b'
@@ -270,13 +271,13 @@ _NUMBER_WORD_PATTERNS = [
     r'(?:a\s+)?(?:half\s+(?:a\s+)?)?'
     r'(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)\s*'
     r'(?:hundred|thousand|million|billion)?\s*'
-    r'(?:ETH|BTC|USDC|USDT|DAI|dollars|bucks|worth)',
+    r'(?:[A-Z]{2,10}|dollars|bucks|worth)',
     # "my six-figure position", "a seven-figure portfolio"
     r'\b(?:four|five|six|seven|eight|nine|ten)-figure\s+(?:position|portfolio|amount|sum|balance|holding|stake)',
     # "half a million", "quarter million" standalone
     r'\b(?:half|quarter|third)\s+(?:a\s+)?(?:million|billion|thousand)\b',
     # "a few hundred thousand"
-    r'\b(?:a\s+)?(?:few|couple|several|many)\s+(?:hundred|thousand|million)\s*(?:thousand|million|billion)?\s*(?:ETH|BTC|USDC|USDT|DAI|dollars|bucks|worth)?',
+    r'\b(?:a\s+)?(?:few|couple|several|many)\s+(?:hundred|thousand|million)\s*(?:thousand|million|billion)?\s*(?:[A-Z]{2,10}|dollars|bucks|worth)?',
 ]
 
 _EMOTIONAL_WORDS = [
@@ -311,11 +312,14 @@ def sanitize_query(query: str) -> str:
     for word in _NUMBER_WORDS:
         # Only strip number words when adjacent to financial context
         result = re.sub(
-            rf'\b{re.escape(word)}\b\s*(?:ETH|BTC|USDC|USDT|DAI|dollars|bucks|worth|position|portfolio)',
+            rf'\b{re.escape(word)}\b\s*(?:[A-Z]{{2,10}}|dollars|bucks|worth|position|portfolio)',
             '', result, flags=re.IGNORECASE
         )
 
-    # Remove addresses
+    # Remove ENS names (vitalik.eth, name.eth)
+    result = re.sub(_ENS_PATTERN, '', result)
+
+    # Remove hex addresses
     result = re.sub(_ADDRESS_PATTERN, '', result)
 
     # Remove amounts (do this before percent to avoid partial matches)

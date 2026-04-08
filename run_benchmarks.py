@@ -426,23 +426,14 @@ def benchmark_d(n_samples: int = 15):
 
     for i, original_q in enumerate(sample):
         try:
-            # Generate template-rewritten version (what Tier 1 sends to cloud)
+            # Generate the cover set and extract the actual template-rewritten
+            # "real" query that _generate() produces. This is the exact query
+            # the cloud would see — not a separate reconstruction.
             from cover_generator import _generate
-            _, _, domain, template, _ = _generate(original_q, k=4, seed=42 + i, domain_strategy="top4", presanitized=True)
-            # The real query in the cover set is template-rewritten
-            # Regenerate just the real fill
-            rng = random.Random(42 + i)
-            from cover_generator import DOMAIN_ONTOLOGY, extract_template
-            tmpl = extract_template(original_q, rng=rng)
-            onto = DOMAIN_ONTOLOGY[domain]
-            rewritten = tmpl
-            for slot, key in [("{MECHANISM}", "mechanisms"), ("{OPERATION}", "operations"),
-                              ("{TRIGGER}", "triggers"), ("{METRIC}", "metrics"),
-                              ("{ACTOR}", "actors"), ("{GENERIC_REF}", "generic_refs"),
-                              ("{RISK_CONCEPT}", "risk_concepts"),
-                              ("{OPERATION_A}", "operations"), ("{OPERATION_B}", "operations")]:
-                if slot in rewritten:
-                    rewritten = rewritten.replace(slot, rng.choice(onto[key]), 1)
+            shuffled, real_idx, domain, template, _ = _generate(
+                original_q, k=4, seed=42 + i, domain_strategy="top4", presanitized=True
+            )
+            rewritten = shuffled[real_idx]
 
             print(f"\n--- Query {i+1}/{len(sample)} ---")
             print(f"  Original:  {original_q[:90]}")

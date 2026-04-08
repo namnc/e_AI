@@ -56,7 +56,7 @@ def generate_training_data(n_sets: int = 1000, k: int = 4, seed: int = 42):
         if len(sanitized.split()) >= 5:
             query_pool.append(sanitized)
     query_pool.extend(NON_SENSITIVE_QUERIES)
-    query_pool = list(set(query_pool))
+    query_pool = sorted(set(query_pool))  # sorted for determinism (set order depends on PYTHONHASHSEED)
 
     # Group queries by domain and balance sampling across top-4
     from cover_generator import TOP_DOMAINS

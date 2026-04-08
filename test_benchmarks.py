@@ -130,6 +130,23 @@ def test_classify_domain_no_lending_bias():
 # D2 pipeline contract (logic only, no LLM)
 # ─────────────────────────────────────────────
 
+def test_benchmark_d_uses_generate_output():
+    """Benchmark D must use _generate()'s actual real query, not reconstruct."""
+    import inspect
+    from run_benchmarks import benchmark_d
+    src = inspect.getsource(benchmark_d)
+    # Should call _generate() and use shuffled[real_idx]
+    assert "shuffled[real_idx]" in src, "D should use _generate()'s output directly"
+    # Should NOT independently reconstruct via extract_template + manual slot filling
+    assert "extract_template" not in src, "D should not independently reconstruct the query"
+
+def test_classifier_pool_deterministic():
+    """Classifier query pool must be sorted for determinism."""
+    import inspect
+    from classifier_validation import generate_training_data
+    src = inspect.getsource(generate_training_data)
+    assert "sorted(set(" in src, "query_pool dedup must use sorted(set()) not list(set())"
+
 def test_d2_mix_has_real_subquery():
     """The mixed set sent to cloud must contain the actual sub-query."""
     from cover_generator import generate_cover_set

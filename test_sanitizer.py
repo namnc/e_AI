@@ -155,11 +155,24 @@ def test_natural_language_quantities():
         result = sanitize_query(f"I have {phrase} in my wallet")
         assert phrase.lower() not in result.lower(), f"LEAKED: '{phrase}' in '{result}'"
 
+def test_broad_token_symbols():
+    """Tokens not in original hardcoded list should still be stripped."""
+    assert "500 ARB" not in sanitize_query("Should I sell 500 ARB on Uniswap?")
+    assert "250 OP" not in sanitize_query("What happens if my 250 OP collateral drops?")
+    assert "800 PEPE" not in sanitize_query("How risky is it to LP 800 PEPE with ETH?")
+    assert "1000 MATIC" not in sanitize_query("I staked 1000 MATIC on Lido")
+
+def test_ens_names():
+    """ENS names should be stripped."""
+    result = sanitize_query("What happens if vitalik.eth moves funds into Aave?")
+    assert "vitalik.eth" not in result
+    result2 = sanitize_query("I sent tokens to myname.eth")
+    assert "myname.eth" not in result2
+
 def test_known_limitation_semantic():
     """Purely semantic quantity references still bypass the sanitizer.
     These require true NLU, not pattern matching."""
     semantic = [
-        "about double what I started with",
         "more than I can afford to lose",
         "a whale-sized position",
     ]
@@ -169,6 +182,11 @@ def test_known_limitation_semantic():
         assert phrase.lower() in result.lower(), (
             f"Surprisingly caught: '{phrase}' → '{result}'. Update test if filter improved."
         )
+
+def test_number_word_double_caught():
+    """'double' is a quantity word and should be caught by the number-word filter."""
+    result = sanitize_query("about double what I started with")
+    assert "double" not in result.lower()
 
 
 # ─────────────────────────────────────────────
