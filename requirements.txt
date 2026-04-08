@@ -1,0 +1,9 @@
+# Core benchmarks (A, B, C, D, E, F)
+anthropic>=0.89.0
+httpx>=0.28.0
+
+# External classifier validation (classifier_validation.py)
+torch>=2.11.0
+transformers>=5.5.0
+scikit-learn>=1.8.0
+numpy>=2.4.0

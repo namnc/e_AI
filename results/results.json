@@ -1,0 +1,28 @@
+{
+  "D2": {
+    "avg_score": 3.6,
+    "n": 5,
+    "details": [
+      {
+        "score": 4,
+        "reason": "Covers the core topic of adjusting collateral but misses specific numerical outcomes and gas costs."
+      },
+      {
+        "score": 4,
+        "reason": "Covers the core topic of minimizing slippage but lacks specific details on how to optimally split the swap between Uniswap and Curve."
+      },
+      {
+        "score": 3,
+        "reason": "The answer provides a general overview and steps but lacks specific information about gas costs and details on the profit potential from the imbalance."
+      },
+      {
+        "score": 4,
+        "reason": "The answer provides relevant advice on unstaking tokens due to an exploit, but it lacks specific details about governance responses or exact exit timelines."
+      },
+      {
+        "score": 3,
+        "reason": "The answer discusses the potential margin call but does not provide specific advice on whether to add margin, close, or set a stop loss."
+      }
+    ]
+  }
+}

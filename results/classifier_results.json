@@ -1,0 +1,16 @@
+{
+  "roc_auc": 0.5963722222222222,
+  "accuracy": 0.75,
+  "precision": 0.0,
+  "recall": 0.0,
+  "f1": 0.0,
+  "set_level_accuracy": 0.3466666666666667,
+  "set_level_n": 300,
+  "per_domain_auc": {
+    "derivatives": 0.6741766800178015,
+    "dex": 0.5203619909502263,
+    "lending": 0.5413018433179724,
+    "staking": 0.619438431938432
+  },
+  "n_test_examples": 1200
+}

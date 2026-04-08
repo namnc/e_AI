@@ -1,0 +1,269 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "date": "2026-04-07",
+    "description": "Realistic DeFi queries for privacy orchestration benchmarks",
+    "total_sensitive": 50,
+    "total_non_sensitive": 50,
+    "total_complex_decomposition": 20
+  },
+  "sensitive_queries": [
+    {
+      "id": "S01",
+      "category": "lending_liquidation",
+      "query": "My Aave V3 WETH position has health factor 1.12 with 450 ETH collateral ($1.125M at $2,500) and 680K USDC borrowed. ETH just dropped 3% in an hour. Should I add collateral or start repaying?",
+      "private_params": ["450 ETH", "$1.125M", "680K USDC", "1.12", "3%", "add collateral", "repay"],
+      "exploitable_by": ["liquidation_hunter", "front_runner"],
+      "estimated_damage_usd": "17000-34000",
+      "source_realism": "Aave V3 ETH LT=83%, position size at 75th percentile"
+    },
+    {
+      "id": "S02",
+      "category": "swap_routing",
+      "query": "I need to swap 200 ETH to USDC. Uniswap V3 0.3% pool has $50M liquidity but Curve 3pool has better rates for the stablecoin leg. What split minimizes my slippage?",
+      "private_params": ["200 ETH", "USDC", "$50M liquidity", "Uniswap", "Curve"],
+      "exploitable_by": ["sandwich_attacker", "front_runner"],
+      "estimated_damage_usd": "500-10000",
+      "source_realism": "Typical large retail swap, real pool depths"
+    },
+    {
+      "id": "S03",
+      "category": "leveraged_position",
+      "query": "I'm 3x leveraged long ETH on GMX with 50 ETH at $2,600 entry. Current price $2,450. My liquidation price is $2,150. Should I add margin or set a stop at $2,250?",
+      "private_params": ["3x", "50 ETH", "$2,600", "$2,450", "$2,150", "long", "GMX", "$2,250"],
+      "exploitable_by": ["liquidation_hunter", "perp_manipulator"],
+      "estimated_damage_usd": "5000-25000",
+      "source_realism": "GMX leverage limits, typical retail position"
+    },
+    {
+      "id": "S04",
+      "category": "yield_strategy",
+      "query": "I have 500K USDC split between Aave (3.2% APY) and Compound (2.8% APY). Morpho is showing 5.1% on their USDC vault. Worth moving? What are the smart contract risks?",
+      "private_params": ["500K USDC", "3.2%", "2.8%", "5.1%", "Aave", "Compound", "Morpho"],
+      "exploitable_by": ["strategy_theft", "front_runner_on_deposit"],
+      "estimated_damage_usd": "1000-5000",
+      "source_realism": "Real APY ranges from defillama.com"
+    },
+    {
+      "id": "S05",
+      "category": "governance",
+      "query": "I hold 85,000 UNI tokens (0.008% of supply). There's a proposal to switch Uniswap fee switch on. If I vote yes and it passes, my LP positions benefit. Should I vote before the market prices it in?",
+      "private_params": ["85,000 UNI", "0.008%", "vote yes", "LP positions benefit"],
+      "exploitable_by": ["governance_front_runner", "sentiment_trader"],
+      "estimated_damage_usd": "5000-50000",
+      "source_realism": "Real governance proposal topic, realistic token holding"
+    },
+    {
+      "id": "S06",
+      "category": "wallet_management",
+      "query": "I want to consolidate funds from 0x1a2B...3c4D (120 ETH) and 0x5e6F...7g8H (80 ETH) into a new Gnosis Safe for a large OTC deal next week.",
+      "private_params": ["0x1a2B...3c4D", "120 ETH", "0x5e6F...7g8H", "80 ETH", "OTC deal", "next week"],
+      "exploitable_by": ["clustering_oracle", "front_runner"],
+      "estimated_damage_usd": "portfolio_exposure",
+      "source_realism": "Common wallet consolidation pattern"
+    },
+    {
+      "id": "S07",
+      "category": "flash_loan_arb",
+      "query": "Curve stETH/ETH pool is trading at 0.997 peg. If I flash loan 1000 ETH from Aave, swap to stETH on Curve, and sell stETH for ETH on Uniswap at 0.999, is the gas + fees worth it?",
+      "private_params": ["0.997", "1000 ETH", "Aave", "Curve", "Uniswap", "0.999"],
+      "exploitable_by": ["arb_front_runner", "strategy_theft"],
+      "estimated_damage_usd": "2000-20000",
+      "source_realism": "Real stETH depeg scenario, realistic arb path"
+    },
+    {
+      "id": "S08",
+      "category": "bridge_transfer",
+      "query": "Moving $2M in USDC from Ethereum to Arbitrum. Across bridge shows 10 minute estimate. Orbiter is faster but has a $500K limit. Split across both?",
+      "private_params": ["$2M", "USDC", "Ethereum", "Arbitrum", "$500K limit"],
+      "exploitable_by": ["bridge_monitor", "l2_front_runner"],
+      "estimated_damage_usd": "2000-20000",
+      "source_realism": "Real bridge limits and speeds"
+    },
+    {
+      "id": "S09",
+      "category": "options_hedging",
+      "query": "I want to buy 300 ETH worth of 30-day put options at $2,200 strike on Lyra. Current premium is 4.1%. Is that cheap relative to historical IV? My Aave position needs protection below $2,169.",
+      "private_params": ["300 ETH", "$2,200 strike", "4.1%", "Lyra", "$2,169", "Aave position"],
+      "exploitable_by": ["options_front_runner", "liquidation_hunter"],
+      "estimated_damage_usd": "5000-30000",
+      "source_realism": "Real Lyra premium ranges, links to Aave position"
+    },
+    {
+      "id": "S10",
+      "category": "staking_exit",
+      "query": "I have 15,000 AAVE tokens in the safety module earning 6.5%. There's a rumor of an exploit in a new Aave market. Cooldown is 10 days. Should I start unstaking now or wait for official response?",
+      "private_params": ["15,000 AAVE", "6.5%", "10 days cooldown", "start unstaking now"],
+      "exploitable_by": ["token_front_runner", "panic_seller"],
+      "estimated_damage_usd": "10000-100000",
+      "source_realism": "Real Aave safety module cooldown, realistic staking amount"
+    },
+    {
+      "id": "S11",
+      "category": "lending_liquidation",
+      "query": "My Maker vault #8421 has 200 WBTC ($12M) collateral and 6M DAI debt. Liquidation ratio is 150%. BTC at $60K means I'm at 200% — safe? But if BTC drops to $45K I'm liquidated.",
+      "private_params": ["vault #8421", "200 WBTC", "$12M", "6M DAI", "200%", "$45K"],
+      "exploitable_by": ["liquidation_hunter"],
+      "estimated_damage_usd": "300000-600000",
+      "source_realism": "Real Maker vault parameters, whale-size position"
+    },
+    {
+      "id": "S12",
+      "category": "lp_management",
+      "query": "My Uniswap V3 ETH/USDC position (100 ETH, range $2,200-$2,800) is now out of range with ETH at $2,100. Remove liquidity and re-enter lower, or wait for price to come back?",
+      "private_params": ["100 ETH", "$2,200-$2,800", "ETH at $2,100", "out of range"],
+      "exploitable_by": ["jit_liquidity_provider", "front_runner"],
+      "estimated_damage_usd": "2000-10000",
+      "source_realism": "Real Uniswap V3 mechanics, common LP dilemma"
+    },
+    {
+      "id": "S13",
+      "category": "tax_planning",
+      "query": "I need to realize $800K in losses by Dec 31 for tax-loss harvesting. My worst positions: 50 ETH bought at $4,000 (now $2,500), 10,000 LINK at $25 (now $14). Best execution to sell without moving the market?",
+      "private_params": ["$800K losses", "Dec 31", "50 ETH at $4,000", "10,000 LINK at $25", "$14"],
+      "exploitable_by": ["front_runner", "timing_exploiter"],
+      "estimated_damage_usd": "5000-20000",
+      "source_realism": "Real tax-loss harvesting scenario, realistic positions"
+    },
+    {
+      "id": "S14",
+      "category": "restaking",
+      "query": "I have 500 ETH in Eigenlayer restaked via Lido. Earning 8.2% total (3.5% staking + 4.7% restaking). But the slashing risk worries me. If I exit, what's the withdrawal timeline?",
+      "private_params": ["500 ETH", "Eigenlayer", "Lido", "8.2%", "3.5%", "4.7%", "exit"],
+      "exploitable_by": ["restaking_monitor", "exit_front_runner"],
+      "estimated_damage_usd": "5000-50000",
+      "source_realism": "Real restaking yields, realistic allocation"
+    },
+    {
+      "id": "S15",
+      "category": "mev_strategy",
+      "query": "I found a profitable backrun opportunity: when large trades hit the ETH/USDC pool on Uniswap V3, I can arbitrage against Sushiswap within the same block. Average profit $200-500 per trade. How do I submit via Flashbots?",
+      "private_params": ["backrun", "ETH/USDC", "Uniswap V3", "Sushiswap", "$200-500", "Flashbots"],
+      "exploitable_by": ["competing_searcher", "strategy_theft"],
+      "estimated_damage_usd": "50000-500000_lifetime",
+      "source_realism": "Real MEV strategy, realistic per-trade profit"
+    },
+    {
+      "id": "S16",
+      "category": "lending_liquidation",
+      "query": "Running low on margin. My Aave V3 wstETH/USDC position: 800 wstETH ($2.4M) collateral, $1.6M USDC debt, HF=1.22. The wstETH/ETH ratio has been dropping — adds extra risk beyond ETH price. How does Aave handle this?",
+      "private_params": ["800 wstETH", "$2.4M", "$1.6M USDC", "1.22", "wstETH/ETH ratio dropping"],
+      "exploitable_by": ["liquidation_hunter", "wstETH_depeg_exploiter"],
+      "estimated_damage_usd": "40000-80000",
+      "source_realism": "Real wstETH depeg risk, realistic position"
+    },
+    {
+      "id": "S17",
+      "category": "swap_routing",
+      "query": "Planning to DCA into 1,000 ETH over the next 2 weeks using TWAP. Starting with $2.5M USDC. Which DEX aggregator handles large TWAP orders best? Want to avoid being detected by MEV bots.",
+      "private_params": ["1,000 ETH", "2 weeks", "$2.5M USDC", "TWAP", "avoid detection"],
+      "exploitable_by": ["sandwich_attacker", "information_trader"],
+      "estimated_damage_usd": "12500-50000",
+      "source_realism": "Real TWAP strategy, whale-size accumulation"
+    },
+    {
+      "id": "S18",
+      "category": "cross_chain",
+      "query": "Need to move my entire DeFi portfolio ($4.5M across 8 protocols) from Ethereum to Base within 48 hours. Gas is $30 average. What's the most efficient migration path?",
+      "private_params": ["$4.5M", "8 protocols", "Ethereum to Base", "48 hours"],
+      "exploitable_by": ["bridge_front_runner", "l2_liquidity_drainer"],
+      "estimated_damage_usd": "10000-100000",
+      "source_realism": "Real migration scenario, realistic total value"
+    },
+    {
+      "id": "S19",
+      "category": "nft_collateral",
+      "query": "I borrowed 45 ETH against my 3 Bored Apes on BendDAO. Floor price dropped from 30 ETH to 22 ETH. My LTV is now 68% (liquidation at 80%). Should I repay some debt or wait?",
+      "private_params": ["45 ETH", "3 Bored Apes", "BendDAO", "30→22 ETH floor", "68% LTV", "80% liquidation"],
+      "exploitable_by": ["nft_liquidation_hunter"],
+      "estimated_damage_usd": "10000-30000",
+      "source_realism": "Real BendDAO parameters, realistic NFT lending scenario"
+    },
+    {
+      "id": "S20",
+      "category": "dao_treasury",
+      "query": "Our DAO treasury has $25M in ETH. We're voting to diversify: 30% to stablecoins, 20% to BTC, keep 50% ETH. The swap will move the market. How do we execute without slippage eating $500K?",
+      "private_params": ["$25M", "30% stables", "20% BTC", "50% ETH", "$500K slippage concern"],
+      "exploitable_by": ["front_runner", "market_manipulator"],
+      "estimated_damage_usd": "125000-500000",
+      "source_realism": "Real DAO treasury rebalancing scenario"
+    }
+  ],
+  "non_sensitive_queries": [
+    {"id": "N01", "query": "What is the ERC-20 token standard and how does it differ from ERC-721?", "source": "Reddit r/ethereum FAQ"},
+    {"id": "N02", "query": "How does Uniswap V3's concentrated liquidity differ from V2's full-range model?", "source": "Ethereum StackExchange"},
+    {"id": "N03", "query": "Explain how optimistic rollups handle fraud proofs vs zk-rollups use validity proofs", "source": "Reddit r/ethereum"},
+    {"id": "N04", "query": "What is impermanent loss and when does it become permanent?", "source": "r/defi FAQ"},
+    {"id": "N05", "query": "How do Aave V3's efficiency modes (E-Mode) work for correlated assets?", "source": "Aave docs FAQ"},
+    {"id": "N06", "query": "What is MEV and how does the proposer-builder separation try to address it?", "source": "Ethereum.org"},
+    {"id": "N07", "query": "How did the Merge change Ethereum's consensus mechanism?", "source": "r/ethereum"},
+    {"id": "N08", "query": "What determines gas prices on Ethereum and how does EIP-1559 work?", "source": "Ethereum StackExchange"},
+    {"id": "N09", "query": "What is a reentrancy attack and how did it affect The DAO?", "source": "Smart contract security courses"},
+    {"id": "N10", "query": "How does MakerDAO maintain the DAI peg through its stability mechanism?", "source": "r/makerdao"},
+    {"id": "N11", "query": "What are the main risks when using cross-chain bridges?", "source": "r/defi"},
+    {"id": "N12", "query": "How does EIP-4844 reduce costs for rollups with blob transactions?", "source": "Ethereum Magicians"},
+    {"id": "N13", "query": "What makes Curve's StableSwap invariant better for same-peg assets than constant product AMMs?", "source": "Curve docs"},
+    {"id": "N14", "query": "What is account abstraction and what does ERC-4337 enable?", "source": "Ethereum.org"},
+    {"id": "N15", "query": "How do decentralized oracles like Chainlink aggregate price data?", "source": "Chainlink docs"},
+    {"id": "N16", "query": "What changed between Aave V2 and V3 in terms of risk management?", "source": "Aave governance forum"},
+    {"id": "N17", "query": "How does Eigenlayer's restaking create additional security for AVSes?", "source": "Eigenlayer docs"},
+    {"id": "N18", "query": "What are the security risks of proxy upgrade patterns like UUPS and Transparent Proxy?", "source": "OpenZeppelin docs"},
+    {"id": "N19", "query": "How does Flashbots Protect route transactions to avoid sandwich attacks?", "source": "Flashbots docs"},
+    {"id": "N20", "query": "How did Tornado Cash's privacy mechanism work before sanctions?", "source": "St. Louis Fed primer"}
+  ],
+  "complex_decomposition_queries": [
+    {
+      "id": "D01",
+      "query": "My Aave V3 WETH position has health factor 1.12 with 450 ETH collateral ($1.125M at $2,500) and 680K USDC borrowed. ETH just dropped 3% in an hour. Should I add collateral or start repaying?",
+      "private_params": ["450 ETH", "$1.125M", "680K USDC", "1.12", "3%"],
+      "expected_sanitized_subqueries": [
+        "How does the health factor formula work in Aave V3 for WETH collateral?",
+        "What are the gas cost differences between adding collateral and repaying debt on Aave V3?",
+        "How quickly can health factor deteriorate during rapid price drops for lending positions?"
+      ],
+      "local_computation": "Apply HF = (collateral × price × LT) / debt. Calculate with 450 ETH, HF=1.12, debt=680K. Compute new HF after adding X collateral. Compare gas costs."
+    },
+    {
+      "id": "D02",
+      "query": "I need to swap 200 ETH to USDC. Uniswap V3 0.3% pool has $50M liquidity but Curve 3pool has better rates for the stablecoin leg. What split minimizes my slippage?",
+      "private_params": ["200 ETH", "USDC", "$50M", "Uniswap V3 0.3%", "Curve 3pool"],
+      "expected_sanitized_subqueries": [
+        "How do DEX aggregators determine optimal routing splits across liquidity venues?",
+        "How does slippage scale with trade size relative to pool depth for constant-product vs stableswap AMMs?"
+      ],
+      "local_computation": "Using slippage formulas from cloud + actual pool depths (fetched via private RPC), calculate optimal split for 200 ETH."
+    },
+    {
+      "id": "D03",
+      "query": "I'm 3x leveraged long ETH on GMX with 50 ETH at $2,600 entry. Current price $2,450. My liquidation price is $2,150. Should I add margin or set a stop at $2,250?",
+      "private_params": ["3x", "50 ETH", "$2,600", "$2,450", "$2,150", "long", "GMX", "$2,250"],
+      "expected_sanitized_subqueries": [
+        "How does the margin and liquidation system work for leveraged positions on decentralized perpetual exchanges?",
+        "What are the tradeoffs between adding margin and setting stop losses for leveraged positions?"
+      ],
+      "local_computation": "Calculate current PnL, distance to liquidation, cost to add margin vs stop loss execution risk, using specific position params."
+    },
+    {
+      "id": "D04",
+      "query": "Curve stETH/ETH pool is trading at 0.997 peg. If I flash loan 1000 ETH from Aave, swap to stETH on Curve, and sell stETH for ETH on Uniswap at 0.999, is the gas + fees worth it?",
+      "private_params": ["0.997", "1000 ETH", "Aave", "Curve", "Uniswap", "0.999"],
+      "expected_sanitized_subqueries": [
+        "What are the mechanics of flash loan arbitrage when a pegged asset trades at a discount?",
+        "How do gas costs and flash loan fees factor into the profitability of cross-DEX arbitrage?",
+        "How does liquidity depth affect execution for large stablecoin/pegged-asset swaps?"
+      ],
+      "local_computation": "Profit = (0.999 - 0.997) × 1000 ETH - gas - flash_fee. Check if positive. Estimate gas from cloud response."
+    },
+    {
+      "id": "D05",
+      "query": "I want to buy 300 ETH worth of 30-day put options at $2,200 strike on Lyra. Current premium is 4.1%. Is that cheap relative to historical IV? My Aave position needs protection below $2,169.",
+      "private_params": ["300 ETH", "$2,200", "4.1%", "Lyra", "$2,169", "Aave position"],
+      "expected_sanitized_subqueries": [
+        "How are options premiums determined on decentralized options platforms?",
+        "What is the historical range of ETH implied volatility for 30-day at-the-money options?",
+        "How does the relationship between strike price and current price affect option premium?"
+      ],
+      "local_computation": "Compare 4.1% premium against historical IV from cloud response. Calculate breakeven. Check if $2,200 strike covers $2,169 liquidation threshold."
+    }
+  ]
+}

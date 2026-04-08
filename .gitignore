@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+.env
+models/
+data/classifier_training_data.json
+data/test_indices.json
