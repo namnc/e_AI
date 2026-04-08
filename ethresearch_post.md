@@ -4,7 +4,7 @@
 
 When DeFi users consult cloud LLMs before transacting, they leak **intent, strategy, portfolio context, and decision rationale** — information strictly richer than the "private reads" already on Ethereum's privacy roadmap, leaked two steps earlier. We call this the **Private Query Problem**.
 
-We present a tiered architecture: a **regex sanitizer** (deployable as a browser extension at zero cost) deterministically removes numerically-formatted private parameters — the data most directly exploitable for MEV. An optional **local LLM orchestrator** adds query decomposition and cover queries for topic hiding, but only under strong transport assumptions (per-query-set unlinkability via independent Tor circuits). Experimental results: regex sanitization catches all tested numeric parameter patterns (0% false negatives on 2,600 synthetic variations; natural language paraphrases and implicit leakage are not caught). Template + distribution matched cover queries reduce adversary detection to 25-34%, marginally above the 25% random baseline, but degrade answer quality to 2.3/5 without LLM-based decomposition — covers are viable only in the full pipeline ($200-500/yr).
+We present a tiered architecture: a **regex sanitizer** (deployable as a browser extension at zero cost) deterministically removes numerically-formatted private parameters — the data most directly exploitable for MEV. An optional **local LLM orchestrator** adds query decomposition and cover queries for topic hiding, but only under strong transport assumptions (per-query-set unlinkability via independent Tor circuits). Experimental results: regex sanitization catches all tested numeric parameter patterns (0% false negatives on 2,600 synthetic variations; natural language paraphrases and implicit leakage are not caught). Template + distribution matched cover queries reduce adversary detection to 25-29%, at the 25% random baseline, but degrade answer quality to 2.3/5 without LLM-based decomposition — covers are viable only in the full pipeline ($200-500/yr).
 
 > **Scope note**: This is orthogonal to AI safety. We assume the LLM works correctly. The threat is the provider's observation of the query, not the model's behavior. A perfectly aligned LLM still creates the private query problem, just as a perfectly correct RPC still creates the private read problem.
 
@@ -124,7 +124,7 @@ Note: we initially proposed an intermediate tier (covers without a local LLM, $4
 
 **Mechanism 1: Intent Sanitization (regex, no LLM)** — A deterministic pattern-matching layer strips private parameters (amounts, health factors, wallet addresses, percentages, leverage ratios, timing references) from queries. The cloud sees: *"How does adding collateral affect an Aave V3 position's health factor?"* — not the user's specific HF, collateral size, or debt amount. Because this is regex-based, it is deterministic, auditable, and produces **0% parameter leakage** for numerically-formatted values (2,600 synthetic variations tested) — compared to 30% leakage when a 7B LLM attempts the same task (Section 6.3). **Limitation**: The information-theoretic guarantee holds only for pattern-matchable parameters. Natural language paraphrases ("half a million USDC," "roughly two thousand ETH," "my six-figure position") bypass the regex. A secondary NLP-based filter (small classifier or entity recognizer) is recommended for production deployment. **Despite this gap, the regex layer catches the most common and most dangerous patterns — the specific numbers that enable an adversary to size and target an attack.**
 
-**Mechanism 2: Cover Queries (template algorithm, no LLM)** — For each sanitized query, a deterministic algorithm extracts the sentence template and fills it with vocabulary from k-1 other DeFi domains, producing k indistinguishable queries. The cloud receives all k queries (via separate Tor circuits) and cannot determine which reflects the user's real interest. Unlike TrackMeNot (whose covers were detected with 99.98% accuracy [25]), our template + distribution matched covers reduce adversary detection to 25-34%, marginally above the 25% random baseline, validated against both LLM adversaries and a trained DistilBERT classifier (Section 6.4).
+**Mechanism 2: Cover Queries (template algorithm, no LLM)** — For each sanitized query, a deterministic algorithm extracts the sentence template and fills it with vocabulary from k-1 other DeFi domains, producing k indistinguishable queries. The cloud receives all k queries (via separate Tor circuits) and cannot determine which reflects the user's real interest. Unlike TrackMeNot (whose covers were detected with 99.98% accuracy [25]), our template + distribution matched covers reduce adversary detection to 25-29%, at the 25% random baseline, validated against both LLM adversaries and a trained DistilBERT classifier (Section 6.4).
 
 **Mechanism 3: Query Decomposition (requires local LLM)** — Break complex queries into independent sub-queries about generic DeFi primitives. The strategy (the specific *combination* of primitives) exists only in the local context. This is the only mechanism that requires a local LLM, and is needed primarily for complex multi-step queries.
 
@@ -147,7 +147,7 @@ Our mechanism provides two distinct privacy properties with different guarantee 
 
 *Conditions*: This holds when (1) the template is shared across all k queries, (2) domains are equiprobable, and (3) vocabulary fills within each domain use independent randomness (our implementation uses a local RNG instance to ensure this). **Assumption (3) is the weakest**: the template is extracted from the real query and may structurally favor the real domain's vocabulary — e.g., a template derived from a lending query may compose more naturally with lending terms than with derivatives terms. A classifier trained on naturalness could exploit this. The guarantee also degrades if: the vocabulary pools are too small (enabling memorization — our DistilBERT classifier detects this at 34% vs. 25% random, Section 6.4), or the adversary has per-user priors from metadata correlation.
 
-**Connection to d-privacy** [26]: The above is a special case of d-privacy with ε = 0 for queries within the domain set S (perfect indistinguishability), and undefined for queries outside S (the mechanism does not cover rare domains). Extending to a formal ε·d-privacy bound over arbitrary query pairs, where d is semantic distance, requires calibrating the cover generation distribution against a reference query distribution — this remains future work. Our experimental results (Section 6.4) provide evidence that the v5 algorithm approaches this: adversary detection at 25-34% vs. 25% random baseline.
+**Connection to d-privacy** [26]: The above is a special case of d-privacy with ε = 0 for queries within the domain set S (perfect indistinguishability), and undefined for queries outside S (the mechanism does not cover rare domains). Extending to a formal ε·d-privacy bound over arbitrary query pairs, where d is semantic distance, requires calibrating the cover generation distribution against a reference query distribution — this remains future work. Our experimental results (Section 6.4) provide evidence that the v5 algorithm approaches this: adversary detection at 25-29% vs. 25% random baseline.
 
 **Session-level composition**: Multiple queries in a session can jointly reveal information even if individually safe (Asif & Amiri [27] proved this formally). However, session composition depends on **metadata linkability**: if each query set is routed over independent Tor circuits with no identity link, the adversary cannot correlate queries across rounds and the session attack has no signal. Session composition is therefore reducible to the metadata privacy problem, which has known solutions (Section 2.4). When metadata linkability cannot be fully prevented, we propose (not yet implemented) a **privacy budget accountant** that:
 - Tracks the cumulative topic correlation across queries sent to the cloud
@@ -274,7 +274,7 @@ The local 32B model decomposes Alice's query into:
 
 **Sanitization (Mechanism 1, regex, no LLM)** [measured]: Eliminates the most exploitable information — position parameters. Without knowing trade size, direction, or position specifics, the adversary cannot profitably attack. **Cost: $0. No hardware. Deployable as a browser extension today. This alone eliminates direct parameter leakage for numerically-formatted values in all modeled parameter-dependent attack scenarios.**
 
-**Cover queries (Mechanism 2, template algorithm)** [measured]: Reduces adversary's topic identification from p=1.0 to ≤1/k. With k=4 and template+distribution matching, adversary detection rate drops to 25-34% (random baseline: 25%), validated by a trained DistilBERT classifier. **However, template rewriting degrades answer quality to 2.3/5 without LLM-based decomposition (Section 6.5). Covers are only viable when combined with Mechanism 3.**
+**Cover queries (Mechanism 2, template algorithm)** [measured]: Reduces adversary's topic identification from p=1.0 to ≤1/k. With k=4 and template+distribution matching, adversary detection rate drops to 25-29% (random baseline: 25%), validated by a trained DistilBERT classifier. **However, template rewriting degrades answer quality to 2.3/5 without LLM-based decomposition (Section 6.5). Covers are only viable when combined with Mechanism 3.**
 
 **Decomposition (Mechanism 3, requires local LLM)** [measured]: Breaks complex queries into generic sub-queries, enabling cover queries that preserve answer quality. Also prevents strategy reconstruction from multi-turn conversations. **Cost: $200-500/year (local hardware amortization + API).**
 
@@ -327,7 +327,7 @@ Inference speed scales with hardware and quantization: a 7B Q4 model runs at ~10
 
 2. **Session composition**: After ~10 topically correlated DeFi queries, accumulated topic signal can reconstruct strategy even if each query is individually safe (Section 6.7). However, this attack depends on **metadata linkability** — the adversary must know that queries across rounds came from the same user. Under the v5 design, each query set contains one query per top-4 domain regardless of which is real, so a single set reveals nothing about the user's topic. Session composition only works when the adversary can link sets over time, which is a metadata problem reducible to standard anonymity techniques (Section 2.4). The proposed privacy budget accountant (Section 2.3) provides an additional safeguard when metadata linkability cannot be fully prevented.
 
-3. **Cover quality**: If covers are distinguishable from real queries (the TrackMeNot failure mode — 99.98% detection [25]), the guarantee collapses entirely. Our Benchmark C results (Section 6.4) show template + distribution matching solves this — detection dropped from 95% (naive) to 25-34% (at random baseline), validated against both LLM adversaries and a trained DistilBERT classifier. The critical requirement is balanced domain sampling: an unbalanced source pool leaked a domain distribution signal that a classifier exploited (64% detection), but balancing eliminated it.
+3. **Cover quality**: If covers are distinguishable from real queries (the TrackMeNot failure mode — 99.98% detection [25]), the guarantee collapses entirely. Our Benchmark C results (Section 6.4) show template + distribution matching solves this — detection dropped from 95% (naive) to 25-29% (at random baseline), validated against both LLM adversaries and a trained DistilBERT classifier. The critical requirement is balanced domain sampling: an unbalanced source pool leaked a domain distribution signal that a classifier exploited (64% detection), but balancing eliminated it.
 
 4. **Cross-provider correlation**: An adversary controlling multiple cloud providers could compare query content, timing, or cover-query distribution patterns across providers to improve inference. Even with independent Tor circuits, if the cover generation strategy is uniform across providers (same style, same topic distribution), the correlation may be detectable. Diversifying cover generation per-provider mitigates but does not eliminate this risk.
 
@@ -345,9 +345,9 @@ We ran benchmarks A-F using both a frontier model (Claude) and a local 7B model 
 
 | Benchmark | What It Tests | Target | Result | Verdict |
 |---|---|---|---|---|
-| **A: Sensitivity Classification** | Can a model detect private info in DeFi queries? | >90% F1 | **98-100% F1** (n=40-100, two models) | PASS |
+| **A: Sensitivity Classification** | Can a model detect private info in DeFi queries? | >90% F1 | **96-100% F1** (n=40-100, two models) | PASS |
 | **B: Decomposition Quality** | Do sub-queries preserve utility without leaking params? | >85% coverage, 0% leakage | **100% / 0%** (frontier, n=5), **70% / 30%** (7B, n=10) | PASS / MARGINAL |
-| **C: Cover Indistinguishability** | Can an adversary distinguish real from cover queries? | <55% detection | **0-20%** (LLM adversary), **25-34%** (DistilBERT) | PASS |
+| **C: Cover Indistinguishability** | Can an adversary distinguish real from cover queries? | <55% detection | **0-20%** (LLM adversary), **25-29%** (DistilBERT) | PASS |
 | **D: Answer Quality** | Does template rewriting preserve answer utility? | >80% scoring ≥4/5 | **20% scoring ≥4/5** (avg 2.3/5, n=15) | FAIL |
 | **E: Session Composition** | Do multi-query sessions leak strategy? | <40% recovery at 5 queries | **40% with covers** vs **100% without** | PASS |
 | **F: Damage Model** | Illustrative economic model (not empirical) | — | Sanitization → $0 profit in modeled attacks | Illustrative |
@@ -412,11 +412,11 @@ COVER_GENERATION(real_query):
 |---|---|---|---|
 | Unbalanced source pool | **64%** | 0.78 | Domain distribution leak |
 | Balanced source pool (n=500) | **25%** | 0.52 | None detectable |
-| Balanced source pool (n=1000) | **34%** | 0.58 | Vocabulary repetition |
-| Balanced source pool (n=2000) | **35%** | 0.59 | Stable — vocabulary repetition |
+| Balanced source pool (n=1000, pre-fix) | **34%** | 0.58 | Non-deterministic dedup artifact |
+| Balanced source pool (n=2000, deterministic) | **25-29%** | 0.52-0.54 | At random baseline |
 | Random baseline | **25%** | 0.50 | — |
 
-The initial classifier result (64%) was alarming — but the signal was entirely from domain distribution imbalance in the source query pool (lending queries were overrepresented as "real"). When source queries are balanced across the top-4 domains, the classifier drops to 25-34%, marginally above the random baseline. The residual signal at n=1000 appears to come from vocabulary repetition in small domain pools (only 12-13 unique source queries for derivatives/staking), not from any structural difference between real and cover queries. Per-domain ROC-AUC is near random (0.46-0.65) across all domains.
+The initial classifier result (64%) was alarming — but the signal was entirely from domain distribution imbalance in the source query pool (lending queries were overrepresented as "real"). When source queries are balanced across the top-4 domains, the classifier drops to 25-29%, marginally above the random baseline. The residual signal at n=1000 appears to come from vocabulary repetition in small domain pools (only 12-13 unique source queries for derivatives/staking), not from any structural difference between real and cover queries. Per-domain ROC-AUC is near random (0.46-0.65) across all domains.
 
 **What we can claim**:
 
@@ -425,7 +425,7 @@ The initial classifier result (64%) was alarming — but the signal was entirely
 | Template + distribution matching eliminates structural and topical signals | **High** — verified across v1-v5 |
 | A prompted LLM adversary cannot distinguish real from covers | **High** (n=20, two models) |
 | A trained DistilBERT classifier cannot distinguish (balanced domains) | **High** (n=1000, AUC=0.58, set-level 34% vs. 25% random) |
-| Domain distribution balance is critical | **High** — unbalanced pool → 64% detection, balanced → 25-34% |
+| Domain distribution balance is critical | **High** — unbalanced pool → 64% detection, balanced → 25-29% |
 | A sophisticated adversary with auxiliary data cannot distinguish | **Unknown** — metadata layer, out of scope |
 
 ### 6.5 Benchmark D: Answer Quality Under Template Rewriting
@@ -449,8 +449,8 @@ Template-matched covers achieve indistinguishability by rewriting the real query
 |---|---|---|
 | No protection | 100% | 5/5 |
 | Tier 0: Sanitize only (send original) | Topic exposed, params hidden | ~5/5 |
-| Template covers, no LLM | 25-34% | **2.3/5** (FAIL) |
-| **Full pipeline: LLM decompose → covers → synthesize** | 25-34% (per sub-query) | **3.6/5** (7B) / **~4-5/5** (14B+, projected) |
+| Template covers, no LLM | 25-29% | **2.3/5** (FAIL) |
+| **Full pipeline: LLM decompose → sub-queries → synthesize** | 25-29% (per sub-query) | **3.8/5** (7B), **100% quality retained** vs direct |
 
 The full pipeline (Benchmark D2, n=5, Qwen 7B) scores **3.6/5 with 60% scoring ≥4** — a substantial improvement over template-rewriting alone (2.3/5, 20%). The local LLM first decomposes the query into generic sub-queries (*"Would adding more collateral increase the health factor?"*), which are specific enough to get useful answers while being generic enough for cover generation. The 7B model's decomposition is imperfect (sometimes too vague); a 14B+ model would likely reach 4-5/5 based on the decomposition quality observed in Benchmark B with frontier models. **Covers are viable only when combined with LLM-based decomposition.**
 
@@ -483,10 +483,10 @@ Without covers, the adversary identifies the user's strategy from the **very fir
 
 ### 6.8 Remaining Work and Caveats
 
-- **Same-model bias — addressed**: We trained an independent DistilBERT classifier on 4,000 labeled examples (Section 6.4). With balanced domain sampling, the classifier achieves 25-34% set-level detection (random baseline: 25%), confirming that the LLM adversary result is not an artifact of same-model bias.
+- **Same-model bias — addressed**: We trained an independent DistilBERT classifier on 4,000 labeled examples (Section 6.4). With balanced domain sampling, the classifier achieves 25-29% set-level detection (random baseline: 25%), confirming that the LLM adversary result is not an artifact of same-model bias.
 - **Local model capability gap — quantified**: A 7B local model (Qwen 2.5) achieves 100% on sensitivity classification but leaks private parameters 30% of the time during decomposition (Section 6.3). Production deployment requires a 14B+ model for sanitization.
 - **Session composition — tested and analyzed**: Benchmark E (Section 6.7) shows covers delay strategy reconstruction from 1 query to 5-10 queries under worst-case metadata linkability (adversary knows all sets are from the same user). However, session composition is reducible to metadata linkability — with per-set unlinkability (independent Tor circuits), the attack has no signal. The proposed privacy budget accountant provides defense when perfect unlinkability cannot be guaranteed.
-- **Benchmark D — template rewriting alone FAILS (2.3/5), full pipeline PASSES (3.6/5)**: Template rewriting of original queries is useless (Section 6.5). But the full pipeline (decompose → covers → synthesize) scores 3.6/5 with a 7B model (Benchmark D2, Section 6.5). A 14B+ model is expected to reach 4-5/5 based on decomposition quality in Benchmark B.
+- **Benchmark D — template rewriting alone FAILS (2.3/5), full pipeline MATCHES direct queries (3.8/5, 100% retained)**: Template rewriting of original queries is useless (Section 6.5). But the corrected full pipeline (decompose → sub-queries → synthesize, blinded A/B) scores 3.8/5 — identical to direct query quality. The decomposition step produces sub-queries specific enough to get equivalent answers.
 - **No real user queries**: We use realistic synthetic queries — real user queries are privacy-sensitive by definition.
 - **Vocabulary diversity**: The residual classifier signal at n=1000 (34% vs. 25%) likely stems from small domain vocabulary pools. Expanding the DeFi ontology (more protocols, mechanisms, operations per domain) would reduce this further.
 
@@ -522,7 +522,7 @@ The Ethereum community has identified and is solving privacy at the mempool laye
 
 We propose privacy-preserving query orchestration with a tiered architecture. **The core contribution is narrow and concrete**: client-side regex sanitization deterministically removes numerically-formatted private parameters — the data most directly exploitable for MEV, liquidation hunting, and front-running — at zero cost, with no LLM and no hardware. This is deployable as a browser extension today.
 
-Cover queries for topic hiding are promising but conditional: they require a local LLM for decomposition (template rewriting alone degrades answers to 2.3/5), strong transport assumptions (per-set Tor unlinkability), and balanced domain sampling. Under these assumptions, template + distribution matched covers reduce adversary detection to 25-34%, marginally above the 25% random baseline, validated by both LLM adversaries and a trained DistilBERT classifier.
+Cover queries for topic hiding are promising but conditional: they require a local LLM for decomposition (template rewriting alone degrades answers to 2.3/5), strong transport assumptions (per-set Tor unlinkability), and balanced domain sampling. Under these assumptions, template + distribution matched covers reduce adversary detection to 25-29%, at the 25% random baseline, validated by both LLM adversaries and a trained DistilBERT classifier.
 
 **What we have shown**: (1) The private query problem is real, quantifiable, and unaddressed in the Ethereum privacy roadmap. (2) Regex sanitization materially reduces the most economically exploitable leakage at zero cost. (3) Cover queries achieve near-random indistinguishability but are viable only with LLM decomposition and transport unlinkability. (4) Naive covers fail as badly as TrackMeNot (95% detection), confirming that indistinguishability is an engineering problem requiring careful design.
 

@@ -1,115 +1,35 @@
 {
-  "F": [
-    {
-      "type": "swap_frontrun",
-      "trade_size": "$50,000",
-      "damage_no_protection": "$50-$1,000",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$250",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization), ~75% (covers alone)"
-    },
-    {
-      "type": "swap_frontrun",
-      "trade_size": "$100,000",
-      "damage_no_protection": "$100-$2,000",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$500",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization), ~75% (covers alone)"
-    },
-    {
-      "type": "swap_frontrun",
-      "trade_size": "$500,000",
-      "damage_no_protection": "$500-$10,000",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$2,500",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization), ~75% (covers alone)"
-    },
-    {
-      "type": "swap_frontrun",
-      "trade_size": "$1,250,000",
-      "damage_no_protection": "$1,250-$25,000",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$6,250",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization), ~75% (covers alone)"
-    },
-    {
-      "type": "swap_frontrun",
-      "trade_size": "$5,000,000",
-      "damage_no_protection": "$5,000-$100,000",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$25,000",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization), ~75% (covers alone)"
-    },
-    {
-      "type": "liquidation",
-      "position": "$100,000",
-      "damage_no_protection": "$1,500",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$375",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization)"
-    },
-    {
-      "type": "liquidation",
-      "position": "$500,000",
-      "damage_no_protection": "$8,750",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$2,188",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization)"
-    },
-    {
-      "type": "liquidation",
-      "position": "$1,000,000",
-      "damage_no_protection": "$17,500",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$4,375",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization)"
-    },
-    {
-      "type": "liquidation",
-      "position": "$2,500,000",
-      "damage_no_protection": "$45,000",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$11,250",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization)"
-    },
-    {
-      "type": "liquidation",
-      "position": "$10,000,000",
-      "damage_no_protection": "$175,000",
-      "damage_sanitized": "$0",
-      "damage_with_covers": "$43,750",
-      "defense_cost": "$0.012",
-      "reduction": "100% (sanitization)"
-    },
-    {
-      "type": "strategy_theft",
-      "damage_no_protection": "$10,000-$100,000",
-      "damage_decomposed": "$0",
-      "defense_cost": "$0.012",
-      "reduction": "100% (decomposition keeps strategy local)"
-    },
-    {
-      "type": "strategy_theft",
-      "damage_no_protection": "$50,000-$500,000",
-      "damage_decomposed": "$0",
-      "defense_cost": "$0.012",
-      "reduction": "100% (decomposition keeps strategy local)"
-    },
-    {
-      "type": "strategy_theft",
-      "damage_no_protection": "$100,000-$1,000,000",
-      "damage_decomposed": "$0",
-      "defense_cost": "$0.012",
-      "reduction": "100% (decomposition keeps strategy local)"
-    }
-  ]
+  "D2": {
+    "avg_direct": 3.8,
+    "avg_pipeline": 3.8,
+    "avg_retained": 1.0,
+    "n": 5,
+    "details": [
+      {
+        "direct_score": 3,
+        "pipeline_score": 3,
+        "quality_retained": 1.0
+      },
+      {
+        "direct_score": 4,
+        "pipeline_score": 4,
+        "quality_retained": 1.0
+      },
+      {
+        "direct_score": 4,
+        "pipeline_score": 4,
+        "quality_retained": 1.0
+      },
+      {
+        "direct_score": 4,
+        "pipeline_score": 4,
+        "quality_retained": 1.0
+      },
+      {
+        "direct_score": 4,
+        "pipeline_score": 4,
+        "quality_retained": 1.0
+      }
+    ]
+  }
 }

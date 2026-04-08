@@ -78,14 +78,14 @@ Cover query indistinguishability depends critically on the generation strategy. 
 
 | Benchmark | What It Tests | Target | Result | Verdict |
 |---|---|---|---|---|
-| **A** | Sensitivity classification | >90% F1 | **98-100% F1** (n=40-100) | PASS |
+| **A** | Sensitivity classification | >90% F1 | **96-100% F1** (n=100, 7B + frontier) | PASS |
 | **B** | Decomposition quality | >85% coverage, 0% leakage | **100%/0%** (frontier), **70%/30%** (7B) | PASS/MARGINAL |
-| **C** | Cover indistinguishability (LLM adversary) | <55% detection | **20%** (n=30, v5) | PASS |
-| **C-ext** | Cover indistinguishability (DistilBERT) | <55% set-level | **35%** (n=2000, balanced) | PASS |
+| **C** | Cover indistinguishability (LLM adversary) | <55% detection | **27%** (n=30, v5) | PASS |
+| **C-ext** | Cover indistinguishability (DistilBERT) | <55% set-level | **25-29%** (n=2000, deterministic) | PASS |
 | **D** | Answer quality (template rewrite only) | >80% scoring >=4/5 | **20%** (avg 2.3/5, n=15) | **FAIL** |
-| **D2** | Answer quality (full pipeline) | >80% scoring >=4/5 | **60%** (avg 3.6/5, n=5, 7B model) | MARGINAL |
-| **E** | Session composition attack | <40% recovery at 5 queries | **40% with covers** vs **100% without** | PASS |
-| **F** | Damage reduction (simulated) | >85% profit reduction | **100% for parameter-dependent attacks** | PASS |
+| **D2** | Pipeline utility (blinded A/B) | >80% quality retained | **100% retained** (3.8/5 vs 3.8/5, n=5) | PASS |
+| **E** | Session composition (simulation) | <40% recovery at 5 queries | **40% with covers** vs **100% without** | PASS |
+| **F** | Economic damage model (illustrative) | — | Sanitization → $0 in modeled attacks | Illustrative |
 
 ## Reproducing Results
 

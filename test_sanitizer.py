@@ -162,6 +162,24 @@ def test_broad_token_symbols():
     assert "800 PEPE" not in sanitize_query("How risky is it to LP 800 PEPE with ETH?")
     assert "1000 MATIC" not in sanitize_query("I staked 1000 MATIC on Lido")
 
+def test_mixed_case_defi_tokens():
+    """Modern DeFi tokens with mixed case should be stripped."""
+    assert "stETH" not in sanitize_query("I have 500 stETH staked")
+    assert "wstETH" not in sanitize_query("200 wstETH as collateral")
+    assert "cbETH" not in sanitize_query("Holding 100 cbETH on Coinbase")
+    assert "frxETH" not in sanitize_query("50 frxETH in the pool")
+    assert "USDC.e" not in sanitize_query("Bridged 500 USDC.e to Arbitrum")
+
+def test_no_erc_standard_destruction():
+    """ERC-20, ERC-721, etc. should not be mangled."""
+    r = sanitize_query("What is the ERC-20 token standard?")
+    assert "ERC" in r and "standard" in r, f"ERC standard destroyed: {r}"
+
+def test_no_short_position_doubling():
+    """'short positions' should not become 'position positions'."""
+    r = sanitize_query("How do short positions work?")
+    assert "position positions" not in r.lower(), f"Double position: {r}"
+
 def test_ens_names():
     """ENS names should be stripped."""
     result = sanitize_query("What happens if vitalik.eth moves funds into Aave?")
@@ -186,9 +204,12 @@ def test_known_limitation_semantic():
 
 def test_cardinal_numbers_with_tokens():
     """Bare cardinal + uppercase token should be stripped."""
-    assert "two ETH" not in sanitize_query("I have two ETH and want to sell").upper()
-    assert "three BTC" not in sanitize_query("I hold three BTC in cold storage").upper()
-    assert "fifty ARB" not in sanitize_query("fifty ARB tokens remaining").upper()
+    r = sanitize_query("I have two ETH and want to sell")
+    assert "two ETH" not in r and "two eth" not in r.lower(), f"Leaked: {r}"
+    r = sanitize_query("I hold three BTC in cold storage")
+    assert "three BTC" not in r and "three btc" not in r.lower(), f"Leaked: {r}"
+    r = sanitize_query("fifty ARB tokens remaining")
+    assert "fifty ARB" not in r and "fifty arb" not in r.lower(), f"Leaked: {r}"
 
 def test_cardinal_no_false_positives():
     """Cardinal + lowercase word should NOT be stripped."""

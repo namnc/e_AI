@@ -245,15 +245,16 @@ DOMAIN_ONTOLOGY = {
 _AMOUNT_PATTERNS_ICASE = [
     r'\$[\d,]+(?:\.\d+)?[KkMmBb]?',                    # $1,000, $1.5M
     r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of)\b',   # 1.8M worth, 500K of
-    r'[\d,]+(?:\.\d+)?\s*(?:tokens?|coins?)',
+    r'\b\d{2,}(?:,\d{3})*\s+(?:tokens?|coins?)\b',        # "1000 tokens" but not "ERC-20 token"
     r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
 ]
-# Amount + UPPERCASE token symbol — CASE SENSITIVE
-# The token part MUST be uppercase (3+ chars to avoid "2FA", "V3", "5G").
-# Single digit is allowed because "3 BTC" is a real amount.
+# Amount + token symbol — CASE SENSITIVE patterns
 _AMOUNT_PATTERNS_CSENSE = [
     r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{3,10}\b',           # 3 BTC, 500 ARB, 1.8M USDC — 3+ uppercase chars
-    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2}(?=\s|$)',          # 50 OP — requires space before 2-char symbol (avoids "2FA")
+    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2}(?=\s|$)',          # 50 OP — 2-char uppercase with space (avoids "2FA")
+    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:st|wst|cb|ez|we|frx|r)(?:ETH|USD|DAI|BTC)\b',  # stETH, wstETH, cbETH, ezETH, rETH, frxETH
+    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:USD|sUSD|sDAI|rlUSD|GHO)[a-z]*\b',  # USDe, sUSDe, sDAI, rlUSD
+    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2,10}\.[a-z]+\b',   # USDC.e, WETH.e — dotted bridged tokens
 ]
 _ADDRESS_PATTERN = r'0x[a-fA-F0-9]{3,}'
 _ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
@@ -308,7 +309,7 @@ _TIMING_PATTERNS = [
     r'\bright now\b', r'\bimmediately\b', r'\bASAP\b', r'\btoday\b', r'\btomorrow\b',
 ]
 _DIRECTIONAL_VERBS = {
-    'buy': 'modify', 'sell': 'modify', 'long': 'position', 'short': 'position',
+    'buy': 'modify', 'sell': 'modify', 'long': 'leveraged', 'short': 'leveraged',
     'close': 'modify', 'exit': 'modify', 'enter': 'modify',
     'unstake': 'modify', 'withdraw': 'modify',
 }
