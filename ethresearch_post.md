@@ -494,11 +494,12 @@ Without covers, the adversary identifies the user's strategy from the **very fir
 
 **Ethereum privacy**: Vitalik's privacy roadmap [19] identifies read privacy as critical but does not mention AI/LLMs. The Sharded PIR proposal [32] notes that "leaking what is being read can lead to frontrunning and other extractive MEV" — our work extends this observation to the AI query layer. While at least one ethresear.ch post has explored differential privacy in a DeFi context (e.g., "Differentially Private Uniswap in ETH2"), **no ethresear.ch posts address AI query privacy** — the leakage from user-to-LLM conversations before transacting.
 
-**Vitalik's local LLM setup** [21] advocates local inference for general privacy but does not connect it to Ethereum's privacy roadmap or MEV.
 
-**Privacy-preserving LLM interaction**: ConfusionPrompt [29] decomposes prompts with fake attributes. PPMI [30] uses Socratic CoT to keep private data local. Minions [31] achieves 97.9% of frontier accuracy with local data. We specialize these to DeFi with formal privacy framing.
+**PII/DLP sanitization for LLMs**: Enterprise tools already use regex + ML to strip personally identifiable information before LLM queries — Strac, LLM Guard, PrivacyScrubber, Nightfall, and Microsoft Azure Language Service all offer this pattern. The technique (regex as fast first pass, NER as second pass, pseudonymization with placeholders) is well-established. Our contribution is not the regex technique itself but its **domain-specific specialization for DeFi**: a pattern set targeting health factors, token quantities, leverage ratios, and wallet addresses — parameters whose leakage enables MEV extraction, not just identity theft. No existing DLP tool models DeFi-specific exploitability or generates cover queries for topic hiding.
 
-**Query obfuscation**: TrackMeNot [25] failed because cover queries were trivially distinguishable. We use LLMs for cover generation — the same capability that defeats AI-text detection works in our favor.
+**Query obfuscation**: TrackMeNot [25] failed because cover queries were trivially distinguishable. We use a deterministic template-matching algorithm — the same structural indistinguishability that makes AI-generated text hard to detect works in our favor.
+
+**Local LLM for privacy**: Vitalik's local LLM setup [21] advocates running models locally for general privacy. ConfusionPrompt [29], PPMI [30], and Minions [31] demonstrate that local-cloud hybrid architectures can preserve utility while keeping private data on-device (97.9% quality retention on FinanceBench). Our architecture follows this pattern but adds two elements: (1) a deterministic regex pre-filter that provides a hard security boundary independent of the local model's capability, and (2) cover queries for topic hiding beyond what local-only inference provides.
 
 **Differential privacy in blockchain**: Essentially absent. One paper applies verifiable DP to transaction amounts [33]. Dandelion++ [34] provides DP-like network anonymity. Our application to AI query privacy is novel.
 
