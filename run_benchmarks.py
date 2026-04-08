@@ -50,12 +50,12 @@ def extract_json(text: str) -> dict | list:
         except json.JSONDecodeError:
             pass
 
-    # Try finding first { or [ and matching
+    # Try finding first { or [ and matching — pick whichever appears first
+    candidates = []
     for start_char, end_char in [('{', '}'), ('[', ']')]:
         start = text.find(start_char)
         if start == -1:
             continue
-        # Find matching closing bracket
         depth = 0
         for i in range(start, len(text)):
             if text[i] == start_char:
@@ -64,9 +64,16 @@ def extract_json(text: str) -> dict | list:
                 depth -= 1
                 if depth == 0:
                     try:
-                        return json.loads(text[start:i+1])
+                        parsed = json.loads(text[start:i+1])
+                        candidates.append((start, parsed))
                     except json.JSONDecodeError:
-                        break
+                        pass
+                    break
+
+    if candidates:
+        # Return the match that appears earliest in the text
+        candidates.sort(key=lambda x: x[0])
+        return candidates[0][1]
 
     raise ValueError(f"No valid JSON found in response: {text[:200]}")
 
@@ -533,9 +540,10 @@ def benchmark_d2(n_samples: int = 5):
             # Step 1: Get direct answer (baseline — no privacy)
             direct_answer = call_llm(original_q, max_tokens=400)
 
-            # Step 2: Decompose into sub-queries (what the local LLM does)
+            # Step 2: Local LLM decomposes the FULL query (not pre-sanitized —
+            # the local model sees everything, which is the real pipeline)
             decomp_resp = call_llm(
-                f"Decompose this query:\n\n{sanitize_query(original_q)}",
+                f"Decompose this query:\n\n{original_q}",
                 system=DECOMPOSE_FOR_PIPELINE, max_tokens=300
             )
             sub_queries = extract_json(decomp_resp)
@@ -546,12 +554,16 @@ def benchmark_d2(n_samples: int = 5):
             for j, sq in enumerate(sub_queries):
                 print(f"    {j+1}. {sq[:80]}")
 
-            # Step 3: Generate covers for each sub-query and get cloud answers
+            # Step 3: For each sub-query, generate covers and send all k to cloud.
+            # We use the real sub-query's answer for synthesis (simulating that
+            # the orchestrator knows which response corresponds to the real query).
             sub_answers = []
-            for sq in sub_queries:
-                # In the real pipeline, covers would be sent too; here we just answer the real sub-query
-                answer = call_llm(sq, max_tokens=300)
-                sub_answers.append(answer)
+            for j, sq in enumerate(sub_queries):
+                cover_set, real_idx = generate_cover_set(sq, k=4, seed=42 + i * 10 + j, presanitized=True)
+                # Send all k queries to cloud (in real pipeline, via independent Tor circuits)
+                all_responses = [call_llm(cq, max_tokens=300) for cq in cover_set]
+                # Orchestrator picks the response to the real query
+                sub_answers.append(all_responses[real_idx])
 
             # Step 4: Synthesize using sub-answers + private params
             synthesis_prompt = (

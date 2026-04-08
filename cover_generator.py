@@ -521,8 +521,14 @@ def _generate(query, k, seed, domain_strategy, presanitized):
     if domain_strategy == "top4":
         available = [d for d in TOP_DOMAINS if d != real_domain]
         if real_domain not in TOP_DOMAINS:
-            available = TOP_DOMAINS[:3]
-        cover_domains = rng.sample(available, min(k - 1, len(available)))
+            available = list(TOP_DOMAINS)
+        # For k > len(available)+1, cycle through domains (with replacement)
+        if k - 1 <= len(available):
+            cover_domains = rng.sample(available, k - 1)
+        else:
+            cover_domains = []
+            for _ in range(k - 1):
+                cover_domains.append(rng.choice(available))
     elif domain_strategy == "weighted":
         available = {d: w for d, w in DOMAIN_DISTRIBUTION.items() if d != real_domain}
         domains = list(available.keys())
@@ -595,16 +601,48 @@ def generate_cover_set(
     domain_strategy: str = "top4",
     presanitized: bool = False,
 ) -> tuple[list[str], int]:
-    """Generate a set of k queries (1 real + k-1 covers), shuffled.
+    """Generate a set of k template-filled queries, shuffled.
+
+    IMPORTANT: The "real" query is NOT the original input. It is a
+    template fill using vocabulary from the input's domain. This is
+    by design — structural identity between real and cover queries is
+    required for indistinguishability. The original query text is NOT
+    preserved. Use generate_cover_set_with_original() if you need
+    both the covers and the original sanitized text.
 
     Uses a local RNG instance — does not mutate global random state.
 
     Returns:
         (shuffled_queries, real_index) where real_index is the position
-        of the real query in the shuffled list.
+        of the real-domain query in the shuffled list.
     """
     shuffled, real_index, _, _, _ = _generate(query, k, seed, domain_strategy, presanitized)
     return shuffled, real_index
+
+
+def generate_cover_set_with_original(
+    query: str,
+    k: int = 4,
+    seed: int | None = None,
+    domain_strategy: str = "top4",
+    presanitized: bool = False,
+) -> tuple[list[str], int, str]:
+    """Generate k template-filled cover queries + return the original sanitized query.
+
+    Use this when you need both:
+    - The cover set (for topic hiding — send all k to cloud)
+    - The original sanitized query (for Tier 0 — send directly to cloud)
+
+    WARNING: If you send the original query alongside template-filled covers,
+    the original is structurally distinguishable (Benchmark D showed 2.3/5
+    detection). Only send the original if you're NOT using covers.
+
+    Returns:
+        (shuffled_covers, real_index, original_sanitized)
+    """
+    sanitized = query if presanitized else sanitize_query(query)
+    shuffled, real_index, _, _, _ = _generate(query, k, seed, domain_strategy, presanitized)
+    return shuffled, real_index, sanitized
 
 
 def generate_cover_set_raw(
@@ -615,6 +653,9 @@ def generate_cover_set_raw(
     presanitized: bool = False,
 ) -> tuple[list[str], int, str, str, list[str]]:
     """Like generate_cover_set but also returns metadata for analysis.
+
+    NOTE: The "real" query at real_index is a template fill, not the
+    original input text. See generate_cover_set() docstring.
 
     Returns:
         (shuffled_queries, real_index, real_domain, template, cover_domains)

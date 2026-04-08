@@ -1,19 +1,22 @@
 #!/bin/bash
 # Run all benchmarks and print a summary table.
-# Usage: ./run_all.sh [--backend ollama|anthropic] [--model MODEL]
-#
-# Benchmark F and the classifier require no LLM backend.
-# Benchmarks A, B, C, D, E require either an API key or Ollama.
+# Usage:
+#   ./run_all.sh                              # non-LLM benchmarks only
+#   ./run_all.sh ollama qwen2.5:7b            # all benchmarks with Ollama
+#   ./run_all.sh anthropic claude-haiku-4-5    # all benchmarks with Anthropic
 
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
 
-BACKEND="${1:---backend}"
-if [ "$BACKEND" = "--backend" ]; then
-    BACKEND_ARG=""
-else
-    BACKEND_ARG="--backend $1 --model ${2:-qwen2.5:7b}"
-    shift 2 2>/dev/null || shift 1
+PYTHON="${PYTHON:-python3}"
+BACKEND_ARG=""
+
+if [ $# -ge 2 ]; then
+    BACKEND_ARG="--backend $1 --model $2"
+    echo "Backend: $1 | Model: $2"
+elif [ $# -eq 1 ]; then
+    BACKEND_ARG="--backend $1"
+    echo "Backend: $1 (default model)"
 fi
 
 echo "============================================"
@@ -22,42 +25,51 @@ echo "============================================"
 echo ""
 
 # Always run these (no LLM needed)
-echo ">>> Benchmark F (damage simulation — no LLM needed)"
-python run_benchmarks.py --benchmark F $BACKEND_ARG 2>&1 | tail -20
+echo ">>> Sanitizer unit tests"
+$PYTHON test_sanitizer.py
 echo ""
 
-echo ">>> Sanitizer unit tests"
-python test_sanitizer.py
+echo ">>> Sanitizer completeness audit"
+$PYTHON test_sanitizer_audit.py 2>&1 | tail -5
+echo ""
+
+echo ">>> Simulation F (economic damage model — no LLM needed)"
+$PYTHON run_benchmarks.py --benchmark F 2>&1 | tail -20
 echo ""
 
 echo ">>> Classifier validation (n=1000, no LLM needed)"
-python classifier_validation.py run --n-sets 1000 2>&1 | grep -A20 "CLASSIFIER VALIDATION"
+$PYTHON classifier_validation.py run --n-sets 1000 2>&1 | grep -A20 "CLASSIFIER VALIDATION" || true
 echo ""
 
 # LLM-dependent benchmarks
-if [ -n "$BACKEND_ARG" ] || [ -n "$ANTHROPIC_API_KEY" ]; then
+if [ -n "$BACKEND_ARG" ] || [ -n "${ANTHROPIC_API_KEY:-}" ]; then
     echo ">>> Benchmark A (sensitivity classification, n=50)"
-    python run_benchmarks.py --benchmark A --samples 50 $BACKEND_ARG 2>&1 | tail -10
+    $PYTHON run_benchmarks.py --benchmark A --samples 50 $BACKEND_ARG 2>&1 | tail -10
     echo ""
 
     echo ">>> Benchmark B (decomposition quality)"
-    python run_benchmarks.py --benchmark B $BACKEND_ARG 2>&1 | tail -8
+    $PYTHON run_benchmarks.py --benchmark B $BACKEND_ARG 2>&1 | tail -8
     echo ""
 
     echo ">>> Benchmark C v5 (cover indistinguishability, n=20)"
-    python run_benchmarks.py --benchmark C --cover-version v5 $BACKEND_ARG 2>&1 | tail -15
+    $PYTHON run_benchmarks.py --benchmark C --cover-version v5 $BACKEND_ARG 2>&1 | tail -15
     echo ""
 
-    echo ">>> Benchmark D (answer quality, n=15)"
-    python run_benchmarks.py --benchmark D --samples 15 $BACKEND_ARG 2>&1 | tail -10
+    echo ">>> Benchmark D (answer quality — template rewrite only, n=15)"
+    $PYTHON run_benchmarks.py --benchmark D --samples 15 $BACKEND_ARG 2>&1 | tail -10
     echo ""
 
-    echo ">>> Benchmark E (session composition)"
-    python run_benchmarks.py --benchmark E $BACKEND_ARG 2>&1 | tail -25
+    echo ">>> Benchmark D2 (full pipeline A/B, n=5)"
+    $PYTHON run_benchmarks.py --benchmark D2 --samples 5 $BACKEND_ARG 2>&1 | tail -10
+    echo ""
+
+    echo ">>> Simulation E (session composition)"
+    $PYTHON run_benchmarks.py --benchmark E $BACKEND_ARG 2>&1 | tail -25
     echo ""
 else
-    echo ">>> Skipping LLM-dependent benchmarks (A, B, C, D, E)"
-    echo "    Set ANTHROPIC_API_KEY or pass: ./run_all.sh ollama qwen2.5:7b"
+    echo ">>> Skipping LLM-dependent benchmarks (A, B, C, D, D2, E)"
+    echo "    Usage: ./run_all.sh ollama qwen2.5:7b"
+    echo "    Or set ANTHROPIC_API_KEY"
     echo ""
 fi
 
