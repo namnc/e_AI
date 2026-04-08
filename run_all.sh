@@ -38,7 +38,12 @@ $PYTHON run_benchmarks.py --benchmark F 2>&1 | tail -20
 echo ""
 
 echo ">>> Classifier validation (n=1000, no LLM needed)"
-$PYTHON classifier_validation.py run --n-sets 1000 2>&1 | grep -A20 "CLASSIFIER VALIDATION" || true
+if $PYTHON -c "import torch, transformers, sklearn" 2>/dev/null; then
+    $PYTHON classifier_validation.py run --n-sets 1000 2>&1 | grep -A20 "CLASSIFIER VALIDATION"
+else
+    echo "  SKIPPED: missing dependencies (torch, transformers, scikit-learn)"
+    echo "  Install with: pip install torch transformers scikit-learn"
+fi
 echo ""
 
 # LLM-dependent benchmarks

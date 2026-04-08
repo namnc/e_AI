@@ -554,16 +554,24 @@ def benchmark_d2(n_samples: int = 5):
             for j, sq in enumerate(sub_queries):
                 print(f"    {j+1}. {sq[:80]}")
 
-            # Step 3: For each sub-query, generate covers and send all k to cloud.
-            # We use the real sub-query's answer for synthesis (simulating that
-            # the orchestrator knows which response corresponds to the real query).
+            # Step 3: For each sub-query, mix it with k-1 covers and send
+            # all k queries with identical parameters. The orchestrator knows
+            # which position is real (it built the set) and keeps only that
+            # response for synthesis.
             sub_answers = []
             for j, sq in enumerate(sub_queries):
-                cover_set, real_idx = generate_cover_set(sq, k=4, seed=42 + i * 10 + j, presanitized=True)
-                # Send all k queries to cloud (in real pipeline, via independent Tor circuits)
-                all_responses = [call_llm(cq, max_tokens=300) for cq in cover_set]
-                # Orchestrator picks the response to the real query
-                sub_answers.append(all_responses[real_idx])
+                # Generate k-1 template-filled covers from other domains
+                cover_set, template_real_idx = generate_cover_set(sq, k=4, seed=42 + i * 10 + j, presanitized=True)
+                # Drop the template-filled "real" slot, keep only the k-1 covers.
+                # Insert the actual sub-query in its place.
+                covers_only = [q for idx_c, q in enumerate(cover_set) if idx_c != template_real_idx]
+                mixed = covers_only[:3] + [sq]  # 3 covers + 1 real = k=4
+                rng_mix = random.Random(42 + i * 10 + j)
+                rng_mix.shuffle(mixed)
+                real_pos = mixed.index(sq)
+                # Send all k with identical max_tokens (no side channel)
+                all_responses = [call_llm(q, max_tokens=300) for q in mixed]
+                sub_answers.append(all_responses[real_pos])
 
             # Step 4: Synthesize using sub-answers + private params
             synthesis_prompt = (

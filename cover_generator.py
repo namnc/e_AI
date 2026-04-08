@@ -536,15 +536,20 @@ def _generate(query, k, seed, domain_strategy, presanitized):
         total = sum(weights)
         weights = [w / total for w in weights]
         cover_domains = []
-        for _ in range(k - 1):
-            pick = rng.choices(domains, weights=weights, k=1)[0]
-            cover_domains.append(pick)
-            idx = domains.index(pick)
-            domains.pop(idx)
-            weights.pop(idx)
-            if domains:
-                total = sum(weights)
-                weights = [w / total for w in weights]
+        if k - 1 > len(domains):
+            # More covers than domains — sample with replacement
+            cover_domains = rng.choices(domains, weights=weights, k=k - 1)
+        else:
+            # Sample without replacement
+            for _ in range(k - 1):
+                pick = rng.choices(domains, weights=weights, k=1)[0]
+                cover_domains.append(pick)
+                idx = domains.index(pick)
+                domains.pop(idx)
+                weights.pop(idx)
+                if domains:
+                    total = sum(weights)
+                    weights = [w / total for w in weights]
     else:
         raise ValueError(f"Unknown strategy: {domain_strategy}")
 
