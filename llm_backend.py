@@ -50,6 +50,16 @@ def init_backend(backend: str = "anthropic", model: str | None = None):
     print(f"Backend: {backend} | Model: {_model}")
 
 
+def get_backend() -> str:
+    """Return the current backend name ('anthropic' or 'ollama')."""
+    return _backend
+
+
+def is_local() -> bool:
+    """Return True if the current backend is local (not sending data to a cloud API)."""
+    return _backend == "ollama"
+
+
 def call_llm(prompt: str, system: str = "", max_tokens: int = 1024) -> str:
     if _backend is None:
         raise RuntimeError("Call init_backend() first")

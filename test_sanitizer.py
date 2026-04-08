@@ -173,6 +173,7 @@ def test_known_limitation_semantic():
     """Purely semantic quantity references still bypass the sanitizer.
     These require true NLU, not pattern matching."""
     semantic = [
+        "about double what I started with",
         "more than I can afford to lose",
         "a whale-sized position",
     ]
@@ -183,10 +184,17 @@ def test_known_limitation_semantic():
             f"Surprisingly caught: '{phrase}' → '{result}'. Update test if filter improved."
         )
 
-def test_number_word_double_caught():
-    """'double' is a quantity word and should be caught by the number-word filter."""
-    result = sanitize_query("about double what I started with")
-    assert "double" not in result.lower()
+def test_cardinal_numbers_with_tokens():
+    """Bare cardinal + uppercase token should be stripped."""
+    assert "two ETH" not in sanitize_query("I have two ETH and want to sell").upper()
+    assert "three BTC" not in sanitize_query("I hold three BTC in cold storage").upper()
+    assert "fifty ARB" not in sanitize_query("fifty ARB tokens remaining").upper()
+
+def test_cardinal_no_false_positives():
+    """Cardinal + lowercase word should NOT be stripped."""
+    assert "two options" in sanitize_query("I have two options here")
+    assert "three ways" in sanitize_query("There are three ways to do this")
+    assert "five protocols" in sanitize_query("I checked five protocols")
 
 
 # ─────────────────────────────────────────────

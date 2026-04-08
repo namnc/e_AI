@@ -22,7 +22,7 @@ import re
 import time
 from pathlib import Path
 
-from llm_backend import init_backend, call_llm
+from llm_backend import init_backend, call_llm, get_backend, is_local
 from cover_generator import generate_cover_set, generate_cover_set_raw, sanitize_query
 from dataset import (
     SENSITIVE_QUERIES, NON_SENSITIVE_QUERIES, COMPLEX_QUERIES,
@@ -510,10 +510,27 @@ Respond naturally as if answering the user's original question directly."""
 
 
 def benchmark_d2(n_samples: int = 5):
-    """Full pipeline: decompose → cover → cloud → synthesize. Compare to direct query."""
+    """Pipeline utility measurement: decompose → covers → cloud → synthesize.
+
+    PRIVACY NOTE: In a real deployment, decomposition and synthesis run on a
+    LOCAL model (the user's private data never leaves the device). This
+    benchmark uses whatever backend is configured. If the backend is a cloud
+    API (anthropic), the benchmark measures UTILITY ONLY — it is NOT a
+    privacy-preserving execution because the original query and private
+    params are sent to the cloud during decomposition and synthesis.
+
+    For a privacy-valid measurement, run with --backend ollama.
+    """
     print("\n" + "=" * 60)
-    print("BENCHMARK D2: Full Pipeline End-to-End Quality")
+    print("BENCHMARK D2: Pipeline Utility Measurement")
     print("=" * 60)
+    if not is_local():
+        print(f"  WARNING: Backend is '{get_backend()}' (cloud). Decomposition and synthesis")
+        print(f"  send the original query and private params to the cloud API.")
+        print(f"  This measures UTILITY ONLY, not privacy. For a privacy-valid")
+        print(f"  run, use: --backend ollama --model <local-model>")
+    else:
+        print(f"  Backend is local ({get_backend()}). Privacy-valid execution.")
     print("  (decompose → covers → cloud answers → synthesize with private params)")
 
     # Use complex queries that have both the full query and known private params
@@ -545,24 +562,24 @@ def benchmark_d2(n_samples: int = 5):
             for j, sq in enumerate(sub_queries):
                 print(f"    {j+1}. {sq[:80]}")
 
-            # Step 3: For each sub-query, mix it with k-1 covers and send
-            # all k queries with identical parameters. The orchestrator knows
-            # which position is real (it built the set) and keeps only that
-            # response for synthesis.
+            # Step 3: For each sub-query, get the cloud's answer.
+            #
+            # UTILITY vs PRIVACY TRADEOFF (honestly documented):
+            # - For UTILITY (this benchmark): we send the original sub-query sq
+            #   to get the most relevant answer. This is structurally
+            #   distinguishable from template-filled covers.
+            # - For PRIVACY (Benchmark C): all k queries are template-filled,
+            #   achieving indistinguishability but degrading answer quality.
+            # - D2 measures utility. C measures privacy. They cannot both be
+            #   maximized simultaneously (Benchmark D showed 2.3/5 for the
+            #   privacy-optimal path).
+            #
+            # In a real deployment, the user chooses where on the tradeoff to
+            # sit. Here we measure the utility ceiling (original sub-queries).
             sub_answers = []
             for j, sq in enumerate(sub_queries):
-                # Generate k-1 template-filled covers from other domains
-                cover_set, template_real_idx = generate_cover_set(sq, k=4, seed=42 + i * 10 + j, presanitized=True)
-                # Drop the template-filled "real" slot, keep only the k-1 covers.
-                # Insert the actual sub-query in its place.
-                covers_only = [q for idx_c, q in enumerate(cover_set) if idx_c != template_real_idx]
-                mixed = covers_only[:3] + [sq]  # 3 covers + 1 real = k=4
-                rng_mix = random.Random(42 + i * 10 + j)
-                rng_mix.shuffle(mixed)
-                real_pos = mixed.index(sq)
-                # Send all k with identical max_tokens (no side channel)
-                all_responses = [call_llm(q, max_tokens=300) for q in mixed]
-                sub_answers.append(all_responses[real_pos])
+                answer = call_llm(sq, max_tokens=300)
+                sub_answers.append(answer)
 
             # Step 4: Synthesize using sub-answers + private params
             synthesis_prompt = (

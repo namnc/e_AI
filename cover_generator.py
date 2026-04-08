@@ -280,6 +280,16 @@ _NUMBER_WORD_PATTERNS = [
     r'\b(?:a\s+)?(?:few|couple|several|many)\s+(?:hundred|thousand|million)\s*(?:thousand|million|billion)?\s*(?:[A-Z]{2,10}|dollars|bucks|worth)?',
 ]
 
+# Cardinal number + UPPERCASE token symbol (case-sensitive for the token part).
+# Separate from _NUMBER_WORD_PATTERNS because those run with re.IGNORECASE.
+_CARDINAL_TOKEN_PATTERN = (
+    r'(?i:\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|'
+    r'thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|'
+    r'forty|fifty|sixty|seventy|eighty|ninety)\b)'
+    r'(?:\s+(?i:hundred|thousand|million|billion))*'
+    r'\s+[A-Z]{2,10}\b'
+)
+
 _EMOTIONAL_WORDS = [
     'worried', 'anxious', 'urgent', 'emergency', 'should I', 'scared',
     'nervous', 'panicking', 'desperate', 'afraid', 'concerned about',
@@ -309,11 +319,14 @@ def sanitize_query(query: str) -> str:
     # Remove natural language quantities (secondary NLP filter)
     for pat in _NUMBER_WORD_PATTERNS:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
+    # Cardinal number + UPPERCASE token (case-sensitive for token part)
+    result = re.sub(_CARDINAL_TOKEN_PATTERN, '', result)
     for word in _NUMBER_WORDS:
-        # Only strip number words when adjacent to financial context
+        # Only strip number words when followed by an UPPERCASE token symbol
+        # (not case-insensitive — avoids matching "two options", "three ways")
         result = re.sub(
-            rf'\b{re.escape(word)}\b\s*(?:[A-Z]{{2,10}}|dollars|bucks|worth|position|portfolio)',
-            '', result, flags=re.IGNORECASE
+            rf'(?i:\b{re.escape(word)}\b)\s*(?:[A-Z]{{2,10}}|dollars|bucks|worth|position|portfolio)',
+            '', result
         )
 
     # Remove ENS names (vitalik.eth, name.eth)
