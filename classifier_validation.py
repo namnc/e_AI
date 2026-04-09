@@ -178,7 +178,17 @@ def train_classifier(
     val_idx = [temp_idx[i] for i in val_idx_rel]
     test_idx = [temp_idx[i] for i in test_idx_rel]
 
+    # Deduplicate: remove test examples whose exact text appears in train
+    train_texts_set = {texts[i] for i in train_idx}
+    test_idx_clean = [i for i in test_idx if texts[i] not in train_texts_set]
+    val_idx_clean = [i for i in val_idx if texts[i] not in train_texts_set]
+    removed_test = len(test_idx) - len(test_idx_clean)
+    removed_val = len(val_idx) - len(val_idx_clean)
+    test_idx = test_idx_clean
+    val_idx = val_idx_clean
+
     print(f"Split: train={len(train_idx)}, val={len(val_idx)}, test={len(test_idx)}")
+    print(f"  Removed {removed_test} test + {removed_val} val examples with text overlap in train")
     print(f"  Train label distribution: {Counter(labels[i] for i in train_idx)}")
     print(f"  Test label distribution:  {Counter(labels[i] for i in test_idx)}")
 

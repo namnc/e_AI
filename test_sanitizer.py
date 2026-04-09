@@ -187,7 +187,8 @@ def test_version_token_pairs_not_destroyed():
 def test_no_erc_standard_destruction():
     """ERC-20, ERC-721, etc. should not be mangled."""
     r = sanitize_query("What is the ERC-20 token standard?")
-    assert "ERC" in r and "standard" in r, f"ERC standard destroyed: {r}"
+    assert "ERC-20" in r or "ERC- 20" in r or ("ERC" in r and "20" in r and "token" in r), f"ERC-20 token mangled: '{r}'"
+    assert "standard" in r, f"'standard' missing from: '{r}'"
 
 def test_no_short_position_doubling():
     """'short positions' should not become 'position positions'."""
@@ -200,6 +201,22 @@ def test_ens_names():
     assert "vitalik.eth" not in result
     result2 = sanitize_query("I sent tokens to myname.eth")
     assert "myname.eth" not in result2
+
+def test_lowercase_cardinal_tokens():
+    """Cardinal + lowercase known token should be stripped."""
+    assert "twenty eth" not in sanitize_query("I have twenty eth in my wallet").lower()
+    assert "two hundred eth" not in sanitize_query("I hold two hundred eth").lower()
+
+def test_worded_fractions_with_tokens():
+    """Fractions like 'half ETH', 'a quarter ETH' should be stripped."""
+    assert "half eth" not in sanitize_query("I have half ETH staked").lower()
+    assert "quarter eth" not in sanitize_query("a quarter ETH remaining").lower()
+    assert "half an eth" not in sanitize_query("just half an ETH left").lower()
+    assert "and a half btc" not in sanitize_query("three and a half btc").lower()
+
+def test_worded_decimal_with_token():
+    """'zero point five eth' should be stripped."""
+    assert "zero point five eth" not in sanitize_query("I have zero point five eth").lower()
 
 def test_known_limitation_semantic():
     """Purely semantic quantity references still bypass the sanitizer.

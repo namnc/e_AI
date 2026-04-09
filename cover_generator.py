@@ -245,7 +245,7 @@ DOMAIN_ONTOLOGY = {
 _AMOUNT_PATTERNS_ICASE = [
     r'\$[\d,]+(?:\.\d+)?[KkMmBb]?',                    # $1,000, $1.5M
     r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of)\b',   # 1.8M worth, 500K of
-    r'\b\d{2,}(?:,\d{3})*\s+(?:tokens?|coins?)\b',        # "1000 tokens" but not "ERC-20 token"
+    r'(?<![-])\b\d{2,}(?:,\d{3})*\s+(?:tokens?|coins?)\b',  # "1000 tokens" but not "ERC-20 token" (negative lookbehind for hyphen)
     r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
     r'\b\d+[eE]\d+\b',                                   # 1e6, 2e18 (scientific notation)
     r'\b\d+\s\d{3}(?:\s\d{3})*\b',                       # 1 000, 1 000 000 (space-separated thousands)
@@ -316,12 +316,27 @@ _CARDINAL_TOKEN_PATTERN = (
     r'(?:\s+(?i:hundred|thousand|million|billion))*'
     r'\s+[A-Z]{2,10}\b'
 )
+# Cardinal + known token (case-insensitive): "twenty eth", "two hundred eth"
+_CARDINAL_KNOWN_TOKEN = (
+    r'(?i:\b' + _CARDINALS + r'\b)'
+    r'(?:\s+(?i:hundred|thousand|million|billion))*'
+    r'\s+(?i:' + _KNOWN_TOKENS + r')\b'
+)
 # Worded percentages: "eighty percent", "five percent of my ETH"
 _WORDED_PERCENT_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+(?:percent|per\s*cent)\b'
 # Worded decimals: "one point two", "two point five"
 _WORDED_DECIMAL_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+point\s+(?i:' + _CARDINALS + r'|zero)\b'
-# "X and a half ETH"
-_WORDED_FRACTION_TOKEN = r'(?i:\b' + _CARDINALS + r')\s+and\s+a\s+half\s+[A-Z]{2,10}\b'
+# Fractions + token: "X and a half ETH", "half ETH", "quarter ETH", "half an ETH"
+_WORDED_FRACTION_TOKEN = (
+    r'(?i:(?:\b' + _CARDINALS + r'\s+and\s+)?'
+    r'(?:a\s+)?(?:half|quarter|third)(?:\s+(?:a|an))?\s+'
+    r'(?:' + _KNOWN_TOKENS + r'|[A-Z]{2,10}))\b'
+)
+# "zero point five eth"
+_WORDED_DECIMAL_TOKEN = (
+    r'(?i:\b(?:zero|' + _CARDINALS + r')\s+point\s+(?:' + _CARDINALS + r'|zero)\s+'
+    r'(?:' + _KNOWN_TOKENS + r'|[A-Z]{2,10}))\b'
+)
 
 _EMOTIONAL_WORDS = [
     'worried', 'anxious', 'urgent', 'emergency', 'should I', 'scared',
@@ -355,10 +370,12 @@ def sanitize_query(query: str) -> str:
     # Remove natural language quantities (secondary NLP filter)
     for pat in _NUMBER_WORD_PATTERNS:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
-    # Cardinal number + UPPERCASE token (case-sensitive for token part)
+    # Cardinal number + tokens (uppercase or known)
+    result = re.sub(_CARDINAL_KNOWN_TOKEN, '', result)
     result = re.sub(_CARDINAL_TOKEN_PATTERN, '', result)
     # Worded percentages, decimals, fractions
     result = re.sub(_WORDED_PERCENT_PATTERN, '', result)
+    result = re.sub(_WORDED_DECIMAL_TOKEN, '', result)
     result = re.sub(_WORDED_DECIMAL_PATTERN, '', result)
     result = re.sub(_WORDED_FRACTION_TOKEN, '', result)
     for word in _NUMBER_WORDS:

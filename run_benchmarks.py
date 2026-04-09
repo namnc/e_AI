@@ -131,18 +131,18 @@ def benchmark_a(n_samples: int = 20):
             results["errors"] += 1
             print(f"  ERROR [{i}]: {e}")
 
-    total = results["tp"] + results["fp"] + results["tn"] + results["fn"]
-    accuracy = (results["tp"] + results["tn"]) / total if total > 0 else 0
+    classified = results["tp"] + results["fp"] + results["tn"] + results["fn"]
+    total_attempts = classified + results["errors"]
+    accuracy = (results["tp"] + results["tn"]) / total_attempts if total_attempts > 0 else 0
     precision = results["tp"] / (results["tp"] + results["fp"]) if (results["tp"] + results["fp"]) > 0 else 0
     recall = results["tp"] / (results["tp"] + results["fn"]) if (results["tp"] + results["fn"]) > 0 else 0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
-    print(f"\nResults (n={total}):")
+    print(f"\nResults (n={total_attempts}, errors={results['errors']} counted as failures):")
     print(f"  Accuracy:  {accuracy:.1%}")
     print(f"  Precision: {precision:.1%}")
     print(f"  Recall:    {recall:.1%}")
     print(f"  F1:        {f1:.1%}")
-    print(f"  Errors:    {results['errors']}")
 
     return {**results, "accuracy": accuracy, "precision": precision, "recall": recall, "f1": f1}
 
@@ -218,10 +218,11 @@ def benchmark_b(n_samples: int = 10):
             results["errors"] += 1
             print(f"  ERROR: {e}")
 
-    leak_rate = results["leaked"] / results["total"] if results["total"] > 0 else 0
-    print(f"\nResults (n={results['total']}):")
-    print(f"  Clean decompositions: {results['no_leak']}/{results['total']} ({1-leak_rate:.0%})")
-    print(f"  Leaked params:        {results['leaked']}/{results['total']} ({leak_rate:.0%})")
+    total_attempts = results["total"] + results["errors"]
+    leak_rate = results["leaked"] / total_attempts if total_attempts > 0 else 0
+    print(f"\nResults (n={total_attempts}, errors={results['errors']} counted as failures):")
+    print(f"  Clean decompositions: {results['no_leak']}/{total_attempts} ({results['no_leak']/total_attempts:.0%})")
+    print(f"  Leaked/errored:       {results['leaked'] + results['errors']}/{total_attempts} ({leak_rate + results['errors']/total_attempts:.0%})")
     print(f"  Target: 0% leakage")
 
     return results
