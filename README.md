@@ -28,7 +28,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 | v2 | Tone-matched | **60%** | 2.4x above | Actionability |
 | v3 | Template-matched | **10%** | Below random | Template structure |
 | v4 | Template-matched, stronger adversary | **60%** | 2.4x above | (Domain prior re-emerged) |
-| v5 | Template + domain-distribution matched | **0%** | Below random | Domain prior |
+| v5 | Template + top-4 equiprobable domains | **0%** | Below random | Domain prior |
 
 **Root cause of failure**: Not a fundamental impossibility, but an engineering problem. Naive covers leak an "actionability" signal — real queries sound like "someone about to do something" while covers sound "educational." A stronger adversary can also exploit domain frequency priors (lending queries are more common than governance queries). When all four signals are eliminated via template + distribution matching, the adversary is reduced to random guessing.
 
@@ -40,7 +40,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 ├── requirements.txt
 ├── run_benchmarks.py            # Benchmark runner (Claude API or Ollama)
 ├── classifier_validation.py     # External DistilBERT classifier validation
-├── cover_generator.py           # v5 cover algorithm (template + distribution matching)
+├── cover_generator.py           # v5 cover algorithm (template + top-4 equiprobable domains)
 ├── llm_backend.py               # Backend abstraction (Anthropic API + Ollama)
 ├── dataset.py                   # Test vectors and session scenarios
 ├── test_sanitizer.py            # Unit tests for regex sanitizer (16 tests)
@@ -66,7 +66,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 │   ├── benchmark_c_v2.md        # v2 tone-matched (60% — FAIL)
 │   ├── benchmark_c_v3.md        # v3 template-matched (10% — PASS)
 │   ├── benchmark_c_v4.md        # v4 multi-strategy adversary (60% — FAIL)
-│   ├── benchmark_c_v5.md        # v5 distribution-matched (0% — PASS)
+│   ├── benchmark_c_v5.md        # v5 top-4 equiprobable (0% — PASS)
 │   ├── results.json             # Benchmark F damage simulation data
 │   └── classifier_results.json  # External classifier validation results
 └── analysis/

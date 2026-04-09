@@ -355,14 +355,20 @@ _EMOTIONAL_WORDS = [
     'worried', 'anxious', 'urgent', 'emergency', 'should I', 'scared',
     'nervous', 'panicking', 'desperate', 'afraid', 'concerned about',
 ]
+_DAYS = r'(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)'
+_MONTHS = r'(?:January|February|March|April|May|June|July|August|September|October|November|December)'
+_WORDED_NUMS = r'(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)'
+_TIME_UNITS = r'(?:hours?|days?|minutes?|weeks?|months?|years?)'
 _TIMING_PATTERNS = [
-    r'\b(?:by|on|before|after) (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
-    r'\b(?:by|on|before|after) (?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}\b',
-    r'\b(?:within|in) \d+ (?:hours?|days?|minutes?|weeks?|months?)\b',
-    r'\bbefore the (?:upgrade|fork|merge|vote|deadline|unlock|expiry)\b',
-    r'\bright now\b', r'\bimmediately\b', r'\bASAP\b', r'\btoday\b', r'\btomorrow\b',
-    r'\bnext (?:week|month|day|hour)\b',
+    rf'\b(?:by|on|before|after|next)\s+{_DAYS}\b',
+    rf'\b(?:by|on|before|after)\s+{_MONTHS}\s+\d{{1,2}}(?:st|nd|rd|th)?\b',
+    rf'\b(?:within|in)\s+\d+\s+{_TIME_UNITS}\b',
+    rf'\b(?:within|in)\s+{_WORDED_NUMS}\s+{_TIME_UNITS}\b',  # "in two days", "within two days"
+    r'\bbefore\s+(?:the\s+)?(?:upgrade|fork|merge|vote|deadline|unlock|expiry|migration)\b',
+    r'\bright now\b', r'\bimmediately\b', r'\bASAP\b', r'\btoday\b', r'\btomorrow\b', r'\byesterday\b',
+    rf'\bnext\s+(?:week|month|day|hour|{_DAYS})\b',  # "next Friday"
     r'\b(?:lock-?up|unlock|vesting)\s+(?:ends?|period)\s+in\s+\d+\s+\w+\b',
+    r'\b(?:by|before)\s+(?:end\s+of\s+)?(?:Q[1-4]|EOD|EOW|EOM|EOY)\b',
 ]
 _DIRECTIONAL_VERBS = {
     'buy': 'modify', 'sell': 'modify', 'long': 'leveraged', 'short': 'leveraged',
@@ -782,6 +788,10 @@ _PROTOCOL_NAMES = sorted([
     "Convex", "Morpho", "Radiant", "Spark", "Frax", "Swell",
     "BendDAO", "Blur", "OpenSea", "Across", "Stargate", "LayerZero",
     "Wormhole", "Orbiter", "Gnosis Safe",
+    "Blast", "Hyperliquid", "Camelot", "CoW Swap", "CoW Protocol",
+    "Trader Joe", "Aerodrome", "Velodrome", "Beefy", "Sommelier",
+    "Maple", "Goldfinch", "Centrifuge", "Ribbon", "Friktion",
+    "Orca", "Raydium", "Jupiter", "Drift", "Mango",
 ], key=len, reverse=True)
 
 
