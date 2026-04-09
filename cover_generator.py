@@ -247,16 +247,28 @@ _AMOUNT_PATTERNS_ICASE = [
     r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of)\b',   # 1.8M worth, 500K of
     r'(?<![-])\b\d{2,}(?:,\d{3})*\s+(?:tokens?|coins?)\b',  # "1000 tokens" but not "ERC-20 token" (negative lookbehind for hyphen)
     r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
-    r'\b\d+[eE]\d+\b',                                   # 1e6, 2e18 (scientific notation)
+    # (scientific notation handled separately in Pass 0 of sanitize_query)
     r'\b\d+\s\d{3}(?:\s\d{3})*\b',                       # 1 000, 1 000 000 (space-separated thousands)
 ]
-# Amount + token symbol — CASE SENSITIVE patterns
+# Amount + ANY token-like word — BROAD catch-all with exception carve-outs.
+# A "token-like word" is any word starting with a letter that contains at least
+# one uppercase letter and is 2-12 chars. This catches eETH, swETH, ankrETH,
+# pumpBTC, USD0, usdt0, etc. without needing an allowlist.
+# Known false positives (version strings, common words) are carved out.
+_FALSE_POSITIVE_WORDS = {
+    # Version strings
+    'V2', 'V3', 'V4', 'V5',
+    # Common words that happen to have uppercase
+    'DeFi', 'WiFi', 'IoT', 'API', 'SDK', 'CLI', 'GPU', 'CPU', 'RAM',
+    'TVL', 'APY', 'APR', 'ROI', 'NFT', 'DAO', 'DEX', 'AMM', 'MEV',
+    'FAQ', 'EVM', 'RPC', 'ABI', 'IDE',
+    # Time/measurement
+    'Hz', 'MB', 'GB', 'TB', 'KB',
+}
 _AMOUNT_PATTERNS_CSENSE = [
-    r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{3,10}\b',   # 3 BTC, 500 ARB — not V3 WBTC
-    r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2}(?=\s|$)', # 50 OP — not V2 XX
-    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:st|wst|cb|ez|we|frx|r)(?:ETH|USD|DAI|BTC)\b',  # stETH, wstETH, cbETH, ezETH, rETH, frxETH
-    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:USD|sUSD|sDAI|rlUSD|GHO)[a-z]*\b',  # USDe, sUSDe, sDAI, rlUSD
-    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2,10}\.[a-z]+\b',   # USDC.e, WETH.e — dotted bridged tokens
+    # Broad: number + token-like word (starts with letter, may contain digits like USD0/usdt0)
+    # Requires at least one uppercase letter somewhere. Negative lookbehind for V/v and hyphen.
+    r'(?<![Vv\-])[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?=[a-zA-Z0-9]*[A-Z])[a-zA-Z][a-zA-Z0-9]{1,11}(?:\.\w+)?\b',
 ]
 # Amount + KNOWN token symbol — CASE INSENSITIVE (catches "500 usdc", "1.8m eth")
 # This is a curated list of common DeFi tokens. Must be maintained as new tokens emerge.
@@ -265,7 +277,7 @@ _KNOWN_TOKENS = (
     r'matic|arb|op|pepe|shib|doge|avax|dot|atom|near|ftm|apt|sui|'
     r'steth|wsteth|cbeth|ezeth|weeth|frxeth|reth|rseth|meth|'
     r'usde|susde|sdai|gho|rlusd|susds|mkr|comp|snx|bal|yfi|'
-    r'pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|'
+    r'pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|usdt0|usd0|'
     r'usdc\.e|weth\.e|usdt\.e|dai\.e|wbtc\.e'  # bridged dotted tokens
 )
 _AMOUNT_KNOWN_TOKEN_PATTERN = (
@@ -326,10 +338,11 @@ _CARDINAL_KNOWN_TOKEN = (
 _WORDED_PERCENT_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+(?:percent|per\s*cent)\b'
 # Worded decimals: "one point two", "two point five"
 _WORDED_DECIMAL_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+point\s+(?i:' + _CARDINALS + r'|zero)\b'
-# Fractions + token: "X and a half ETH", "half ETH", "quarter ETH", "half an ETH"
+# Fractions + token: "X and a half ETH", "half ETH", "quarter ETH", "half an ETH",
+# "three quarters ETH", "quarter of an ETH"
 _WORDED_FRACTION_TOKEN = (
     r'(?i:(?:\b' + _CARDINALS + r'\s+and\s+)?'
-    r'(?:a\s+)?(?:half|quarter|third)(?:\s+(?:a|an))?\s+'
+    r'(?:a\s+)?(?:half|quarter|third|three\s+quarters?)(?:\s+(?:a|an|of\s+a|of\s+an))?\s+'
     r'(?:' + _KNOWN_TOKENS + r'|[A-Z]{2,10}))\b'
 )
 # "zero point five eth"
@@ -392,15 +405,23 @@ def sanitize_query(query: str) -> str:
     # Remove hex addresses
     result = re.sub(_ADDRESS_PATTERN, '', result)
 
-    # Remove amounts: three passes with different case handling.
+    # Remove amounts: four passes with different case handling.
+    # Pass 0: scientific notation + trailing token (must run first — "1e6 usdc")
+    result = re.sub(r'\b\d+(?:\.\d+)?[eE][+-]?\d+\s*\w*\b', '', result, flags=re.IGNORECASE)
     # Pass 1: case-insensitive known DeFi tokens (catches "500 usdc", "1.8m eth")
     result = re.sub(_AMOUNT_KNOWN_TOKEN_PATTERN, '', result, flags=re.IGNORECASE)
     # Pass 2: case-insensitive dollar amounts and suffixed numbers
     for pat in _AMOUNT_PATTERNS_ICASE:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
-    # Pass 3: case-sensitive uppercase symbols (catches novel tokens not in known list)
+    # Pass 3: broad token-like word matching (catches novel tokens not in known list)
+    # Uses a callback to skip known false positives (V3, DeFi, FAQ, etc.)
+    def _strip_unless_fp(m):
+        word = m.group().split()[-1]  # the token-like word
+        if word in _FALSE_POSITIVE_WORDS:
+            return m.group()  # preserve
+        return ''  # strip
     for pat in _AMOUNT_PATTERNS_CSENSE:
-        result = re.sub(pat, '', result)  # NO re.IGNORECASE — token must be uppercase
+        result = re.sub(pat, _strip_unless_fp, result)
 
     # Remove health factor values
     result = re.sub(_HF_PATTERN, 'health factor', result, flags=re.IGNORECASE)
