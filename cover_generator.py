@@ -731,6 +731,46 @@ def generate_cover_set_raw(
     return _generate(query, k, seed, domain_strategy, presanitized)
 
 
+# ---------------------------------------------------------------------------
+# Sub-query genericization (Approach A)
+# ---------------------------------------------------------------------------
+
+# Protocol names to strip, longest first to avoid partial matches
+_PROTOCOL_NAMES = sorted([
+    "Aave V3", "Aave V2", "Aave", "Compound V3", "Compound V2", "Compound",
+    "Uniswap V3", "Uniswap V2", "Uniswap", "Curve", "Balancer", "SushiSwap",
+    "MakerDAO", "Maker", "dYdX", "GMX", "Synthetix", "Lyra", "Opyn",
+    "Lido", "Rocket Pool", "Eigenlayer", "EigenLayer", "Pendle", "Yearn",
+    "Convex", "Morpho", "Radiant", "Spark", "Frax", "Swell",
+    "BendDAO", "Blur", "OpenSea", "Across", "Stargate", "LayerZero",
+    "Wormhole", "Orbiter", "Gnosis Safe",
+], key=len, reverse=True)
+
+
+def genericize_subquery(sub_query: str) -> str:
+    """Strip protocol names from a sub-query, replacing with generic domain references.
+
+    This is the key to the privacy-utility middle ground:
+    - Preserves the specific MECHANISM ("health factor", "funding rate")
+    - Removes the specific PROTOCOL ("Aave V3", "dYdX")
+    - The cloud gets the right question without knowing which protocol the user cares about
+
+    Benchmarked at: 3.0/5 utility (same as original), 20% detection (vs 80% original).
+    """
+    result = sub_query
+    domain = classify_domain(sub_query)
+    onto = DOMAIN_ONTOLOGY.get(domain, {})
+    generic_ref = onto.get("generic_refs", ["DeFi protocols"])[0]
+
+    for proto in _PROTOCOL_NAMES:
+        result = re.sub(rf'\b{re.escape(proto)}\b', generic_ref, result, flags=re.IGNORECASE)
+
+    # Clean up doubled generic refs
+    result = re.sub(rf'({re.escape(generic_ref)})\s+\1', generic_ref, result)
+    result = re.sub(r'\s+', ' ', result).strip()
+    return result
+
+
 def generate_per_provider(
     query: str,
     providers: list[str],

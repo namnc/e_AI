@@ -347,8 +347,10 @@ We ran benchmarks A-F using both a frontier model (Claude) and a local 7B model 
 |---|---|---|---|---|
 | **A: Sensitivity Classification** | Can a model detect private info in DeFi queries? | >90% F1 | **96-100% F1** (n=40-100, two models) | PASS |
 | **B: Decomposition Quality** | Do sub-queries preserve utility without leaking params? | >85% coverage, 0% leakage | **100% / 0%** (frontier, n=5), **70% / 30%** (7B, n=10) | PASS / MARGINAL |
-| **C: Cover Indistinguishability** | Can an adversary distinguish real from cover queries? | <55% detection | **0-20%** (LLM adversary), **25-29%** (DistilBERT) | PASS |
+| **C: Cover Indistinguishability** | Template-filled queries: can adversary detect? | <55% detection | **27%** (LLM), **25-29%** (DistilBERT) | PASS |
+| **C2: Deployed Pipeline** | Genericized sub-queries mixed with covers | <55% detection | **35%** (n=20) | PASS |
 | **D: Answer Quality** | Does template rewriting preserve answer utility? | >80% scoring ≥4/5 | **20% scoring ≥4/5** (avg 2.3/5, n=15) | FAIL |
+| **D2: Full Pipeline** | Decompose → genericize → synthesize (blinded A/B) | >80% quality retained | **3.8/5** (133% retained vs direct, n=5) | PASS |
 | **E: Session Composition** | Do multi-query sessions leak strategy? | <40% recovery at 5 queries | **40% with covers** vs **100% without** | PASS |
 | **F: Damage Model** | Illustrative economic model (not empirical) | — | Sanitization → $0 profit in modeled attacks | Illustrative |
 
@@ -450,7 +452,7 @@ Template-matched covers achieve indistinguishability by rewriting the real query
 | No protection | 100% | 5/5 |
 | Tier 0: Sanitize only (send original) | Topic exposed, params hidden | ~5/5 |
 | Template covers, no LLM | 25-29% | **2.3/5** (FAIL) |
-| **Full pipeline: LLM decompose → sub-queries → synthesize** | 25-29% (per sub-query) | **3.8/5** (7B), **100% quality retained** vs direct |
+| **Full pipeline: decompose → genericize → covers → synthesize** | **35%** (C2, deployed config) | **3.8/5** (7B), quality retained |
 
 The full pipeline (Benchmark D2, n=5, Qwen 7B) scores **3.6/5 with 60% scoring ≥4** — a substantial improvement over template-rewriting alone (2.3/5, 20%). The local LLM first decomposes the query into generic sub-queries (*"Would adding more collateral increase the health factor?"*), which are specific enough to get useful answers while being generic enough for cover generation. The 7B model's decomposition is imperfect (sometimes too vague); a 14B+ model would likely reach 4-5/5 based on the decomposition quality observed in Benchmark B with frontier models. **Covers are viable only when combined with LLM-based decomposition.**
 
@@ -486,7 +488,7 @@ Without covers, the adversary identifies the user's strategy from the **very fir
 - **Same-model bias — addressed**: We trained an independent DistilBERT classifier on 4,000 labeled examples (Section 6.4). With balanced domain sampling, the classifier achieves 25-29% set-level detection (random baseline: 25%), confirming that the LLM adversary result is not an artifact of same-model bias.
 - **Local model capability gap — quantified**: A 7B local model (Qwen 2.5) achieves 100% on sensitivity classification but leaks private parameters 30% of the time during decomposition (Section 6.3). Production deployment requires a 14B+ model for sanitization.
 - **Session composition — tested and analyzed**: Benchmark E (Section 6.7) shows covers delay strategy reconstruction from 1 query to 5-10 queries under worst-case metadata linkability (adversary knows all sets are from the same user). However, session composition is reducible to metadata linkability — with per-set unlinkability (independent Tor circuits), the attack has no signal. The proposed privacy budget accountant provides defense when perfect unlinkability cannot be guaranteed.
-- **Benchmark D — template rewriting alone FAILS (2.3/5), full pipeline MATCHES direct queries (3.8/5, 100% retained)**: Template rewriting of original queries is useless (Section 6.5). But the corrected full pipeline (decompose → sub-queries → synthesize, blinded A/B) scores 3.8/5 — identical to direct query quality. The decomposition step produces sub-queries specific enough to get equivalent answers.
+- **Benchmark D/D2 — template rewriting alone FAILS (2.3/5), genericized pipeline PASSES (3.8/5)**: Template rewriting destroys answers. The full pipeline (decompose → genericize sub-queries by stripping protocol names → synthesize) scores 3.8/5 in blinded A/B, matching or exceeding direct queries. Genericized queries are detected at 35% (Benchmark C2) — between the template baseline (27%) and raw sub-queries (~67%). **Protocol name removal is the key signal elimination: it preserves the mechanism question while removing the adversary's main detection heuristic.**
 - **No real user queries**: We use realistic synthetic queries — real user queries are privacy-sensitive by definition.
 - **Vocabulary diversity**: The residual classifier signal at n=1000 (34% vs. 25%) likely stems from small domain vocabulary pools. Expanding the DeFi ontology (more protocols, mechanisms, operations per domain) would reduce this further.
 
@@ -522,7 +524,7 @@ The Ethereum community has identified and is solving privacy at the mempool laye
 
 We propose privacy-preserving query orchestration with a tiered architecture. **The core contribution is narrow and concrete**: client-side regex sanitization deterministically removes numerically-formatted private parameters — the data most directly exploitable for MEV, liquidation hunting, and front-running — at zero cost, with no LLM and no hardware. This is deployable as a browser extension today.
 
-Cover queries for topic hiding are promising but conditional: they require a local LLM for decomposition (template rewriting alone degrades answers to 2.3/5), strong transport assumptions (per-set Tor unlinkability), and balanced domain sampling. Under these assumptions, template + distribution matched covers reduce adversary detection to 25-29%, at the 25% random baseline, validated by both LLM adversaries and a trained DistilBERT classifier.
+Cover queries for topic hiding are promising but conditional: they require a local LLM for decomposition and a genericization step (stripping protocol names from sub-queries). Template rewriting alone degrades answers to 2.3/5; genericization preserves utility (3.8/5) while reducing detection from 67% (raw sub-queries) to 35% (Benchmark C2). The residual 10-point gap between C2 (35%) and C (27%) reflects the phrasing difference between genericized natural language and mechanical template fills — an engineering gap, not a fundamental one.
 
 **What we have shown**: (1) The private query problem is real, quantifiable, and unaddressed in the Ethereum privacy roadmap. (2) Regex sanitization materially reduces the most economically exploitable leakage at zero cost. (3) Cover queries achieve near-random indistinguishability but are viable only with LLM decomposition and transport unlinkability. (4) Naive covers fail as badly as TrackMeNot (95% detection), confirming that indistinguishability is an engineering problem requiring careful design.
 

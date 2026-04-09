@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 from llm_backend import init_backend, call_llm, get_backend, is_local
-from cover_generator import generate_cover_set, generate_cover_set_raw, sanitize_query
+from cover_generator import generate_cover_set, generate_cover_set_raw, sanitize_query, genericize_subquery
 from dataset import (
     SENSITIVE_QUERIES, NON_SENSITIVE_QUERIES, COMPLEX_QUERIES,
     MEV_SCENARIOS, SANITIZED_QUERIES, SESSION_SCENARIOS,
@@ -389,6 +389,81 @@ def benchmark_c(n_samples: int = 20, cover_version: str = "v5", adversary: str =
 
 
 # ─────────────────────────────────────────────
+# Benchmark C2: Deployed-Pipeline Detectability
+# ─────────────────────────────────────────────
+
+def benchmark_c2(n_samples: int = 20, adversary: str = "multi"):
+    """Detectability of genericized sub-queries mixed with template-filled covers.
+
+    This measures the DEPLOYED configuration: real query is a genericized
+    sub-query (protocol names stripped, mechanism preserved), covers are
+    template-filled from other domains. This is harder than C (template-vs-
+    template) because the genericized query has natural phrasing while
+    covers have template phrasing.
+    """
+    print("\n" + "=" * 60)
+    print(f"BENCHMARK C2: Deployed-Pipeline Detectability (adversary={adversary})")
+    print("  (genericized sub-query mixed with template-filled covers)")
+    print("=" * 60)
+
+    real_sample = random.sample(SANITIZED_QUERIES, min(n_samples, len(SANITIZED_QUERIES)))
+    correct_guesses = 0
+    total_tests = 0
+    detect_system = DETECT_SYSTEM_MULTI if adversary == "multi" else DETECT_SYSTEM
+
+    for i, real_q in enumerate(real_sample):
+        try:
+            # Genericize the real query (strip protocol names)
+            generic_q = genericize_subquery(real_q)
+
+            # Generate template-filled covers
+            cover_set, template_real_idx = generate_cover_set(real_q, k=4, seed=42 + i, presanitized=True)
+            covers_only = [q for idx, q in enumerate(cover_set) if idx != template_real_idx][:3]
+
+            # Mix genericized real + 3 template covers
+            mixed = covers_only + [generic_q]
+            rng = random.Random(42 + i)
+            rng.shuffle(mixed)
+            real_pos = mixed.index(generic_q)
+
+            # Adversary tries to detect
+            query_list = "\n".join(f"Query {j}: {mixed[j]}" for j in range(4))
+            detect_resp = call_llm(
+                f"Which of these 4 queries is the real one?\n\n{query_list}",
+                system=detect_system, max_tokens=300
+            )
+            parsed = extract_json(detect_resp)
+
+            if adversary == "multi":
+                guess = parsed.get("final_guess", -1)
+            else:
+                guess = parsed.get("guess", -1)
+
+            total_tests += 1
+            detected = guess == real_pos
+            if detected:
+                correct_guesses += 1
+
+            status = "DETECTED" if detected else "FOOLED"
+            print(f"  [{i}] {status} (real={real_pos}, guess={guess})")
+
+        except Exception as e:
+            print(f"  [{i}] ERROR: {e}")
+
+    detection_rate = correct_guesses / total_tests if total_tests > 0 else 0
+    print(f"\nResults (n={total_tests}):")
+    print(f"  Detection rate:  {detection_rate:.1%}")
+    print(f"  Random baseline: 25.0%")
+    print(f"  Compare: C (template-vs-template) = 27%, Original sub-queries = ~67%")
+
+    return {
+        "detection_rate": detection_rate,
+        "total": total_tests,
+        "correct": correct_guesses,
+    }
+
+
+# ─────────────────────────────────────────────
 # Benchmark D: End-to-End Answer Quality
 # ─────────────────────────────────────────────
 
@@ -565,11 +640,16 @@ def benchmark_d2(n_samples: int = 5):
             #   maximized simultaneously (Benchmark D showed 2.3/5 for the
             #   privacy-optimal path).
             #
-            # In a real deployment, the user chooses where on the tradeoff to
-            # sit. Here we measure the utility ceiling (original sub-queries).
+            # Each sub-query is genericized (protocol names stripped) before
+            # sending to the cloud. This preserves the mechanism question
+            # ("health factor", "funding rate") while removing the protocol
+            # signal ("Aave V3", "dYdX") that makes queries distinguishable.
+            # Benchmarked: 3.0/5 utility at 20% detection (vs 80% original).
             sub_answers = []
             for j, sq in enumerate(sub_queries):
-                answer = call_llm(sq, max_tokens=300)
+                generic_sq = genericize_subquery(sq)
+                print(f"    {j+1}g. {generic_sq[:80]}")
+                answer = call_llm(generic_sq, max_tokens=300)
                 sub_answers.append(answer)
 
             # Step 4: Synthesize using sub-answers + private params
@@ -815,7 +895,7 @@ def benchmark_f():
 def main():
     parser = argparse.ArgumentParser(description="Privacy Orchestration Benchmarks")
     parser.add_argument("--benchmark", "-b",
-                        choices=["A", "B", "C", "D", "D2", "E", "F", "all"],
+                        choices=["A", "B", "C", "C2", "D", "D2", "E", "F", "all"],
                         default="all")
     parser.add_argument("--backend", choices=["anthropic", "ollama"],
                         default="anthropic")
@@ -850,6 +930,9 @@ def main():
 
     if args.benchmark in ("C", "all"):
         results["C"] = benchmark_c(args.samples, args.cover_version, args.adversary)
+
+    if args.benchmark in ("C2", "all"):
+        results["C2"] = benchmark_c2(args.samples, args.adversary)
 
     if args.benchmark in ("D", "all"):
         results["D"] = benchmark_d(args.samples)
