@@ -1,7 +1,35 @@
 {
-  "C2": {
-    "detection_rate": 0.35,
-    "total": 20,
-    "correct": 7
+  "D2": {
+    "avg_direct": 3.6,
+    "avg_pipeline": 3.8,
+    "avg_retained": 1.1,
+    "n": 5,
+    "details": [
+      {
+        "direct_score": 2,
+        "pipeline_score": 3,
+        "quality_retained": 1.5
+      },
+      {
+        "direct_score": 4,
+        "pipeline_score": 4,
+        "quality_retained": 1.0
+      },
+      {
+        "direct_score": 4,
+        "pipeline_score": 4,
+        "quality_retained": 1.0
+      },
+      {
+        "direct_score": 4,
+        "pipeline_score": 4,
+        "quality_retained": 1.0
+      },
+      {
+        "direct_score": 4,
+        "pipeline_score": 4,
+        "quality_retained": 1.0
+      }
+    ]
   }
 }
