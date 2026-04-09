@@ -1,18 +1,34 @@
 # Sanitizer Coverage: What's Caught, What's Not, and Recommended Filters
 
-## What the Regex Sanitizer Catches (0% false negatives)
+## Input Normalization (runs first)
 
-All numerically-formatted parameters are deterministically removed:
+Before any regex matching, the sanitizer normalizes input:
+- **NFKC Unicode normalization**: fullwidth digits → ASCII (１．１５ → 1.15)
+- **Zero-width character stripping**: U+200B, U+200C, U+200D, U+FEFF, soft hyphens
+- **Joined token splitting**: `125ETH` → `125 ETH`, `500usdc` → `500 usdc` (lowercase after digit)
+- **Separator normalization**: `125-ETH`, `125/ETH` → `125 ETH`
 
-| Pattern | Examples | Regex |
+This fixes an entire class of bypasses (Unicode variants, format tricks) at the source.
+
+## What the Regex Sanitizer Catches
+
+Parameters are stripped in four passes: (1) addresses/ENS before normalization, (2) known tokens case-insensitive, (3) dollar/magnitude patterns, (4) broad token-like-word matching.
+
+| Pattern | Examples | Notes |
 |---|---|---|
-| Dollar amounts | $1,000 / $1.5M / $500K | `\$[\d,]+(\.\d+)?[KMB]?` |
-| Token quantities | 500 ETH / 1.8M USDC / 10,000 AAVE | `[\d,]+(\.\d+)?[KMB]?\s*(ETH\|BTC\|...)` |
-| Wallet addresses | 0x742d...f2bD / 0xdead...beef | `0x[a-fA-F0-9]{3,}` |
-| Percentages | 10% / 3.5% / 65% | `\d+(\.\d+)?%` |
-| Health factor values | HF is 1.15 / health factor: 1.08 | `(health factor\|HF)\s*(is\|of\|at)?\s*\d+` |
-| Leverage ratios | 5x / 10x | `\d+x` |
-| Comma-formatted numbers | 1,000 / 10,000,000 | `\d{1,3}(,\d{3})+` |
+| Dollar amounts | $1,000 / $1.5M / $500K | Case-insensitive |
+| Known token quantities | 500 ETH / 1.8M usdc / 200 arb / 500 stETH | ~60 curated tokens, case-insensitive |
+| Novel token quantities | 500 eETH / 200 pumpBTC / 100 USD0 | Broad pattern: number + word with uppercase |
+| Crypto-suffix tokens | 500 pumpbtc / 200 ankreth | Lowercase words ending in btc/eth/usd/sol/etc. |
+| Wallet addresses | 0x742d... / 0XABC... / bc1q... / cosmos1... / Solana base58 | EVM, Bitcoin, Cosmos, Solana |
+| ENS names | vitalik.eth / myname.eth | Stripped before normalization |
+| Percentages | 10% / 3.5% / 65% | |
+| Health factor values | HF is 1.15 / health factor: 1.08 | |
+| Leverage ratios | 5x / 5X / 5× | Including Unicode multiplication sign |
+| Scientific notation | 1e6 / 1.5e6 / 5e-2 / 2E18 | Including trailing token |
+| Bare magnitudes | 500k / 2m / 1.5m | Standalone K/M/B suffixes |
+| Space-separated thousands | 1 000 / 1 000 000 | |
+| Comma-formatted numbers | 1,000 / 10,000,000 | |
 | Timing references | by Friday / within 48 hours / tomorrow | keyword list |
 | Emotional language | worried / anxious / emergency | keyword list |
 | Qualitative descriptors | underwater / close to liquidation | keyword list |

@@ -4,14 +4,14 @@
 
 When DeFi users consult cloud LLMs before transacting, they leak intent, strategy, portfolio context, and reasoning to the provider — two steps earlier than RPC reads, with orders of magnitude richer information. We call this the **Private Query Problem**.
 
-We propose a **tiered architecture**: a regex sanitizer (browser extension, $0) deterministically removes numeric private parameters — the most directly exploitable data. Adding topic hiding via cover queries requires a local LLM for decomposition ($200-500/yr) and strong transport assumptions (per-query-set unlinkability).
+We propose a **tiered architecture**: a regex sanitizer (browser extension, $0) strips numeric private parameters — the data that makes intent economically actionable. Even when intent/topic leaks, stripping params reduces adversary profit to ~$0 for >99% of users because attacks require specific parameters to size and target. Adding topic hiding via cover queries requires a local LLM ($200-500/yr) and transport assumptions.
 
 ### At a Glance
 
 | Tier | What | Hardware | Cost/yr | Privacy | Assumptions |
 |---|---|---|---|---|---|
-| **0: Sanitize** | Regex strips numeric params | Browser extension | **$0** | Deterministic param removal | Regex covers the param format |
-| **1: Full pipeline** | + LLM decompose + covers | Mac Mini 14B+ | **$200-500** | + topic hiding (25-34%) | + per-set Tor unlinkability |
+| **0: Sanitize** | Regex strips params + input normalization | Browser extension | **$0** | Params removed (~$0 adversary profit) | Regex covers the param format |
+| **1: Full pipeline** | + LLM decompose + genericize + covers | Mac Mini 14B+ | **$200-500** | + topic hiding (40% detection) | + per-set Tor unlinkability |
 
 This repository contains:
 - **`ethresearch_post.md`** — the main ethresear.ch post (Part 1)
@@ -78,14 +78,14 @@ Cover query indistinguishability depends critically on the generation strategy. 
 
 | Benchmark | What It Tests | Target | Result | Verdict |
 |---|---|---|---|---|
-| **A** | Sensitivity classification | >90% F1 | **96-100% F1** (n=100, 7B + frontier) | PASS |
-| **B** | Decomposition quality | >85% coverage, 0% leakage | **100%/0%** (frontier), **70%/30%** (7B) | PASS/MARGINAL |
-| **C** | Template indistinguishability | <55% detection | **27%** (LLM), **25-29%** (DistilBERT) | PASS |
-| **C2** | Deployed-pipeline detectability | <55% detection | **35%** (genericized sub-queries, n=20) | PASS |
+| **A** | Sensitivity classification | >90% F1 | **97% F1** (n=100, Qwen 7B) | PASS |
+| **B** | Decomposition quality (string-match only) | >85% coverage, 0% leakage | **100%/0%** (frontier), **70%/30%** (7B) | PASS/MARGINAL |
+| **C** | Template indistinguishability | <55% detection | **20%** (LLM), **AUC 0.507** (DistilBERT) | PASS |
+| **C2** | Deployed-pipeline detectability | <55% detection | **40%** (genericized sub-queries, n=20) | MARGINAL |
 | **D** | Answer quality (template rewrite only) | >80% scoring >=4/5 | **20%** (avg 2.3/5, n=15) | **FAIL** |
-| **D2** | Full pipeline (genericized, blinded A/B) | >80% quality retained | **3.8/5** (133% retained, n=5) | PASS |
-| **E** | Session composition (simulation) | <40% recovery at 5 queries | **40% with covers** vs **100% without** | PASS |
-| **F** | Economic damage model (illustrative) | — | Sanitization → $0 in modeled attacks | Illustrative |
+| **D2** | Full pipeline (genericized, blinded A/B) | >80% quality retained | **3.8/5** (128% retained vs direct, n=5) | PASS |
+| **E** | Session composition (simulation) | <40% recovery at 5 queries | **20-60% with covers** vs **100% without** | MARGINAL |
+| **F** | Economic damage model (illustrative) | — | Sanitization → ~$0 for param-dependent attacks | Illustrative |
 
 ## Reproducing Results
 
@@ -123,14 +123,15 @@ The `results/*.md` files contain earlier in-conversation results generated with 
 
 **This is a research prototype, not an audit-complete privacy tool.**
 
-- **Classifier validation is partially external**: DistilBERT trains on data from the same `cover_generator` — it tests whether a second model exploits this generator's artifacts, not robustness against truly external distributions or human adversaries
-- **Benchmark B leakage detection is string-matching only**: Misses paraphrases ("large position"), abstractions ("near liquidation"), and derived disclosures. A stronger detector (NER, entailment-based) is needed
-- **Benchmarks E and F are simulations, not attack benchmarks**: E assumes per-set unlinkability (best case). F hard-codes adversary profit reduction from k=4 as 75% — an assumption, not a measurement
-- **Benchmark D2 is a blinded A/B comparison** (direct vs pipeline answer, randomized order, same judge). Previous versions had a methodological bug where the direct answer was unused
+- **Sanitizer coverage is format-bounded**: Input normalization handles Unicode bypasses and joined tokens, but the completeness audit covers 14 base symbols. Novel tokens not in the known-token list and not matching the broad pattern (all-lowercase, no crypto suffix) can leak. Natural-language quantities ("three quarters of my portfolio") and semantic leakage ("near liquidation") are not caught
+- **C2 at 40% (15 points above random)**: The deployed pipeline is more detectable than template-filled sets (C at 20%) because genericized sub-queries retain natural phrasing that differs from template-filled covers. This is an engineering gap, not a fundamental one
+- **Classifier validation is partially external**: DistilBERT trains on data from the same `cover_generator` (AUC 0.507, effectively random). Train/test text overlap is removed but the generator artifacts are shared
+- **Benchmark B uses string-matching only**: Misses paraphrases, abstractions, and derived disclosures. "0% leakage" means no exact-string copies, not no semantic leakage
+- **Benchmarks E and F are simulations**: E assumes per-set unlinkability (best case). F models param-dependent attacks only — topic-only attacks not modeled
+- **D2 uses same model for answering and judging** (blinded A/B, n=5). D2 refuses cloud backends by default (requires ALLOW_CLOUD_D2=1 to override)
 - **Local model capability gap**: 7B models leak private parameters 30% during decomposition. Need 14B+ for production
-- **Small sample sizes**: n=5-40 per benchmark — larger-scale validation needed
-- **No real user queries**: 216-query synthetic benchmark includes forum-sourced phrasings but has not been validated by independent DeFi users. Real DeFi position queries are inherently private (0.004% hit rate in 1M WildChat conversations)
-- **Requirements pinned to exact versions** for reproducibility. Results may differ with other package versions or LLM backends
+- **Small sample sizes**: n=5-20 for most benchmarks. Directionally correct but not statistically robust
+- **No real user queries**: 216-query synthetic benchmark. Real DeFi position queries are inherently private (0.004% hit rate in 1M WildChat conversations)
 
 ## Contributing
 

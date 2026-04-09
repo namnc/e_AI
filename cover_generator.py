@@ -284,7 +284,7 @@ _KNOWN_TOKENS = (
     r'usdc\.e|weth\.e|usdt\.e|dai\.e|wbtc\.e'  # bridged dotted tokens
 )
 _AMOUNT_KNOWN_TOKEN_PATTERN = (
-    r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:' + _KNOWN_TOKENS + r')\b'  # negative lookbehind for V/v (version numbers)
+    r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s*(?:' + _KNOWN_TOKENS + r')\b'  # \s* allows joined: 500OP, 500usdc
 )
 
 _ADDRESS_PATTERNS = [
@@ -391,9 +391,46 @@ _QUALITATIVE = [
 ]
 
 
+def _normalize_input(text: str) -> str:
+    """Canonicalize input before regex matching.
+
+    Fixes an entire class of bypasses: zero-width chars, fullwidth digits,
+    joined number-token patterns (125ETH), and separator variants (125-ETH).
+    """
+    import unicodedata
+    # NFKC normalization: fullwidth → ASCII, compatibility decomposition
+    text = unicodedata.normalize('NFKC', text)
+    # Strip zero-width and invisible Unicode characters
+    text = re.sub(r'[\u200b\u200c\u200d\u2060\ufeff\u00ad]', '', text)
+    # Strip other control characters (except newline/tab)
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    # Insert space between digit and letter when joined: 125eth → 125 eth, 500usdc → 500 usdc
+    # Only lowercase after digit — preserves 2FA, 3D, 5G, V3
+    # For uppercase: 125ETH → 125 ETH (digit followed by 3+ uppercase, preserving 2FA)
+    text = re.sub(r'(\d)([a-z])', r'\1 \2', text)
+    text = re.sub(r'(\d)([A-Z]{3,})', r'\1 \2', text)
+    # Insert space between letter and digit in some contexts: ETH500 stays, but normalize separators
+    # Normalize common separators between numbers and tokens: 125-ETH, 125/ETH → 125 ETH
+    text = re.sub(r'(\d)\s*[-/]\s*([a-zA-Z]{2,})', r'\1 \2', text)
+    # Collapse multiple spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
 def sanitize_query(query: str) -> str:
     """Strip private parameters, emotional language, timing, and qualitative descriptors."""
+    # Step 0a: Strip blockchain addresses BEFORE normalization
+    # (normalization inserts spaces in base58/bech32 addresses, breaking the patterns)
     result = query
+    # First strip zero-width chars so addresses aren't split by invisible chars
+    result = re.sub(r'[\u200b\u200c\u200d\u2060\ufeff\u00ad]', '', result)
+    for pat in _ADDRESS_PATTERNS:
+        result = re.sub(pat, '', result)
+    # Also strip ENS names before normalization
+    result = re.sub(_ENS_PATTERN, '', result)
+
+    # Step 0b: Normalize remaining input (fixes Unicode bypasses, joined tokens)
+    result = _normalize_input(result)
 
     # Remove natural language quantities (secondary NLP filter)
     for pat in _NUMBER_WORD_PATTERNS:
@@ -414,12 +451,7 @@ def sanitize_query(query: str) -> str:
             '', result
         )
 
-    # Remove ENS names (vitalik.eth, name.eth)
-    result = re.sub(_ENS_PATTERN, '', result)
-
-    # Remove blockchain addresses (EVM, Bitcoin, Solana, Cosmos)
-    for pat in _ADDRESS_PATTERNS:
-        result = re.sub(pat, '', result)
+    # (addresses and ENS names already stripped in Step 0a)
 
     # Remove amounts: four passes with different case handling.
     # Pass 0: scientific notation + trailing token (must run first — "1e6 usdc")

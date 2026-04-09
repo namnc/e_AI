@@ -243,6 +243,26 @@ def test_genericize_missing_protocols():
     r = genericize_subquery("Want to use Instadapp to migrate my Aave V2 position to Aave V3")
     assert "Instadapp" not in r, f"Instadapp leaked: {r}"
 
+def test_joined_number_token():
+    """125ETH, 125.0ETH — no space between number and token."""
+    assert "125" not in sanitize_query("I have 125ETH in my wallet")
+    assert "125.0" not in sanitize_query("I have 125.0ETH staked")
+
+def test_separator_variants():
+    """125-ETH, 125/ETH — separator between number and token."""
+    assert "125" not in sanitize_query("I hold 125-ETH on Aave")
+    assert "125" not in sanitize_query("I hold 125/ETH on Aave")
+
+def test_zero_width_chars():
+    """Zero-width characters should not bypass sanitization."""
+    assert "500" not in sanitize_query("I have 500\u200bETH staked")
+    assert "0x742d" not in sanitize_query("Address 0x742d\u200b35Cc6634C0532925a3b844Bc")
+
+def test_fullwidth_digits():
+    """Fullwidth digits (Unicode) should be normalized and caught."""
+    # fullwidth 1.15 = \uff11\uff0e\uff11\uff15
+    assert "1.15" not in sanitize_query("health factor \uff11\uff0e\uff11\uff15 on Aave")
+
 def test_known_limitation_semantic():
     """Purely semantic quantity references still bypass the sanitizer.
     These require true NLU, not pattern matching."""

@@ -1,16 +1,16 @@
 {
-  "roc_auc": 0.5368907407407407,
-  "accuracy": 0.75,
+  "roc_auc": 0.5072755711441842,
+  "accuracy": 0.727433628318584,
   "precision": 0.0,
   "recall": 0.0,
   "f1": 0.0,
-  "set_level_accuracy": 0.29333333333333333,
-  "set_level_n": 300,
+  "set_level_accuracy": 0.36363636363636365,
+  "set_level_n": 154,
   "per_domain_auc": {
-    "derivatives": 0.6029652686762779,
-    "dex": 0.5638730408551381,
-    "lending": 0.5208138173302107,
-    "staking": 0.4765327695560254
+    "derivatives": 0.4998670212765957,
+    "dex": 0.5491452991452992,
+    "lending": 0.5166666666666667,
+    "staking": 0.49585365853658536
   },
-  "n_test_examples": 1200
+  "n_test_examples": 565
 }

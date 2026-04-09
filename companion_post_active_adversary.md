@@ -2,7 +2,7 @@
 
 ## Abstract
 
-In [Part 1](ethresearch_post.md) we introduced the Private Query Problem and proposed a tiered architecture: regex sanitization (deterministic parameter removal, $0) plus optional cover queries with local LLM decomposition (topic hiding under transport assumptions, $200-500/yr). Part 1 assumed a **semi-honest** adversary: the cloud observes queries but responds correctly.
+In [Part 1](ethresearch_post.md) we introduced the Private Query Problem and proposed a tiered architecture: regex sanitization with input normalization (parameter removal, $0) plus optional cover queries with local LLM decomposition and genericization (topic hiding under transport assumptions, $200-500/yr). Part 1 showed that even when intent/topic leaks, stripping private parameters reduces adversary profit to ~$0 for >99% of users because attacks require specific parameters to size and target. Part 1 assumed a **semi-honest** adversary: the cloud observes queries but responds correctly.
 
 This companion post extends the threat model to **actively malicious** cloud providers that manipulate responses, fingerprint queries, or inject canary tokens. We analyze five attack classes and survey practical defenses: GPU TEEs for model attestation, cross-provider verification for response correctness, and challenge-response testing for uniform treatment. We also sketch — as a **research agenda, not a completed reduction** — how on-chain staking and supply chain verification could provide cryptoeconomic accountability. The individual components exist today; composing them into a protocol is future work.
 
@@ -238,7 +238,7 @@ The semi-honest threat model from Part 1 is a starting point, not a complete sol
 
 The deeper contribution is the **accountability framework**: TEE attestation provides non-repudiability, on-chain staking provides economic penalties, and open-weight models enable full supply chain verification. Together, these give DeFi users the same security properties that regulated brokers provide — but enforced by cryptoeconomics rather than law.
 
-The gap between "possible" and "deployed" is protocol composition. Every component exists. Building the protocol that composes them — for privacy-preserving, verifiable, accountable AI inference serving DeFi users — is the next step.
+The gap between "possible" and "deployed" is protocol composition. Recent work on composable primitives makes this increasingly concrete: Crapis & Buterin's ZK API Usage Credits [Part 1, Ref 36] provide anonymous metered payment, Shih et al.'s zk-promises [Part 1, Ref 37] enable anonymous reputation and moderation via stateful anonymous credentials with callbacks, and our work provides query content privacy. Together these form a three-layer privacy stack: anonymous identity (zk-promises) + anonymous payment (ZK API Credits) + anonymous content (this work). Every component exists. Composing them into a single protocol is the next step.
 
 ---
 

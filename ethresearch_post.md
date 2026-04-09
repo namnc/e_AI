@@ -278,9 +278,20 @@ The local 32B model decomposes Alice's query into:
 
 **Decomposition (Mechanism 3, requires local LLM)** [measured]: Breaks complex queries into generic sub-queries, enabling cover queries that preserve answer quality. Also prevents strategy reconstruction from multi-turn conversations. **Cost: $200-500/year (local hardware amortization + API).**
 
-**What does topic hiding (Mechanism 2) actually prevent beyond sanitization?** For the three main parameter-dependent attacks (front-running, liquidation hunting, strategy theft), sanitization alone reduces adversary profit to $0 because these attacks require specific parameters to execute. Topic-only knowledge (e.g., "someone asked about Aave health factors") has near-zero marginal value because: (1) liquidation bots already monitor all positions regardless of LLM queries; (2) swap front-running requires trade size and direction, not just the topic; (3) strategy theft requires the full multi-step plan, not just the domain. The exception is **unique position identification**: if only 3-5 positions match a narrow topic, the topic alone can deanonymize the user, enabling targeted attacks. This affects <1% of users (those with rare or very large positions) but the potential damage is high. **Covers protect this tail risk** — they prevent the adversary from learning even the topic, at the cost of requiring a local LLM ($200-500/year).
+**Why sanitization is valuable even when topic/intent leaks.** A critical question: if the adversary discovers the user's intent (e.g., knows they're asking about Aave health factors), does stripping parameters still help? **Yes — parameters are what make intent actionable.**
 
-**The minimum viable product is a $0 browser extension** running Mechanism 1 (regex sanitization). For >99% of users, this is sufficient. Adding topic hiding via covers (Mechanisms 2+3, ~$200-500/year) protects the <1% with unique positions and prevents session-level strategy reconstruction.
+The analogy is payment for order flow (PFOF), worth ~$4.9B/year to market makers. PFOF is valuable because it reveals *exact* trade parameters — size, direction, price, timing. If brokers only sold "someone wants to trade something," the signal would be nearly worthless. Our sanitizer performs exactly this transformation: it converts the rich, monetizable signal (exact position parameters) into the vague, unactionable signal (someone has a DeFi position).
+
+| Attack | With params (unprotected) | With topic only (sanitized) | Why params matter |
+|---|---|---|---|
+| Liquidation hunting | $45K-$175K: target specific wallet, pre-position at exact threshold | **~$0**: bots already monitor all positions; one more "Aave HF" query adds no targeting ability | Can't calculate liquidation price without HF, collateral, debt |
+| Swap front-running | $50-$100K: size the front-run to the trade | **~$0**: "someone asked about DEX routing" describes millions of users | Can't size a front-run without knowing trade amount and direction |
+| Strategy theft | $10K-$1M: replicate exact multi-step plan | **~$0**: "interested in leverage" describes the entire degen DeFi population | Can't replicate without the specific combination of protocols, ratios, triggers |
+| On-chain correlation | Identify wallet + profit from all above | **Identify wallet but ~$0 profit**: still can't size the attack | Position SIZE determines if it's worth attacking (1 ETH vs 1,000 ETH) |
+
+The exception is **unique position identification** (<1% of users): if only 3-5 positions match a narrow topic, the topic alone can deanonymize the user. Covers protect this tail risk. But even in that case, the adversary still cannot determine position SIZE from the topic, limiting their ability to justify the capital commitment for an attack.
+
+**The minimum viable product is a $0 browser extension** running Mechanism 1 (regex sanitization). For >99% of users, this eliminates the monetizable signal. Adding topic hiding via covers (Mechanisms 2+3, ~$200-500/year) protects the <1% tail and prevents session-level strategy reconstruction.
 
 ### Latency Profile
 
@@ -288,7 +299,7 @@ We measured each pipeline stage on commodity hardware (Apple M-series, Qwen 2.5 
 
 | Stage | Latency (M1 Pro, warm) | Notes |
 |---|---|---|
-| Regex sanitization | **4 ms** | Zero perceptible delay |
+| Regex sanitization (with normalization) | **0.2 ms** | NFKC + zero-width strip + regex passes |
 | Cover generation (k=4) | **0.2 ms** | Deterministic Python, no LLM |
 | Local 7B decomposition | **~23 s** | Bottleneck; hardware-dependent (see below) |
 | Cloud calls (k=4, parallel) | **~2 s** (API) / **~18 s** (local) | Parallel via independent circuits |

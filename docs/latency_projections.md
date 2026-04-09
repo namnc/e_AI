@@ -4,7 +4,7 @@
 
 | Stage | Latency | Tokens |
 |---|---|---|
-| Regex sanitization | 4 ms | — |
+| Regex sanitization (with normalization) | 0.2 ms | Unicode normalization + regex passes |
 | Cover generation (k=4) | 0.2 ms | — |
 | Local decomposition | 23 s | ~200 tok out @ 8.7 tok/s |
 | Cloud API (Haiku, parallel) | 2 s | ~200 tok out |
