@@ -50,30 +50,21 @@ def extract_json(text: str) -> dict | list:
         except json.JSONDecodeError:
             pass
 
-    # Try finding first { or [ and matching — pick whichever appears first
-    candidates = []
-    for start_char, end_char in [('{', '}'), ('[', ']')]:
-        start = text.find(start_char)
-        if start == -1:
-            continue
-        depth = 0
-        for i in range(start, len(text)):
-            if text[i] == start_char:
-                depth += 1
-            elif text[i] == end_char:
-                depth -= 1
-                if depth == 0:
-                    try:
-                        parsed = json.loads(text[start:i+1])
-                        candidates.append((start, parsed))
-                    except json.JSONDecodeError:
-                        pass
-                    break
+    # Scan for JSON objects/arrays using raw_decode (handles strings with braces correctly)
+    decoder = json.JSONDecoder()
+    best = None
+    for i, ch in enumerate(text):
+        if ch in ('{', '['):
+            try:
+                obj, end = decoder.raw_decode(text, i)
+                if best is None or i < best[0]:
+                    best = (i, obj)
+                break  # take the first valid match
+            except json.JSONDecodeError:
+                continue
 
-    if candidates:
-        # Return the match that appears earliest in the text
-        candidates.sort(key=lambda x: x[0])
-        return candidates[0][1]
+    if best is not None:
+        return best[1]
 
     raise ValueError(f"No valid JSON found in response: {text[:200]}")
 

@@ -247,6 +247,8 @@ _AMOUNT_PATTERNS_ICASE = [
     r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of)\b',   # 1.8M worth, 500K of
     r'\b\d{2,}(?:,\d{3})*\s+(?:tokens?|coins?)\b',        # "1000 tokens" but not "ERC-20 token"
     r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
+    r'\b\d+[eE]\d+\b',                                   # 1e6, 2e18 (scientific notation)
+    r'\b\d+\s\d{3}(?:\s\d{3})*\b',                       # 1 000, 1 000 000 (space-separated thousands)
 ]
 # Amount + token symbol — CASE SENSITIVE patterns
 _AMOUNT_PATTERNS_CSENSE = [
@@ -256,11 +258,11 @@ _AMOUNT_PATTERNS_CSENSE = [
     r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:USD|sUSD|sDAI|rlUSD|GHO)[a-z]*\b',  # USDe, sUSDe, sDAI, rlUSD
     r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2,10}\.[a-z]+\b',   # USDC.e, WETH.e — dotted bridged tokens
 ]
-_ADDRESS_PATTERN = r'0x[a-fA-F0-9]{3,}'
+_ADDRESS_PATTERN = r'0[xX][a-fA-F0-9]{3,}'  # both 0x and 0X
 _ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
 _PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%'
 _HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*\d+(?:\.\d+)?'
-_LEVERAGE_PATTERN = r'\b\d+x\b'
+_LEVERAGE_PATTERN = r'\b\d+[xX×](?=\s|$|\b)'  # 5x, 5X, 5× (× is non-word, so \b doesn't work after it)
 
 # Natural language quantity patterns (secondary NLP filter)
 _NUMBER_WORDS = [
@@ -290,13 +292,22 @@ _NUMBER_WORD_PATTERNS = [
 
 # Cardinal number + UPPERCASE token symbol (case-sensitive for the token part).
 # Separate from _NUMBER_WORD_PATTERNS because those run with re.IGNORECASE.
-_CARDINAL_TOKEN_PATTERN = (
-    r'(?i:\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|'
+_CARDINALS = (
+    r'(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|'
     r'thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|'
-    r'forty|fifty|sixty|seventy|eighty|ninety)\b)'
+    r'forty|fifty|sixty|seventy|eighty|ninety)'
+)
+_CARDINAL_TOKEN_PATTERN = (
+    r'(?i:\b' + _CARDINALS + r'\b)'
     r'(?:\s+(?i:hundred|thousand|million|billion))*'
     r'\s+[A-Z]{2,10}\b'
 )
+# Worded percentages: "eighty percent", "five percent of my ETH"
+_WORDED_PERCENT_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+(?:percent|per\s*cent)\b'
+# Worded decimals: "one point two", "two point five"
+_WORDED_DECIMAL_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+point\s+(?i:' + _CARDINALS + r'|zero)\b'
+# "X and a half ETH"
+_WORDED_FRACTION_TOKEN = r'(?i:\b' + _CARDINALS + r')\s+and\s+a\s+half\s+[A-Z]{2,10}\b'
 
 _EMOTIONAL_WORDS = [
     'worried', 'anxious', 'urgent', 'emergency', 'should I', 'scared',
@@ -329,6 +340,10 @@ def sanitize_query(query: str) -> str:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
     # Cardinal number + UPPERCASE token (case-sensitive for token part)
     result = re.sub(_CARDINAL_TOKEN_PATTERN, '', result)
+    # Worded percentages, decimals, fractions
+    result = re.sub(_WORDED_PERCENT_PATTERN, '', result)
+    result = re.sub(_WORDED_DECIMAL_PATTERN, '', result)
+    result = re.sub(_WORDED_FRACTION_TOKEN, '', result)
     for word in _NUMBER_WORDS:
         # Only strip number words when followed by an UPPERCASE token symbol
         # (not case-insensitive — avoids matching "two options", "three ways")
