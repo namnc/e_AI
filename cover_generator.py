@@ -244,7 +244,8 @@ DOMAIN_ONTOLOGY = {
 # Amount patterns applied with re.IGNORECASE (safe for these patterns)
 _AMOUNT_PATTERNS_ICASE = [
     r'\$[\d,]+(?:\.\d+)?[KkMmBb]?',                    # $1,000, $1.5M
-    r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of)\b',   # 1.8M worth, 500K of
+    r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of|notional|exposure)\b',  # 1.8M worth, 500K of, 1.5m notional
+    r'\b\d+(?:\.\d+)?[KkMmBb]\b',                       # bare 500k, 2m, 1.5m (standalone magnitude)
     r'(?<![-])\b\d{2,}(?:,\d{3})*\s+(?:tokens?|coins?)\b',  # "1000 tokens" but not "ERC-20 token" (negative lookbehind for hyphen)
     r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
     # (scientific notation handled separately in Pass 0 of sanitize_query)
@@ -269,6 +270,8 @@ _AMOUNT_PATTERNS_CSENSE = [
     # Broad: number + token-like word (starts with letter, may contain digits like USD0/usdt0)
     # Requires at least one uppercase letter somewhere. Negative lookbehind for V/v and hyphen.
     r'(?<![Vv\-])[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?=[a-zA-Z0-9]*[A-Z])[a-zA-Z][a-zA-Z0-9]{1,11}(?:\.\w+)?\b',
+    # Lowercase tokens ending in crypto suffixes: pumpbtc, wsteth, ankrbtc, etc.
+    r'(?<![Vv\-])[\d,]+(?:\.\d+)?[KkMmBb]?\s+\w*(?:btc|eth|usd[a-z]*|dai|sol|bnb|avax|matic)\b',
 ]
 # Amount + KNOWN token symbol — CASE INSENSITIVE (catches "500 usdc", "1.8m eth")
 # This is a curated list of common DeFi tokens. Must be maintained as new tokens emerge.
@@ -284,7 +287,13 @@ _AMOUNT_KNOWN_TOKEN_PATTERN = (
     r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:' + _KNOWN_TOKENS + r')\b'  # negative lookbehind for V/v (version numbers)
 )
 
-_ADDRESS_PATTERN = r'0[xX][a-fA-F0-9]{3,}'  # both 0x and 0X
+_ADDRESS_PATTERNS = [
+    r'0[xX][a-fA-F0-9]{3,}',                              # EVM: 0x742d...
+    r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b',               # Bitcoin legacy (P2PKH/P2SH)
+    r'\bbc1[a-zA-HJ-NP-Z0-9]{25,90}\b',                   # Bitcoin bech32
+    r'\b(?:cosmos|osmo|terra|inj|sei|dydx)1[a-z0-9]{38,58}\b',  # Cosmos ecosystem
+    r'\b[1-9A-HJ-NP-Za-km-z]{32,44}\b',                   # Solana base58 (broad — may FP on long words)
+]
 _ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
 _PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%'
 _HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*\d+(?:\.\d+)?'
@@ -408,8 +417,9 @@ def sanitize_query(query: str) -> str:
     # Remove ENS names (vitalik.eth, name.eth)
     result = re.sub(_ENS_PATTERN, '', result)
 
-    # Remove hex addresses
-    result = re.sub(_ADDRESS_PATTERN, '', result)
+    # Remove blockchain addresses (EVM, Bitcoin, Solana, Cosmos)
+    for pat in _ADDRESS_PATTERNS:
+        result = re.sub(pat, '', result)
 
     # Remove amounts: four passes with different case handling.
     # Pass 0: scientific notation + trailing token (must run first — "1e6 usdc")
@@ -792,6 +802,8 @@ _PROTOCOL_NAMES = sorted([
     "Trader Joe", "Aerodrome", "Velodrome", "Beefy", "Sommelier",
     "Maple", "Goldfinch", "Centrifuge", "Ribbon", "Friktion",
     "Orca", "Raydium", "Jupiter", "Drift", "Mango",
+    "Instadapp", "DeFi Saver", "Gearbox", "Kamino", "Jito", "Meteora",
+    "Flashbots", "MEV Blocker", "Chainlink", "Pyth", "RedStone",
 ], key=len, reverse=True)
 
 

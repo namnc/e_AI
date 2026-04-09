@@ -592,10 +592,14 @@ def benchmark_d2(n_samples: int = 5):
     print("BENCHMARK D2: Pipeline Utility Measurement")
     print("=" * 60)
     if not is_local():
-        print(f"  WARNING: Backend is '{get_backend()}' (cloud). Decomposition and synthesis")
-        print(f"  send the original query and private params to the cloud API.")
-        print(f"  This measures UTILITY ONLY, not privacy. For a privacy-valid")
-        print(f"  run, use: --backend ollama --model <local-model>")
+        print(f"  ERROR: Backend is '{get_backend()}' (cloud). D2 sends the original")
+        print(f"  query and private params during decomposition and synthesis.")
+        print(f"  Refusing to run — use: --backend ollama --model <local-model>")
+        print(f"  Or set ALLOW_CLOUD_D2=1 to override (utility-only measurement).")
+        import os
+        if not os.environ.get("ALLOW_CLOUD_D2"):
+            return {}
+        print(f"  ALLOW_CLOUD_D2 set — running in utility-only mode.")
     else:
         print(f"  Backend is local ({get_backend()}). Privacy-valid execution.")
     print("  (decompose → covers → cloud answers → synthesize with private params)")

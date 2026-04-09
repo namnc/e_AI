@@ -218,6 +218,31 @@ def test_worded_decimal_with_token():
     """'zero point five eth' should be stripped."""
     assert "zero point five eth" not in sanitize_query("I have zero point five eth").lower()
 
+def test_bare_magnitude_suffixes():
+    """Bare 500k, 2m, 1.5m without $ or token should be stripped."""
+    assert "500k" not in sanitize_query("Should I split 500k between protocols?").lower()
+    assert "2m" not in sanitize_query("I have 2m in DeFi positions").lower()
+    assert "1.5m notional" not in sanitize_query("1.5m notional exposure").lower()
+
+def test_lowercase_novel_tokens():
+    """All-lowercase novel tokens should be caught by broad pattern."""
+    assert "pumpbtc" not in sanitize_query("I hold 500 pumpbtc in my wallet").lower()
+
+def test_non_evm_addresses():
+    """Solana, Bitcoin, Cosmos addresses should be stripped."""
+    # Solana base58 (32-44 chars, alphanumeric, no 0/O/I/l)
+    assert "9xQeWvG816" not in sanitize_query("My Solana wallet 9xQeWvG816bUx9EPjHmaT23yvVMiS9Wn3QPa7mK7iTs has funds")
+    # Bitcoin bech32
+    assert "bc1q" not in sanitize_query("Send to bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4")
+    # Cosmos
+    assert "cosmos1" not in sanitize_query("My Cosmos wallet cosmos1fl48vsnmsdzcv85q5d2q4z5ajdha8yu34mf0eh")
+
+def test_genericize_missing_protocols():
+    """Protocols not in the hardcoded list should ideally be caught."""
+    from cover_generator import genericize_subquery
+    r = genericize_subquery("Want to use Instadapp to migrate my Aave V2 position to Aave V3")
+    assert "Instadapp" not in r, f"Instadapp leaked: {r}"
+
 def test_known_limitation_semantic():
     """Purely semantic quantity references still bypass the sanitizer.
     These require true NLU, not pattern matching."""
