@@ -170,6 +170,20 @@ def test_mixed_case_defi_tokens():
     assert "frxETH" not in sanitize_query("50 frxETH in the pool")
     assert "USDC.e" not in sanitize_query("Bridged 500 USDC.e to Arbitrum")
 
+def test_lowercase_token_amounts():
+    """Users often type tokens in lowercase — must still be stripped."""
+    assert "usdc" not in sanitize_query("I want to swap 500 usdc to eth on uniswap").lower()
+    assert "1.8m usdc" not in sanitize_query("My debt is 1.8m usdc on aave").lower()
+    assert "200 arb" not in sanitize_query("Holding 200 arb on Arbitrum").lower()
+    assert "rseth" not in sanitize_query("I have 500 rsETH staked").lower()
+    assert "susds" not in sanitize_query("Borrow 300 sUSDS against wBTC").lower()
+
+def test_version_token_pairs_not_destroyed():
+    """'V3 WBTC/ETH' should not be mangled into 'V /ETH'."""
+    r = sanitize_query("How does Uniswap V3 WBTC/ETH concentrated liquidity work?")
+    assert "V3" in r, f"V3 destroyed: {r}"
+    # WBTC may be stripped (it's a token amount context) but V3 must survive
+
 def test_no_erc_standard_destruction():
     """ERC-20, ERC-721, etc. should not be mangled."""
     r = sanitize_query("What is the ERC-20 token standard?")

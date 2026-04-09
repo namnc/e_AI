@@ -252,12 +252,26 @@ _AMOUNT_PATTERNS_ICASE = [
 ]
 # Amount + token symbol — CASE SENSITIVE patterns
 _AMOUNT_PATTERNS_CSENSE = [
-    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{3,10}\b',           # 3 BTC, 500 ARB, 1.8M USDC — 3+ uppercase chars
-    r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2}(?=\s|$)',          # 50 OP — 2-char uppercase with space (avoids "2FA")
+    r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{3,10}\b',   # 3 BTC, 500 ARB — not V3 WBTC
+    r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2}(?=\s|$)', # 50 OP — not V2 XX
     r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:st|wst|cb|ez|we|frx|r)(?:ETH|USD|DAI|BTC)\b',  # stETH, wstETH, cbETH, ezETH, rETH, frxETH
     r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:USD|sUSD|sDAI|rlUSD|GHO)[a-z]*\b',  # USDe, sUSDe, sDAI, rlUSD
     r'[\d,]+(?:\.\d+)?[KkMmBb]?\s+[A-Z]{2,10}\.[a-z]+\b',   # USDC.e, WETH.e — dotted bridged tokens
 ]
+# Amount + KNOWN token symbol — CASE INSENSITIVE (catches "500 usdc", "1.8m eth")
+# This is a curated list of common DeFi tokens. Must be maintained as new tokens emerge.
+_KNOWN_TOKENS = (
+    r'eth|btc|usdc|usdt|dai|weth|wbtc|link|aave|uni|crv|glp|sol|ens|'
+    r'matic|arb|op|pepe|shib|doge|avax|dot|atom|near|ftm|apt|sui|'
+    r'steth|wsteth|cbeth|ezeth|weeth|frxeth|reth|rseth|meth|'
+    r'usde|susde|sdai|gho|rlusd|susds|mkr|comp|snx|bal|yfi|'
+    r'pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|'
+    r'usdc\.e|weth\.e|usdt\.e|dai\.e|wbtc\.e'  # bridged dotted tokens
+)
+_AMOUNT_KNOWN_TOKEN_PATTERN = (
+    r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?:' + _KNOWN_TOKENS + r')\b'  # negative lookbehind for V/v (version numbers)
+)
+
 _ADDRESS_PATTERN = r'0[xX][a-fA-F0-9]{3,}'  # both 0x and 0X
 _ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
 _PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%'
@@ -314,10 +328,13 @@ _EMOTIONAL_WORDS = [
     'nervous', 'panicking', 'desperate', 'afraid', 'concerned about',
 ]
 _TIMING_PATTERNS = [
-    r'\bby (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
-    r'\bwithin \d+ (?:hours?|days?|minutes?)\b',
-    r'\bbefore the (?:upgrade|fork|merge|vote|deadline)\b',
+    r'\b(?:by|on|before|after) (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
+    r'\b(?:by|on|before|after) (?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}\b',
+    r'\b(?:within|in) \d+ (?:hours?|days?|minutes?|weeks?|months?)\b',
+    r'\bbefore the (?:upgrade|fork|merge|vote|deadline|unlock|expiry)\b',
     r'\bright now\b', r'\bimmediately\b', r'\bASAP\b', r'\btoday\b', r'\btomorrow\b',
+    r'\bnext (?:week|month|day|hour)\b',
+    r'\b(?:lock-?up|unlock|vesting)\s+(?:ends?|period)\s+in\s+\d+\s+\w+\b',
 ]
 _DIRECTIONAL_VERBS = {
     'buy': 'modify', 'sell': 'modify', 'long': 'leveraged', 'short': 'leveraged',
@@ -358,11 +375,13 @@ def sanitize_query(query: str) -> str:
     # Remove hex addresses
     result = re.sub(_ADDRESS_PATTERN, '', result)
 
-    # Remove amounts — split into case-insensitive (dollar amounts, suffixed numbers)
-    # and case-sensitive (number + UPPERCASE token symbol) to avoid false positives
-    # on phrases like "2 weeks", "V3", "2FA", "10 basis points"
+    # Remove amounts: three passes with different case handling.
+    # Pass 1: case-insensitive known DeFi tokens (catches "500 usdc", "1.8m eth")
+    result = re.sub(_AMOUNT_KNOWN_TOKEN_PATTERN, '', result, flags=re.IGNORECASE)
+    # Pass 2: case-insensitive dollar amounts and suffixed numbers
     for pat in _AMOUNT_PATTERNS_ICASE:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
+    # Pass 3: case-sensitive uppercase symbols (catches novel tokens not in known list)
     for pat in _AMOUNT_PATTERNS_CSENSE:
         result = re.sub(pat, '', result)  # NO re.IGNORECASE — token must be uppercase
 
