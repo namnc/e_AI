@@ -420,10 +420,11 @@ def _normalize_input(text: str) -> str:
     # Detect by: digit.3digits,digits pattern
     text = re.sub(r'(\d)\.(\d{3})(?=[,.]|\b)', r'\1\2', text)  # strip dot-thousands
     text = re.sub(r'(\d),(\d)', r'\1.\2', text)  # comma-decimal → dot-decimal
-    # Strip zero-width and invisible Unicode characters
-    text = re.sub(r'[\u200b\u200c\u200d\u2060\ufeff\u00ad]', '', text)
-    # Strip other control characters (except newline/tab)
-    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    # Strip ALL Unicode format/control/invisible characters (Categories Cf, Cc except \n\t\r)
+    text = ''.join(
+        ch for ch in text
+        if ch in '\n\t\r' or unicodedata.category(ch) not in ('Cf', 'Cc')
+    )
     # Normalize hyphenated cardinals: "twenty-five" → "twenty five"
     text = re.sub(r'\b(\w+)-(\w+)\b', lambda m: f'{m.group(1)} {m.group(2)}'
                   if m.group(1).lower() in {'twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'}
@@ -444,8 +445,9 @@ def sanitize_query(query: str) -> str:
     # Step 0a: Strip blockchain addresses BEFORE normalization
     # (normalization inserts spaces in base58/bech32 addresses, breaking the patterns)
     result = query
-    # First strip zero-width chars so addresses aren't split by invisible chars
-    result = re.sub(r'[\u200b\u200c\u200d\u2060\ufeff\u00ad]', '', result)
+    # First strip ALL invisible/control Unicode chars so addresses aren't split
+    import unicodedata as _ud
+    result = ''.join(ch for ch in result if ch in '\n\t\r' or _ud.category(ch) not in ('Cf', 'Cc'))
     for pat in _ADDRESS_PATTERNS:
         result = re.sub(pat, '', result)
     # Also strip ENS names before normalization

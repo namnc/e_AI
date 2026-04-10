@@ -29,6 +29,9 @@ jobs:
       - name: Compile all Python files
         run: python3 -m py_compile cover_generator.py run_benchmarks.py classifier_validation.py llm_backend.py dataset.py
 
+      - name: Run sanitizer fuzz test (1000 rounds)
+        run: python3 test_sanitizer_fuzz.py --rounds 1000 || true  # report but don't block (adversarial mutations)
+
       - name: Check run_all.sh syntax
         run: bash -n run_all.sh
 

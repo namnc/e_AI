@@ -44,7 +44,10 @@ Cover query indistinguishability depends critically on the generation strategy. 
 ├── llm_backend.py               # Backend abstraction (Anthropic API + Ollama)
 ├── dataset.py                   # Test vectors and session scenarios
 ├── test_sanitizer.py            # Unit tests for regex sanitizer (39+ tests)
-├── test_sanitizer_audit.py      # Completeness audit (2,600 synthetic params, 0% FN)
+├── test_sanitizer_audit.py      # Completeness audit (2,600 synthetic params)
+├── test_sanitizer_fuzz.py       # Adversarial fuzz test (Unicode tricks, format mutations)
+├── .github/workflows/tests.yml  # CI pipeline (runs on every PR)
+├── Dockerfile                   # Reproducible test environment
 ├── run_all.sh                   # One-click full benchmark run
 ├── docs/
 │   ├── adversary_prompt.md      # All LLM prompts used in benchmarks
