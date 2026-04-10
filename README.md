@@ -4,14 +4,14 @@
 
 When DeFi users consult cloud LLMs before transacting, they leak intent, strategy, portfolio context, and reasoning to the provider — two steps earlier than RPC reads, with orders of magnitude richer information. We call this the **Private Query Problem**.
 
-We propose a **tiered architecture**: a regex sanitizer (browser extension, $0) strips numeric private parameters — the data that makes intent economically actionable. Even when intent/topic leaks, stripping params reduces adversary profit to ~$0 for >99% of users because attacks require specific parameters to size and target. Adding topic hiding via cover queries requires a local LLM ($200-500/yr) and transport assumptions.
+We propose a **tiered architecture**: a regex sanitizer (browser extension, $0) strips numerically-formatted private parameters from queries before they reach the cloud. Under a constrained synthetic threat model, this removes the data most directly exploitable for MEV — but the sanitizer only covers patterns it recognizes, and has not been tested on real user queries. Adding topic hiding via cover queries requires a local LLM ($200-500/yr) and strong transport assumptions that are achievable but operationally non-trivial.
 
 ### At a Glance
 
 | Tier | What | Hardware | Cost/yr | Privacy | Assumptions |
 |---|---|---|---|---|---|
-| **0: Sanitize** | Regex strips params + input normalization | Browser extension | **$0** | Params removed (~$0 adversary profit) | Regex covers the param format |
-| **1: Full pipeline** | + LLM decompose + genericize + covers | Mac Mini 14B+ | **$200-500** | + topic hiding (40% detection) | + per-set Tor unlinkability |
+| **0: Sanitize** | Regex strips params + input normalization | Browser extension | **$0** | Format-matchable params removed | Regex covers the param format; no semantic/NL coverage |
+| **1: Full pipeline** | + LLM decompose + genericize + covers | Mac Mini 14B+ | **$200-500** | + topic hiding (40% detection, n=20) | + per-set Tor unlinkability; small-sample result |
 
 This repository contains:
 - **`ethresearch_post.md`** — the main ethresear.ch post (Part 1)
@@ -54,12 +54,12 @@ Cover query indistinguishability depends critically on the generation strategy. 
 │   ├── sanitizer_gaps.md        # What's caught, what leaks, recommended NLP filters
 │   └── staking_mechanism.md     # On-chain staking interface (Solidity), slashing tiers
 ├── data/
-│   ├── benchmark_dataset.jsonl  # Unified dataset: 170 queries (JSONL, reusable)
+│   ├── benchmark_dataset.jsonl  # Unified dataset: 216 queries (JSONL, reusable)
 │   ├── build_dataset.py         # Dataset builder (merges sources, adds borderline cases)
 │   ├── real_queries.json        # Rich metadata source (category, damage, exploitability)
 │   └── sources.md               # Data provenance and methodology
 ├── results/
-│   ├── benchmark_a_results.md   # Sensitivity classification (100% F1)
+│   ├── benchmark_a_results.md   # Sensitivity classification (97% F1 at n=100)
 │   ├── benchmark_b_results.md   # Decomposition quality (0% leakage)
 │   ├── benchmark_c_results.md   # Cover indistinguishability v1 (95% — FAIL)
 │   ├── benchmark_c_detection.md # v1 adversarial detection detail
@@ -118,6 +118,16 @@ python classifier_validation.py run --n-sets 1000
 
 ### Previous results
 The `results/*.md` files contain earlier in-conversation results generated with Claude acting as both generator and adversarial detector. See `analysis/failure_analysis.md` for methodology.
+
+## What This Repo Does NOT Prove
+
+- **NOT a general privacy guarantee.** The sanitizer removes patterns it recognizes. Novel formats, natural-language quantities ("three quarters of my portfolio"), semantic leakage ("near liquidation"), and implicit intent signals ("What's a good health factor?") are not caught.
+- **NOT tested on real user queries.** All evaluation uses synthetic data. Real DeFi queries are inherently private and unavailable at scale (0.004% hit rate in 1M WildChat conversations).
+- **NOT robust against adversarial formatting.** Input normalization handles known Unicode/format tricks, but the regex approach is inherently brittle against adversaries who craft novel bypass encodings.
+- **NOT independently evaluated.** The same model generates and judges in D2 (n=5). The classifier trains on data from the same generator. Benchmark B is exact-string-only. No independent red-team or human evaluation has been conducted.
+- **NOT a stable release.** The commit history shows rapid sanitizer fixes over 2 days (mixed-case tokens, Unicode bypasses, timing leaks, false positives). The code is still stabilizing.
+
+Read all benchmark results as **"under a constrained synthetic threat model"**, not as general production claims.
 
 ## Caveats
 
