@@ -112,7 +112,7 @@ python classifier_validation.py run --n-sets 1000
 
 ### Option 4: One-click full run
 ```bash
-./run_all.sh ollama qwen2.5:7b    # runs everything with local model
+./run_all.sh ollama qwen2.5:7b    # runs everything (NOTE: 7B leaks params 30% — use 14B+ for production)
 ./run_all.sh                       # runs only non-LLM benchmarks (F, classifier, sanitizer tests)
 ```
 

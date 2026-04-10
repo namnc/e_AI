@@ -689,7 +689,7 @@ def benchmark_d2(n_samples: int = 5):
             results_list.append({
                 "direct_score": scores["direct"],
                 "pipeline_score": scores["pipeline"],
-                "quality_retained": scores["pipeline"] / max(scores["direct"], 1),
+                "quality_retained": min(scores["pipeline"] / max(scores["direct"], 1), 1.0),  # cap at 100%
             })
             print(f"  Direct: {scores['direct']}/5 | Pipeline: {scores['pipeline']}/5 | Retained: {scores['pipeline']/max(scores['direct'],1):.0%}")
 

@@ -56,8 +56,12 @@ if [ -n "$BACKEND_ARG" ] || [ -n "${ANTHROPIC_API_KEY:-}" ]; then
     $PYTHON run_benchmarks.py --benchmark B $BACKEND_ARG 2>&1 | tail -8
     echo ""
 
-    echo ">>> Benchmark C v5 (cover indistinguishability, n=20)"
+    echo ">>> Benchmark C v5 (template indistinguishability, n=20)"
     $PYTHON run_benchmarks.py --benchmark C --cover-version v5 $BACKEND_ARG 2>&1 | tail -15
+    echo ""
+
+    echo ">>> Benchmark C2 (deployed-pipeline detectability, n=20)"
+    $PYTHON run_benchmarks.py --benchmark C2 $BACKEND_ARG 2>&1 | tail -10
     echo ""
 
     echo ">>> Benchmark D (answer quality — template rewrite only, n=15)"
