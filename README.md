@@ -85,10 +85,10 @@ Cover query indistinguishability depends critically on the generation strategy. 
 |---|---|---|---|---|
 | **A** | Sensitivity classification | >90% F1 | **97% F1** (n=100, Qwen 7B) | PASS |
 | **B** | Decomposition quality (string-match only) | >85% coverage, 0% leakage | **100%/0%** (frontier), **70%/30%** (7B) | PASS/MARGINAL |
-| **C** | Template indistinguishability | <55% detection | **20%** (LLM), **AUC 0.507** (DistilBERT) | PASS |
-| **C2** | Deployed-pipeline detectability | <55% detection | **40%** (genericized sub-queries, n=20) | MARGINAL |
+| **C** | Template indistinguishability | Near 25% random | **20%** (LLM, n=20), **AUC 0.507** (DistilBERT) | PASS |
+| **C2** | Deployed-pipeline detectability | Near 25% random | **40%** (genericized sub-queries, n=20) | MARGINAL (+15pp above random) |
 | **D** | Answer quality (template rewrite only) | >80% scoring >=4/5 | **20%** (avg 2.3/5, n=15) | **FAIL** |
-| **D2** | Full pipeline (genericized, blinded A/B) | >80% quality retained | **3.8/5** (capped at 100% vs direct, n=5) | PASS |
+| **D2** | Utility only: genericized pipeline (blinded A/B, same-model judge) | >80% quality retained | **3.8/5** (capped at 100% vs direct, n=5) | PASS |
 | **E** | Session composition (simulation) | <40% recovery at 5 queries | **20-60% with covers** vs **100% without** | MARGINAL |
 | **F** | Economic damage model (illustrative) | — | Sanitization → ~$0 for param-dependent attacks | Illustrative |
 

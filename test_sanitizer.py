@@ -300,6 +300,13 @@ def test_us_decimal_amounts():
     r = sanitize_query("I have 1,234,567.89 USDC in my wallet")
     assert "234" not in r, f"US decimal leaked: {r}"
 
+def test_comma_decimal_locale():
+    """Comma-as-decimal: 1,15 (EU-style) should be caught after normalization."""
+    r = sanitize_query("health factor is 1,15")
+    assert "1,15" not in r and "1.15" not in r, f"Comma-decimal HF leaked: {r}"
+    r = sanitize_query("rate is 10,5% on Aave")
+    assert "10,5" not in r and "10.5" not in r, f"Comma-decimal percent leaked: {r}"
+
 def test_leading_dot_health_factor():
     """Health factor .95, .5, etc. — leading dot decimal."""
     r = sanitize_query("health factor is .95")

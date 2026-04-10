@@ -358,10 +358,10 @@ We ran benchmarks A-F using both a frontier model (Claude) and a local 7B model 
 |---|---|---|---|---|
 | **A: Sensitivity Classification** | Can a model detect private info in DeFi queries? | >90% F1 | **97% F1** (n=100, Qwen 7B) | PASS |
 | **B: Decomposition Quality** | Do sub-queries preserve utility without leaking params? | >85% coverage, 0% leakage | **100% / 0%** (frontier, n=5), **70% / 30%** (7B, n=10) | PASS / MARGINAL |
-| **C: Cover Indistinguishability** | Template-filled queries: can adversary detect? | <55% detection | **20%** (LLM, n=20), **AUC 0.507** (DistilBERT, n=2000) | PASS |
-| **C2: Deployed Pipeline** | Genericized sub-queries mixed with covers | <55% detection | **40%** (n=20) | MARGINAL |
+| **C: Cover Indistinguishability** | Template-filled queries: can adversary detect? | Near 25% random | **20%** (LLM, n=20), **AUC 0.507** (DistilBERT, n=2000) | PASS |
+| **C2: Deployed Pipeline** | Genericized sub-queries mixed with covers | Near 25% random | **40%** (n=20) | MARGINAL (+15pp) |
 | **D: Answer Quality** | Does template rewriting preserve answer utility? | >80% scoring ≥4/5 | **20% scoring ≥4/5** (avg 2.3/5, n=15) | FAIL |
-| **D2: Full Pipeline** | Decompose → genericize → synthesize (blinded A/B) | >80% quality retained | **3.8/5** (≥ direct quality, n=5, same-model judge) | PASS |
+| **D2: Utility Only** | Genericized pipeline utility (blinded A/B, same-model judge) | >80% quality retained | **3.8/5** (≥ direct quality, n=5) | PASS |
 | **E: Session Composition** | Do multi-query sessions leak strategy? | <40% recovery at 5 queries | **40% with covers** vs **100% without** | PASS |
 | **F: Damage Model** | Illustrative economic model (not empirical) | — | Sanitization → $0 profit in modeled attacks | Illustrative |
 
