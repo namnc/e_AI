@@ -276,6 +276,20 @@ def test_fullwidth_digits():
     # fullwidth 1.15 = \uff11\uff0e\uff11\uff15
     assert "1.15" not in sanitize_query("health factor \uff11\uff0e\uff11\uff15 on Aave")
 
+def test_us_decimal_amounts():
+    """US-format: 1,234.56 USDC — commas are thousands, dot is decimal."""
+    r = sanitize_query("I have 1,234.56 USDC in my wallet")
+    assert "1,234" not in r and "1.234" not in r and "234" not in r, f"US decimal leaked: {r}"
+    r = sanitize_query("I have 1,234,567.89 USDC in my wallet")
+    assert "234" not in r, f"US decimal leaked: {r}"
+
+def test_leading_dot_health_factor():
+    """Health factor .95, .5, etc. — leading dot decimal."""
+    r = sanitize_query("health factor is .95")
+    assert ".95" not in r and "95" not in r.split(), f"Leading-dot HF leaked: {r}"
+    r = sanitize_query("HF .95 and falling")
+    assert ".95" not in r, f"Leading-dot HF leaked: {r}"
+
 def test_known_limitation_semantic():
     """Purely semantic quantity references still bypass the sanitizer.
     These require true NLU, not pattern matching."""

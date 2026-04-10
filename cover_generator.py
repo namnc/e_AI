@@ -299,7 +299,7 @@ _ADDRESS_PATTERNS = [
 ]
 _ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
 _PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%'
-_HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*\d+(?:\.\d+)?'
+_HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*\.?\d+(?:\.\d+)?'  # .95, 1.15, 0.95
 _LEVERAGE_PATTERN = r'\b\d+\s*[xX×](?=\s|$|\b)'  # 5x, 5X, 5×, 5 x, 6 X (with optional space)
 
 # Natural language quantity patterns (secondary NLP filter)
@@ -416,10 +416,17 @@ def _normalize_input(text: str) -> str:
     text = text.replace('\u066b', '.')  # Arabic decimal separator
     # Normalize locale thousand separators to nothing: apostrophe (1'000), underscore (1_000), dot-as-thousands (1.234.567)
     text = re.sub(r"(\d)[''_](\d)", r'\1\2', text)
-    # European format: 1.234,56 → 1234.56 (dot=thousands, comma=decimal)
-    # Detect by: digit.3digits,digits pattern
-    text = re.sub(r'(\d)\.(\d{3})(?=[,.]|\b)', r'\1\2', text)  # strip dot-thousands
-    text = re.sub(r'(\d),(\d)', r'\1.\2', text)  # comma-decimal → dot-decimal
+    # Handle US vs European decimal formats:
+    # US: 1,234.56 (comma=thousands, dot=decimal) — commas should be stripped, dot stays
+    # EU: 1.234,56 (dot=thousands, comma=decimal) — dots stripped, comma→dot
+    # Detection heuristic: if comma is followed by exactly 3 digits (and another comma or end),
+    # it's a US thousands separator. If comma is followed by 1-2 digits at end, it's EU decimal.
+    # Step 1: Strip US-style thousand commas (digit,3digits pattern)
+    text = re.sub(r'(\d),(\d{3})(?=,|\b|[^0-9])', r'\1\2', text)
+    # Step 2: Strip EU-style dot-thousands (digit.3digits pattern)
+    text = re.sub(r'(\d)\.(\d{3})(?=[,.]|\b)', r'\1\2', text)
+    # Step 3: Convert EU decimal comma to dot (comma followed by 1-2 digits at word boundary)
+    text = re.sub(r'(\d),(\d{1,2})\b', r'\1.\2', text)
     # Strip ALL Unicode format/control/invisible characters (Categories Cf, Cc except \n\t\r)
     text = ''.join(
         ch for ch in text
@@ -871,6 +878,8 @@ _PROTOCOL_NAMES = sorted([
     "Euler", "Ethena", "Marginfi", "Berachain", "Polymarket",
     "Vertex", "Aevo", "Kwenta", "Perennial", "Angle",
     "EtherFi", "Puffer", "Kelp", "Renzo", "Mantle",
+    "Maverick", "Venus",
+    "Aave Gov", "Compound Gov", "Uniswap Gov", "Curve Gov",
 ], key=len, reverse=True)
 
 

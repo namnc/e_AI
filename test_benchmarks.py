@@ -147,6 +147,17 @@ def test_classifier_pool_deterministic():
     src = inspect.getsource(generate_training_data)
     assert "sorted(set(" in src, "query_pool dedup must use sorted(set()) not list(set())"
 
+def test_ontology_protocols_in_genericizer():
+    """Every protocol in the ontology should be in the genericizer's strip list."""
+    from cover_generator import DOMAIN_ONTOLOGY, _PROTOCOL_NAMES
+    generic_set = {p.lower() for p in _PROTOCOL_NAMES}
+    missing = []
+    for domain, onto in DOMAIN_ONTOLOGY.items():
+        for p in onto.get("protocols", []):
+            if p.lower() not in generic_set:
+                missing.append(p)
+    assert not missing, f"Ontology protocols missing from genericizer: {missing}"
+
 def test_d2_mix_has_real_subquery():
     """The mixed set sent to cloud must contain the actual sub-query."""
     from cover_generator import generate_cover_set
