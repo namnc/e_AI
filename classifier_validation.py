@@ -392,6 +392,12 @@ def evaluate_classifier(model_path: str | None = None):
     unique_sets = sorted(set(set_ids))
     set_correct = 0
     set_total = 0
+    intact_correct = 0
+    intact_total = 0
+    partial_correct = 0
+    partial_total = 0
+    baseline_sum = 0.0
+
     for sid in unique_sets:
         s_mask = [i for i, s in enumerate(set_ids) if s == sid]
         if not s_mask:
@@ -402,23 +408,41 @@ def evaluate_classifier(model_path: str | None = None):
         if 1 not in s_labels:
             continue  # no real query in this set's test split
 
-        # Highest probability = classifier's guess for "real"
+        set_size = len(s_mask)
+        random_baseline = 1.0 / set_size  # per-set baseline (not always 25%)
+
         best_idx = max(range(len(s_probs)), key=lambda i: s_probs[i])
-        if s_labels[best_idx] == 1:
-            set_correct += 1
-        set_total += 1
+        correct = s_labels[best_idx] == 1
 
-    set_accuracy = set_correct / set_total if set_total > 0 else 0
+        if set_size == 4:  # intact set
+            intact_total += 1
+            if correct:
+                intact_correct += 1
+        else:  # partial set (some examples removed by dedup)
+            partial_total += 1
+            if correct:
+                partial_correct += 1
 
-    print(f"\n  Set-level detection (comparable to Benchmark C):")
-    print(f"    Classifier picks real query as top-ranked: {set_accuracy:.1%} ({set_correct}/{set_total})")
-    print(f"    Random baseline: 25.0%")
-    if set_accuracy <= 0.30:
-        print(f"    PASS: Near random baseline")
-    elif set_accuracy <= 0.40:
+        baseline_sum += random_baseline
+
+    # Report on intact sets only (valid comparison)
+    intact_accuracy = intact_correct / intact_total if intact_total > 0 else 0
+    avg_baseline = baseline_sum / (intact_total + partial_total) if (intact_total + partial_total) > 0 else 0.25
+
+    print(f"\n  Set-level detection:")
+    print(f"    Intact 4-query sets: {intact_accuracy:.1%} ({intact_correct}/{intact_total})")
+    print(f"    Partial sets (dedup-reduced): {partial_correct}/{partial_total}")
+    print(f"    Computed random baseline: {1/4:.1%} (for intact sets)")
+    if intact_total < 10:
+        print(f"    WARNING: Only {intact_total} intact sets — result is not statistically meaningful")
+    if intact_accuracy <= 0.30:
+        print(f"    PASS: Near random baseline (intact sets)")
+    elif intact_accuracy <= 0.40:
         print(f"    MARGINAL: Slight advantage over random")
     else:
         print(f"    FAIL: Classifier has significant detection ability")
+
+    set_accuracy = intact_accuracy  # use intact-only for the saved result
 
     # Save results
     RESULTS_DIR.mkdir(exist_ok=True)

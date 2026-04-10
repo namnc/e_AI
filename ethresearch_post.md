@@ -361,7 +361,7 @@ We ran benchmarks A-F using both a frontier model (Claude) and a local 7B model 
 | **C: Cover Indistinguishability** | Template-filled queries: can adversary detect? | <55% detection | **20%** (LLM, n=20), **AUC 0.507** (DistilBERT, n=2000) | PASS |
 | **C2: Deployed Pipeline** | Genericized sub-queries mixed with covers | <55% detection | **40%** (n=20) | MARGINAL |
 | **D: Answer Quality** | Does template rewriting preserve answer utility? | >80% scoring ≥4/5 | **20% scoring ≥4/5** (avg 2.3/5, n=15) | FAIL |
-| **D2: Full Pipeline** | Decompose → genericize → synthesize (blinded A/B) | >80% quality retained | **3.8/5** (133% retained vs direct, n=5) | PASS |
+| **D2: Full Pipeline** | Decompose → genericize → synthesize (blinded A/B) | >80% quality retained | **3.8/5** (≥ direct quality, n=5, same-model judge) | PASS |
 | **E: Session Composition** | Do multi-query sessions leak strategy? | <40% recovery at 5 queries | **40% with covers** vs **100% without** | PASS |
 | **F: Damage Model** | Illustrative economic model (not empirical) | — | Sanitization → $0 profit in modeled attacks | Illustrative |
 

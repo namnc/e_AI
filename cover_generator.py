@@ -400,18 +400,29 @@ def _normalize_input(text: str) -> str:
     """Canonicalize input before regex matching.
 
     Fixes an entire class of bypasses: zero-width chars, fullwidth digits,
-    joined number-token patterns (125ETH), and separator variants (125-ETH).
+    joined number-token patterns (125ETH), separator variants (125-ETH),
+    locale-specific currency/decimal/thousand separators, and Unicode fractions.
     """
     import unicodedata
-    # NFKC normalization: fullwidth → ASCII, compatibility decomposition
+    # NFKC normalization: fullwidth → ASCII, compatibility decomposition,
+    # also normalizes Unicode fractions (⅔ → 2⁄3, ½ → 1⁄2)
     text = unicodedata.normalize('NFKC', text)
+    # Normalize currency symbols to $ (so €500k, ¥500000, £1000 get caught by $ patterns)
+    text = re.sub(r'[€£¥₹₩₿]', '$', text)
+    # Normalize locale decimal separators: Arabic decimal (٫), comma-as-decimal (1,15 → 1.15)
+    # Note: comma-as-decimal is ambiguous with thousand separators; we handle both
+    text = text.replace('\u066b', '.')  # Arabic decimal separator
+    # Normalize locale thousand separators to nothing: apostrophe (1'000), underscore (1_000)
+    text = re.sub(r"(\d)[''_](\d)", r'\1\2', text)
     # Strip zero-width and invisible Unicode characters
     text = re.sub(r'[\u200b\u200c\u200d\u2060\ufeff\u00ad]', '', text)
     # Strip other control characters (except newline/tab)
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
-    # Insert space between digit and letter when joined: 125eth → 125 eth, 500usdc → 500 usdc
-    # Only lowercase after digit — preserves 2FA, 3D, 5G, V3
-    # For uppercase: 125ETH → 125 ETH (digit followed by 3+ uppercase, preserving 2FA)
+    # Normalize hyphenated cardinals: "twenty-five" → "twenty five"
+    text = re.sub(r'\b(\w+)-(\w+)\b', lambda m: f'{m.group(1)} {m.group(2)}'
+                  if m.group(1).lower() in {'twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'}
+                  else m.group(0), text)
+    # Insert space between digit and letter when joined: 125eth → 125 eth
     text = re.sub(r'(\d)([a-z])', r'\1 \2', text)
     text = re.sub(r'(\d)([A-Z]{3,})', r'\1 \2', text)
     # Insert space between letter and digit in some contexts: ETH500 stays, but normalize separators

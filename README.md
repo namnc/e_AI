@@ -83,7 +83,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 | **C** | Template indistinguishability | <55% detection | **20%** (LLM), **AUC 0.507** (DistilBERT) | PASS |
 | **C2** | Deployed-pipeline detectability | <55% detection | **40%** (genericized sub-queries, n=20) | MARGINAL |
 | **D** | Answer quality (template rewrite only) | >80% scoring >=4/5 | **20%** (avg 2.3/5, n=15) | **FAIL** |
-| **D2** | Full pipeline (genericized, blinded A/B) | >80% quality retained | **3.8/5** (128% retained vs direct, n=5) | PASS |
+| **D2** | Full pipeline (genericized, blinded A/B) | >80% quality retained | **3.8/5** (capped at 100% vs direct, n=5) | PASS |
 | **E** | Session composition (simulation) | <40% recovery at 5 queries | **20-60% with covers** vs **100% without** | MARGINAL |
 | **F** | Economic damage model (illustrative) | — | Sanitization → ~$0 for param-dependent attacks | Illustrative |
 
