@@ -300,7 +300,7 @@ _ADDRESS_PATTERNS = [
 _ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
 _PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%'
 _HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*\d+(?:\.\d+)?'
-_LEVERAGE_PATTERN = r'\b\d+[xX×](?=\s|$|\b)'  # 5x, 5X, 5× (× is non-word, so \b doesn't work after it)
+_LEVERAGE_PATTERN = r'\b\d+\s*[xX×](?=\s|$|\b)'  # 5x, 5X, 5×, 5 x, 6 X (with optional space)
 
 # Natural language quantity patterns (secondary NLP filter)
 _NUMBER_WORDS = [
