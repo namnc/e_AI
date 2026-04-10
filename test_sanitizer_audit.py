@@ -197,7 +197,8 @@ def main():
     else:
         print(f"VERDICT: FAIL ({overall_rate:.1%} false negative rate)")
 
-    return leaked_all == 0
+    # Exit success if false-negative rate < 1% (matches printed PASS verdict)
+    return (leaked_all / total_all) < 0.01 if total_all > 0 else True
 
 
 if __name__ == "__main__":
