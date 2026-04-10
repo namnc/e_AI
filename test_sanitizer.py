@@ -214,6 +214,19 @@ def test_worded_fractions_with_tokens():
     assert "half an eth" not in sanitize_query("just half an ETH left").lower()
     assert "and a half btc" not in sanitize_query("three and a half btc").lower()
 
+def test_compound_cardinal_tokens():
+    """Compound cardinal + token: 'twenty five ETH', 'one hundred and five ETH'."""
+    assert "twenty five eth" not in sanitize_query("I have twenty five ETH").lower()
+    assert "one hundred and five eth" not in sanitize_query("I have one hundred and five ETH").lower()
+    assert "two thousand five hundred eth" not in sanitize_query("I have two thousand five hundred ETH").lower()
+
+def test_plural_acronym_false_positives():
+    """Plural acronyms like APIs, SDKs should NOT be stripped."""
+    r = sanitize_query("How do 4 APIs compare to 5 SDKs?")
+    assert "APIs" in r and "SDKs" in r, f"Plural acronyms stripped: {r}"
+    r = sanitize_query("I checked 3 RPCs")
+    assert "RPCs" in r, f"RPCs stripped: {r}"
+
 def test_worded_decimal_with_token():
     """'zero point five eth' should be stripped."""
     assert "zero point five eth" not in sanitize_query("I have zero point five eth").lower()

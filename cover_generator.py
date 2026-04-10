@@ -263,6 +263,9 @@ _FALSE_POSITIVE_WORDS = {
     'DeFi', 'WiFi', 'IoT', 'API', 'SDK', 'CLI', 'GPU', 'CPU', 'RAM',
     'TVL', 'APY', 'APR', 'ROI', 'NFT', 'DAO', 'DEX', 'AMM', 'MEV',
     'FAQ', 'EVM', 'RPC', 'ABI', 'IDE',
+    # Plurals of common acronyms
+    'APIs', 'SDKs', 'RPCs', 'ABIs', 'IDEs', 'NFTs', 'DAOs', 'DEXs', 'AMMs',
+    'FAQs', 'EVMs', 'GPUs', 'CPUs',
     # Time/measurement
     'Hz', 'MB', 'GB', 'TB', 'KB',
 }
@@ -332,16 +335,18 @@ _CARDINALS = (
     r'thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|'
     r'forty|fifty|sixty|seventy|eighty|ninety)'
 )
-_CARDINAL_TOKEN_PATTERN = (
-    r'(?i:\b' + _CARDINALS + r'\b)'
-    r'(?:\s+(?i:hundred|thousand|million|billion))*'
-    r'\s+[A-Z]{2,10}\b'
+# Compound cardinal: "twenty five", "one hundred and five", "two thousand five hundred"
+# Matches the longest possible chain of cardinal words before a token
+_COMPOUND_CARDINAL = (
+    r'(?i:\b' + _CARDINALS + r')'
+    r'(?:\s+(?:and\s+)?(?:hundred|thousand|million|billion|' + _CARDINALS + r'))*'
 )
-# Cardinal + known token (case-insensitive): "twenty eth", "two hundred eth"
+_CARDINAL_TOKEN_PATTERN = (
+    _COMPOUND_CARDINAL + r'\s+[A-Z]{2,10}\b'
+)
+# Cardinal + known token (case-insensitive): "twenty eth", "twenty five eth", "two thousand five hundred eth"
 _CARDINAL_KNOWN_TOKEN = (
-    r'(?i:\b' + _CARDINALS + r'\b)'
-    r'(?:\s+(?i:hundred|thousand|million|billion))*'
-    r'\s+(?i:' + _KNOWN_TOKENS + r')\b'
+    _COMPOUND_CARDINAL + r'\s+(?i:' + _KNOWN_TOKENS + r')\b'
 )
 # Worded percentages: "eighty percent", "five percent of my ETH"
 _WORDED_PERCENT_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+(?:percent|per\s*cent)\b'
@@ -836,6 +841,9 @@ _PROTOCOL_NAMES = sorted([
     "Orca", "Raydium", "Jupiter", "Drift", "Mango",
     "Instadapp", "DeFi Saver", "Gearbox", "Kamino", "Jito", "Meteora",
     "Flashbots", "MEV Blocker", "Chainlink", "Pyth", "RedStone",
+    "Euler", "Ethena", "Marginfi", "Berachain", "Polymarket",
+    "Vertex", "Aevo", "Kwenta", "Perennial", "Angle",
+    "EtherFi", "Puffer", "Kelp", "Renzo", "Mantle",
 ], key=len, reverse=True)
 
 

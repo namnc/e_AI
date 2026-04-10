@@ -43,7 +43,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 ├── cover_generator.py           # v5 cover algorithm (template + top-4 equiprobable domains)
 ├── llm_backend.py               # Backend abstraction (Anthropic API + Ollama)
 ├── dataset.py                   # Test vectors and session scenarios
-├── test_sanitizer.py            # Unit tests for regex sanitizer (16 tests)
+├── test_sanitizer.py            # Unit tests for regex sanitizer (39+ tests)
 ├── test_sanitizer_audit.py      # Completeness audit (2,600 synthetic params, 0% FN)
 ├── run_all.sh                   # One-click full benchmark run
 ├── docs/
@@ -164,4 +164,4 @@ Try to write a query that contains exploitable private information but passes th
 **3. Independent labeling**
 Label 100 queries from `data/benchmark_dataset.jsonl` as sensitive/non-sensitive/borderline. We'll compute inter-annotator agreement (target: Cohen's kappa > 0.7).
 - **Damage reduction is simulated**: 100% reduction holds for parameter-dependent attacks; topic-only attacks (narrowing search by domain) are not modeled
-- **Regex has a natural language gap**: "half a million USDC" and "roughly two thousand ETH" bypass the sanitizer; a secondary NLP filter is recommended
+- **Regex has a natural language gap**: Common worded quantities ("half a million USDC", "twenty ETH") are now caught, but compound forms ("twenty five ETH" → partially leaks), semantic quantities ("three quarters of my portfolio"), and novel phrasings still bypass the sanitizer
