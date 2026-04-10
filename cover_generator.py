@@ -449,11 +449,12 @@ def _normalize_input(text: str) -> str:
 
 def sanitize_query(query: str) -> str:
     """Strip private parameters, emotional language, timing, and qualitative descriptors."""
-    # Step 0a: Strip blockchain addresses BEFORE normalization
-    # (normalization inserts spaces in base58/bech32 addresses, breaking the patterns)
-    result = query
-    # First strip ALL invisible/control Unicode chars so addresses aren't split
     import unicodedata as _ud
+
+    # Step 0a: Light normalization — NFKC + strip invisible chars, but NO space insertion.
+    # This canonicalizes fullwidth chars (０x → 0x, Ａ → A) so address/ENS patterns match,
+    # without breaking base58/bech32 addresses with inserted spaces.
+    result = _ud.normalize('NFKC', query)
     result = ''.join(ch for ch in result if ch in '\n\t\r' or _ud.category(ch) not in ('Cf', 'Cc'))
     for pat in _ADDRESS_PATTERNS:
         result = re.sub(pat, '', result)
@@ -893,8 +894,10 @@ def genericize_subquery(sub_query: str) -> str:
 
     Benchmarked at: 3.0/5 utility (same as original), 20% detection (vs 80% original).
     """
-    result = sub_query
-    domain = classify_domain(sub_query)
+    import unicodedata as _ud
+    result = _ud.normalize('NFKC', sub_query)  # canonicalize fullwidth → ASCII
+    result = ''.join(ch for ch in result if ch in '\n\t\r' or _ud.category(ch) not in ('Cf', 'Cc'))
+    domain = classify_domain(result)
     onto = DOMAIN_ONTOLOGY.get(domain, {})
     generic_ref = onto.get("generic_refs", ["DeFi protocols"])[0]
 

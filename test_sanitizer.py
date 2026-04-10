@@ -276,6 +276,23 @@ def test_fullwidth_digits():
     # fullwidth 1.15 = \uff11\uff0e\uff11\uff15
     assert "1.15" not in sanitize_query("health factor \uff11\uff0e\uff11\uff15 on Aave")
 
+def test_fullwidth_address_bypass():
+    """Fullwidth 0x address should be normalized then stripped."""
+    r = sanitize_query("\uff10x742d35Cc6634C0532925a3b844Bc9e7595f2bD38 has funds")
+    assert "742d" not in r, f"Fullwidth address leaked: {r}"
+
+def test_fullwidth_ens_bypass():
+    """Fullwidth ENS name should be normalized then stripped."""
+    from cover_generator import genericize_subquery
+    r = sanitize_query("\uff56\uff49\uff54\uff41\uff4c\uff49\uff4b.eth sent tokens")
+    assert "vitalik" not in r.lower(), f"Fullwidth ENS leaked: {r}"
+
+def test_fullwidth_protocol_genericize():
+    """Fullwidth protocol names should be genericized after normalization."""
+    from cover_generator import genericize_subquery
+    r = genericize_subquery("How does \uff21\uff41\uff56\uff45 V3 health factor work?")
+    assert "aave" not in r.lower() and "Aave" not in r, f"Fullwidth protocol leaked: {r}"
+
 def test_us_decimal_amounts():
     """US-format: 1,234.56 USDC — commas are thousands, dot is decimal."""
     r = sanitize_query("I have 1,234.56 USDC in my wallet")
