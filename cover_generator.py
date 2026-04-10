@@ -249,7 +249,7 @@ _AMOUNT_PATTERNS_ICASE = [
     r'(?<![-])\b\d{2,}(?:,\d{3})*\s+(?:tokens?|coins?)\b',  # "1000 tokens" but not "ERC-20 token" (negative lookbehind for hyphen)
     r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
     # (scientific notation handled separately in Pass 0 of sanitize_query)
-    r'\b\d+\s\d{3}(?:\s\d{3})*\b',                       # 1 000, 1 000 000 (space-separated thousands)
+    r'\b\d+\s\d{3}(?:\s\d{3})*(?:\s*[a-zA-Z]\w*)?\b',    # 1 000 ETH, 123 456 (space-separated, optional trailing token)
 ]
 # Amount + ANY token-like word — BROAD catch-all with exception carve-outs.
 # A "token-like word" is any word starting with a letter that contains at least
@@ -404,16 +404,22 @@ def _normalize_input(text: str) -> str:
     locale-specific currency/decimal/thousand separators, and Unicode fractions.
     """
     import unicodedata
-    # NFKC normalization: fullwidth → ASCII, compatibility decomposition,
-    # also normalizes Unicode fractions (⅔ → 2⁄3, ½ → 1⁄2)
+    # NFKC normalization: fullwidth → ASCII, compatibility decomposition
     text = unicodedata.normalize('NFKC', text)
+    # Normalize Unicode fraction slash (⁄ U+2044) to regular slash, then strip fraction patterns
+    text = text.replace('\u2044', '/')
+    text = re.sub(r'\b\d+/\d+\b', '', text)  # strip fractions like 1/2, 2/3
     # Normalize currency symbols to $ (so €500k, ¥500000, £1000 get caught by $ patterns)
     text = re.sub(r'[€£¥₹₩₿]', '$', text)
     # Normalize locale decimal separators: Arabic decimal (٫), comma-as-decimal (1,15 → 1.15)
     # Note: comma-as-decimal is ambiguous with thousand separators; we handle both
     text = text.replace('\u066b', '.')  # Arabic decimal separator
-    # Normalize locale thousand separators to nothing: apostrophe (1'000), underscore (1_000)
+    # Normalize locale thousand separators to nothing: apostrophe (1'000), underscore (1_000), dot-as-thousands (1.234.567)
     text = re.sub(r"(\d)[''_](\d)", r'\1\2', text)
+    # European format: 1.234,56 → 1234.56 (dot=thousands, comma=decimal)
+    # Detect by: digit.3digits,digits pattern
+    text = re.sub(r'(\d)\.(\d{3})(?=[,.]|\b)', r'\1\2', text)  # strip dot-thousands
+    text = re.sub(r'(\d),(\d)', r'\1.\2', text)  # comma-decimal → dot-decimal
     # Strip zero-width and invisible Unicode characters
     text = re.sub(r'[\u200b\u200c\u200d\u2060\ufeff\u00ad]', '', text)
     # Strip other control characters (except newline/tab)
@@ -445,7 +451,14 @@ def sanitize_query(query: str) -> str:
     # Also strip ENS names before normalization
     result = re.sub(_ENS_PATTERN, '', result)
 
-    # Step 0b: Normalize remaining input (fixes Unicode bypasses, joined tokens)
+    # Step 0b: Strip scientific notation BEFORE normalization
+    # (normalization splits "3.5e8" into "3.5 e 8" by inserting spaces)
+    result = re.sub(r'\b\d+(?:\.\d+)?[eE][+-]?\d+\s*\w*\b', '', result, flags=re.IGNORECASE)
+
+    # Step 0c: Strip space-separated thousands BEFORE normalization splits them further
+    result = re.sub(r'\b\d+\s\d{3}(?:\s\d{3})*(?:\s*[a-zA-Z]\w*)?\b', '', result, flags=re.IGNORECASE)
+
+    # Step 0d: Normalize remaining input (fixes Unicode bypasses, joined tokens)
     result = _normalize_input(result)
 
     # Remove natural language quantities (secondary NLP filter)
@@ -839,8 +852,9 @@ def generate_cover_set_raw(
 
 # Protocol names to strip, longest first to avoid partial matches
 _PROTOCOL_NAMES = sorted([
-    "Aave V3", "Aave V2", "Aave", "Compound V3", "Compound V2", "Compound",
-    "Uniswap V3", "Uniswap V2", "Uniswap", "Curve", "Balancer", "SushiSwap",
+    "Aave V3", "Aave V2", "Aave",
+    "UniswapX", "Uniswap V3", "Uniswap V2", "Uniswap", "Curve", "Balancer", "SushiSwap",
+    "Morpho Blue", "Morpho", "Compound III", "Compound V3", "Compound V2", "Compound",
     "MakerDAO", "Maker", "dYdX", "GMX", "Synthetix", "Lyra", "Opyn",
     "Lido", "Rocket Pool", "Eigenlayer", "EigenLayer", "Pendle", "Yearn",
     "Convex", "Morpho", "Radiant", "Spark", "Frax", "Swell",

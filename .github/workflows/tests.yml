@@ -1,0 +1,49 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sanitizer-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run sanitizer unit tests
+        run: python3 test_sanitizer.py
+
+      - name: Run sanitizer completeness audit
+        run: python3 test_sanitizer_audit.py
+
+      - name: Run benchmark regression tests
+        run: python3 test_benchmarks.py
+
+      - name: Compile all Python files
+        run: python3 -m py_compile cover_generator.py run_benchmarks.py classifier_validation.py llm_backend.py dataset.py
+
+      - name: Check run_all.sh syntax
+        run: bash -n run_all.sh
+
+  classifier-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install classifier dependencies
+        run: pip install torch transformers scikit-learn numpy
+
+      - name: Generate classifier data and train
+        run: python3 classifier_validation.py run --n-sets 500 --epochs 5

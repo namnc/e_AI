@@ -178,10 +178,13 @@ def train_classifier(
     val_idx = [temp_idx[i] for i in val_idx_rel]
     test_idx = [temp_idx[i] for i in test_idx_rel]
 
-    # Deduplicate: remove test examples whose exact text appears in train
+    # Deduplicate: remove text overlaps across all split pairs
     train_texts_set = {texts[i] for i in train_idx}
     test_idx_clean = [i for i in test_idx if texts[i] not in train_texts_set]
     val_idx_clean = [i for i in val_idx if texts[i] not in train_texts_set]
+    # Also remove val/test overlap
+    test_texts_set = {texts[i] for i in test_idx_clean}
+    val_idx_clean = [i for i in val_idx_clean if texts[i] not in test_texts_set]
     removed_test = len(test_idx) - len(test_idx_clean)
     removed_val = len(val_idx) - len(val_idx_clean)
     test_idx = test_idx_clean
@@ -390,8 +393,6 @@ def evaluate_classifier(model_path: str | None = None):
     # Set-level accuracy (the metric comparable to Benchmark C)
     # For each set: does the classifier rank the real query highest?
     unique_sets = sorted(set(set_ids))
-    set_correct = 0
-    set_total = 0
     intact_correct = 0
     intact_total = 0
     partial_correct = 0
@@ -453,7 +454,7 @@ def evaluate_classifier(model_path: str | None = None):
         "recall": recall,
         "f1": f1,
         "set_level_accuracy": set_accuracy,
-        "set_level_n": set_total,
+        "set_level_n": intact_total,
         "per_domain_auc": domain_aucs,
         "n_test_examples": len(test_examples),
     }
