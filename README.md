@@ -55,7 +55,9 @@ Cover query indistinguishability depends critically on the generation strategy. 
 │   ├── transport_assumptions.md # Tor circuit pool, mixnet, timing mitigations
 │   ├── latency_projections.md   # Per-hardware latency estimates (M1→M4 Max)
 │   ├── sanitizer_gaps.md        # What's caught, what leaks, recommended NLP filters
-│   └── staking_mechanism.md     # On-chain staking interface (Solidity), slashing tiers
+│   ├── staking_mechanism.md     # On-chain staking interface (Solidity), slashing tiers
+│   ├── research_directions.md  # 10 open problems with approaches and priority ranking
+│   └── research_solutions.md   # Analytical solutions: formal proof, optimal k, Shannon capacity, collusion analysis
 ├── data/
 │   ├── benchmark_dataset.jsonl  # Unified dataset: 216 queries (JSONL, reusable)
 │   ├── build_dataset.py         # Dataset builder (merges sources, adds borderline cases)
