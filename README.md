@@ -43,7 +43,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 ├── cover_generator.py           # v5 cover algorithm (template + top-4 equiprobable domains)
 ├── llm_backend.py               # Backend abstraction (Anthropic API + Ollama)
 ├── dataset.py                   # Test vectors and session scenarios
-├── test_sanitizer.py            # Unit tests for regex sanitizer (39+ tests)
+├── test_sanitizer.py            # Unit tests for regex sanitizer (47 tests)
 ├── test_sanitizer_audit.py      # Completeness audit (2,600 synthetic params)
 ├── test_sanitizer_fuzz.py       # Adversarial fuzz test (Unicode tricks, format mutations)
 ├── .github/workflows/tests.yml  # CI pipeline (runs on every PR)

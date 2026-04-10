@@ -294,12 +294,12 @@ _ADDRESS_PATTERNS = [
     r'0[xX][a-fA-F0-9]{3,}',                              # EVM: 0x742d...
     r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b',               # Bitcoin legacy (P2PKH/P2SH)
     r'\bbc1[a-zA-HJ-NP-Z0-9]{25,90}\b',                   # Bitcoin bech32
-    r'\b(?:cosmos|osmo|terra|inj|sei|dydx)1[a-z0-9]{38,58}\b',  # Cosmos ecosystem
+    r'\b(?:cosmos|osmo|terra|inj|sei|dydx)1[a-z0-9]{10,58}\b',  # Cosmos ecosystem (10+ chars to catch truncated addresses)
     r'\b[1-9A-HJ-NP-Za-km-z]{32,44}\b',                   # Solana base58 (broad — may FP on long words)
 ]
 _ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
-_PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%'
-_HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*\.?\d+(?:\.\d+)?'  # .95, 1.15, 0.95
+_PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%(?!\s*attack)'  # skip "51% attack" (concept name, not private param)
+_HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*(?:approximately|about|around|roughly|nearly|~|≈)?\s*\.?\d+(?:\.\d+)?'
 _LEVERAGE_PATTERN = r'\b\d+\s*[xX×](?=\s|$|\b)'  # 5x, 5X, 5×, 5 x, 6 X (with optional space)
 
 # Natural language quantity patterns (secondary NLP filter)
@@ -461,9 +461,11 @@ def sanitize_query(query: str) -> str:
     # Also strip ENS names before normalization
     result = re.sub(_ENS_PATTERN, '', result)
 
-    # Step 0b: Strip scientific notation BEFORE normalization
-    # (normalization splits "3.5e8" into "3.5 e 8" by inserting spaces)
-    result = re.sub(r'\b\d+(?:\.\d+)?[eE][+-]?\d+\s*\w*\b', '', result, flags=re.IGNORECASE)
+    # Step 0b: Strip patterns that normalization would break by inserting spaces
+    result = re.sub(r'\b\d+(?:\.\d+)?[eE][+-]?\d+\s*\w*\b', '', result, flags=re.IGNORECASE)  # sci notation
+    result = re.sub(r'\b\d+(?:\.\d+)?[KkMmBb]\b', '', result)  # bare magnitudes (500k, 2m, 1.5b)
+    result = re.sub(r'\b\d+(?:\.\d+)?[+~≈><]\s*\w*\b', '', result)  # 500+ ETH, ~1000, >500, ≈500
+    result = re.sub(r'\b\d+(?:\.\d+)?-\d+(?:\.\d+)?[xX×]?\s*\w*\b', '', result)  # ranges: 500-1000 ETH, 10-20x leveraged
 
     # Step 0c: Strip space-separated thousands BEFORE normalization splits them further
     result = re.sub(r'\b\d+\s\d{3}(?:\s\d{3})*(?:\s*[a-zA-Z]\w*)?\b', '', result, flags=re.IGNORECASE)

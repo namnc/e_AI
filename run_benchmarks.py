@@ -691,7 +691,8 @@ def benchmark_d2(n_samples: int = 5):
                 "pipeline_score": scores["pipeline"],
                 "quality_retained": min(scores["pipeline"] / max(scores["direct"], 1), 1.0),  # cap at 100%
             })
-            print(f"  Direct: {scores['direct']}/5 | Pipeline: {scores['pipeline']}/5 | Retained: {scores['pipeline']/max(scores['direct'],1):.0%}")
+            capped = min(scores["pipeline"] / max(scores["direct"], 1), 1.0)
+            print(f"  Direct: {scores['direct']}/5 | Pipeline: {scores['pipeline']}/5 | Retained: {capped:.0%} (capped)")
 
         except Exception as e:
             print(f"  ERROR: {e}")
