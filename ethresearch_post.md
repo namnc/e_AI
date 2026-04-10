@@ -177,7 +177,9 @@ While metadata privacy is out of scope for this work, the required mitigations a
 
 **Actively malicious adversary**: The cloud could manipulate responses to extract data (prompt injection via response, watermarking, canary queries, poisoned advice). The key defense is **statelessness between phases**: the query generation phase must NEVER be influenced by cloud responses. Each query batch is generated from the user's original query only; cloud responses feed only into the final local answer.
 
-For correctness against active adversaries, we can use: TEE attestation (practical today, <7%), cross-provider verification (3x cost), or zkML (impractical but on trajectory). The local LLM acts as a verifier — it can detect gross factual errors, prompt injection attempts, and response uniformity violations. The human user is the final verifier, possessing the **private witness** (their actual position parameters) that makes verification easier than attack.
+**Malicious intermediary adversary**: LLM API routers — intermediary services that proxy requests between clients and model providers — have full plaintext access to every request and response. Liu et al. [38] measured 428 real-world routers and found 9 actively injecting malicious payloads and 17 exfiltrating credentials; one drained Ethereum from a leaked private key. This threat is not hypothetical. Our architecture provides defense-in-depth: Tier 0 runs entirely client-side (no intermediary involved), and for Tier 1, the sanitizer strips private parameters before any intermediary sees them — even a compromised router observes only genericized sub-queries and template-filled covers.
+
+For correctness against active adversaries, we can use: TEE attestation (practical today, <7%), cross-provider verification (3x cost), or zkML (impractical but on trajectory). Liu et al. [38] propose provider-signed canonical response envelopes (model identity, arguments, nonce, validity window) as a long-term defense — the same mechanism we describe in Part 2. No major provider currently deploys response signing for tool-call arguments.
 
 ## 3. Anatomy of an Attack: A Concrete Walkthrough
 
@@ -590,3 +592,4 @@ The Ethereum privacy roadmap should include AI query privacy as a concern alongs
 [35] Abdelnabi et al., "Firewalls to Secure Dynamic LLM Agentic Networks," arXiv, 2025. https://arxiv.org/abs/2502.01822 (accessed April 2026).
 [36] Crapis & Buterin, "ZK API Usage Credits: LLMs and Beyond," ethresear.ch, February 2026. https://ethresear.ch/t/zk-api-usage-credits-llms-and-beyond/24104 (accessed April 2026).
 [37] Shih, Rosenberg, Kailad & Miers, "zk-promises: Anonymous Moderation, Reputation, and Blocking from Anonymous Credentials with Callbacks," IACR ePrint 2024/1260. https://eprint.iacr.org/2024/1260 (accessed April 2026).
+[38] Liu, Shou, Wen, Chen, Fang & Feng, "Your Agent Is Mine: Measuring Malicious Intermediary Attacks on the LLM Supply Chain," arXiv 2604.08407, April 2026. https://arxiv.org/abs/2604.08407 (accessed April 2026).
