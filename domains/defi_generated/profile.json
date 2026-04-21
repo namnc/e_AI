@@ -1,0 +1,2547 @@
+{
+  "meta": {
+    "domain_name": "defi_generated",
+    "version": "0.1.0",
+    "generated_by": "meta/analyzer.py",
+    "validation_status": "draft"
+  },
+  "domain_distribution": {
+    "lending": 0.37,
+    "crypto": 0.18,
+    "blockchain": 0.08,
+    "ethereum": 0.05,
+    "staking": 0.04,
+    "finance": 0.04,
+    "trading": 0.03,
+    "cryptocurrencies": 0.03,
+    "defi": 0.02,
+    "crypto_trading": 0.02,
+    "security": 0.02,
+    "investment": 0.01,
+    "privacy": 0.01,
+    "yield_farming": 0.01,
+    "governance": 0.01,
+    "general": 0.01,
+    "contract_review": 0.01,
+    "arbitrage": 0.0,
+    "yield_aggregation": 0.0,
+    "investing": 0.0,
+    "smart_contract": 0.0,
+    "smart_contracts": 0.0,
+    "cryptography": 0.0,
+    "dao": 0.0,
+    "tokenomics": 0.0,
+    "cardiology": 0.0,
+    "gaming": 0.0,
+    "taxes": 0.0,
+    "web_analysis": 0.0,
+    "health": 0.0,
+    "yield farming": 0.0
+  },
+  "top_domains": [
+    "lending",
+    "crypto"
+  ],
+  "subdomains": {
+    "arbitrage": {
+      "mechanisms": [
+        "backrunning",
+        "front-running",
+        "arbitrage opportunities",
+        "pool liquidity manipulation",
+        "block-level arbitrage"
+      ],
+      "operations": [
+        "submitting trades via Flashbots",
+        "executing trades in sequence",
+        "locking assets for liquidity provision",
+        "monitoring trade volumes"
+      ],
+      "triggers": [
+        "large trades hitting the pool",
+        "price discrepancies across pools",
+        "block confirmations",
+        "flash loan availability"
+      ],
+      "metrics": [
+        "profit margin",
+        "execution latency",
+        "liquidity depth",
+        "transaction fees",
+        "slippage tolerance"
+      ],
+      "actors": [
+        "arbitrageurs",
+        "traders",
+        "liquidity providers (LPs)",
+        "market makers",
+        "flash loan recipients"
+      ],
+      "risk_concepts": [
+        "slippage risk",
+        "front-running threats",
+        "price volatility",
+        "liquidation risk",
+        "transaction censorship"
+      ],
+      "generic_refs": [
+        "trading protocols",
+        "crypto exchanges",
+        "liquidity networks"
+      ],
+      "protocols": [
+        "Uniswap V3",
+        "Sushiswap",
+        "Flashbots",
+        "liquidity providers (LPs)",
+        "trading pools"
+      ]
+    },
+    "blockchain": {
+      "mechanisms": [
+        "fraud proofs",
+        "validity proofs",
+        "proposer-builder separation",
+        "consensus mechanism",
+        "data availability solution",
+        "oracle aggregation",
+        "cross-chain messaging",
+        "blob data (EIP-4844)",
+        "security assumptions"
+      ],
+      "operations": [
+        "adding collateral",
+        "filing a claim",
+        "searching for MEV",
+        "building transactions",
+        "validating transactions"
+      ],
+      "triggers": [
+        "prices drop",
+        "symptoms worsen",
+        "fraud detection",
+        "data availability issues",
+        "oracle failures"
+      ],
+      "metrics": [
+        "health factor",
+        "blood pressure",
+        "gas cost",
+        "transaction throughput",
+        "confirmation time"
+      ],
+      "actors": [
+        "borrowers",
+        "patients",
+        "builders",
+        "validators",
+        "searchers"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "misdiagnosis",
+        "bridge security",
+        "MEV exploitation",
+        "oracle failure"
+      ],
+      "generic_refs": [
+        "lending protocols",
+        "healthcare providers",
+        "cryptocurrency networks",
+        "blockchain applications",
+        "smart contract platforms"
+      ],
+      "protocols": [
+        "Aave",
+        "Mayo Clinic",
+        "Chainlink",
+        "Ethereum",
+        "MEV",
+        "zk-rollup",
+        "optimistic rollup",
+        "cross-chain bridge",
+        "sidechain",
+        "rollup",
+        "L1",
+        "L2",
+        "LayerZero",
+        "Wormhole",
+        "gas token"
+      ]
+    },
+    "cardiology": {
+      "mechanisms": [
+        "ventricular dysfunction",
+        "angina pectoris",
+        "congestive heart failure",
+        "valvular regurgitation",
+        "arrhythmia"
+      ],
+      "operations": [
+        "prescribing medication",
+        "monitoring vitals",
+        "conducting an ECG",
+        "performing a stress test",
+        "administering intravenous fluids"
+      ],
+      "triggers": [
+        "chest pain",
+        "shortness of breath",
+        "dizziness or lightheadedness",
+        "fainting",
+        "pounding heartbeats (palpitations)"
+      ],
+      "metrics": [
+        "ejection fraction",
+        "blood pressure",
+        "heart rate",
+        "serum creatinine",
+        "cardiac output"
+      ],
+      "actors": [
+        "patients",
+        "physicians",
+        "nurses",
+        "cardiologists",
+        "healthcare providers"
+      ],
+      "risk_concepts": [
+        "cardiovascular events",
+        "myocardial infarction risk",
+        "stroke risk",
+        "sudden cardiac arrest",
+        "heart failure exacerbation"
+      ],
+      "generic_refs": [
+        "cardiac conditions",
+        "vital signs",
+        "diagnostic tests",
+        "treatment protocols",
+        "patient outcomes"
+      ],
+      "protocols": [
+        "heart failure",
+        "coronary artery disease",
+        "cardiac arrest",
+        "atrial fibrillation",
+        "myocardial infarction"
+      ]
+    },
+    "contract_review": {
+      "mechanisms": [
+        "formal verification",
+        "code analysis",
+        "static analysis",
+        "runtime verification",
+        "security checks"
+      ],
+      "operations": [
+        "checking safety",
+        "reviewing contracts",
+        "analyzing code",
+        "conducting audits",
+        "testing functionality"
+      ],
+      "triggers": [
+        "vulnerabilities discovered",
+        "unexpected behavior",
+        "hack attempts",
+        "security breaches",
+        "protocol updates"
+      ],
+      "metrics": [
+        "code complexity",
+        "vulnerability score",
+        "risk level",
+        "audit coverage",
+        "code quality metrics"
+      ],
+      "actors": [
+        "auditors",
+        "developers",
+        "contract reviewers",
+        "security experts",
+        "protocol maintainers"
+      ],
+      "risk_concepts": [
+        "execution risk",
+        "hacking risks",
+        "smart contract vulnerabilities",
+        "loss of funds",
+        "reentrancy attacks"
+      ],
+      "generic_refs": [
+        "decentralized finance (DeFi) protocols",
+        "cryptographic security measures",
+        "smart contract development frameworks",
+        "blockchain network security",
+        "protocol governance"
+      ],
+      "protocols": [
+        "smart contracts",
+        "token contracts",
+        "lending protocols",
+        "security audits",
+        "audit reports"
+      ]
+    },
+    "crypto": {
+      "mechanisms": [
+        "concentrated liquidity",
+        "impermanent loss",
+        "flash loan",
+        "stablecoin peg",
+        "swap routing",
+        "order matching",
+        "proof of stake (PoS)",
+        "liquidity mining",
+        "rebalancing strategies"
+      ],
+      "operations": [
+        "swapping tokens",
+        "consolidating funds",
+        "staking",
+        "unstaking",
+        "deploying contracts",
+        "creating multisigs",
+        "depositing collateral",
+        "withdrawing assets",
+        "selling options",
+        "moving funds across L1-L2 bridges"
+      ],
+      "triggers": [
+        "market movements",
+        "price drops",
+        "liquidity changes",
+        "protocol updates",
+        "network upgrades",
+        "price volatility",
+        "decentralized exchange (DEX) flash loan attacks",
+        "network congestion",
+        "token supply events"
+      ],
+      "metrics": [
+        "slippage",
+        "gas fees",
+        "premiums",
+        "strike prices",
+        "liquidity pools",
+        "peg deviation",
+        "historical volatility",
+        "on-chain transactions",
+        "market capitalization",
+        "trade volumes"
+      ],
+      "actors": [
+        "borrowers",
+        "traders",
+        "DAO members",
+        "users",
+        "miners",
+        "developers",
+        "validators"
+      ],
+      "risk_concepts": [
+        "flash loan attacks",
+        "slippage risk",
+        "market manipulation",
+        "price oracle attacks",
+        "gas inefficiency",
+        "liquidation risk",
+        "front running",
+        "reentrancy attacks",
+        "decentralization risk"
+      ],
+      "generic_refs": [
+        "lending protocols",
+        "DEXs (Decentralized Exchanges)",
+        "smart contracts",
+        "token swaps",
+        "cryptographic assets",
+        "stability fees",
+        "gas costs",
+        "blockchain networks"
+      ],
+      "protocols": [
+        "Aave",
+        "Lyra",
+        "Gnosis Safe",
+        "Uniswap V3",
+        "Curve",
+        "Lido",
+        "Blast L2",
+        "Wormhole",
+        "Eigenlayer",
+        "dYdX"
+      ]
+    },
+    "crypto_trading": {
+      "mechanisms": [
+        "leveraged staking",
+        "flash loan",
+        "arbitrage (arb)",
+        "liquidity pool imbalance",
+        "slippage minimization",
+        "leverage trading",
+        "short selling"
+      ],
+      "operations": [
+        "depositing",
+        "borrowing",
+        "buying more ETH",
+        "repaying flash loan",
+        "selling",
+        "monitoring liquidity pools",
+        "position management"
+      ],
+      "triggers": [
+        "price fluctuation",
+        "liquidity imbalance",
+        "block timestamp",
+        "gas fees",
+        "slippage threshold"
+      ],
+      "metrics": [
+        "liquidity factor",
+        "imbalance percentage",
+        "gas cost",
+        "position value",
+        "leverage ratio",
+        "flash loan fee"
+      ],
+      "actors": [
+        "borrowers",
+        "traders",
+        "liquidity providers",
+        "market makers",
+        "smart contract users"
+      ],
+      "risk_concepts": [
+        "slippage risk",
+        "gas price volatility",
+        "imbalance risk",
+        "flash loan risk",
+        "leverage amplification"
+      ],
+      "generic_refs": [
+        "lending protocols",
+        "trading platforms",
+        "smart contract systems"
+      ],
+      "protocols": [
+        "Aave",
+        "Curve",
+        "dYdX",
+        "GMX",
+        "3pool",
+        "DEXes",
+        "USDC",
+        "ETH",
+        "USD"
+      ]
+    },
+    "cryptocurrencies": {
+      "mechanisms": [
+        "liquidity provision",
+        "automated market making (AMM)",
+        "price oracle",
+        "yield farming",
+        "stableswap invariant",
+        "constant product AMM",
+        "uniswap liquidity pool",
+        "oracle price feed",
+        "smart contract execution"
+      ],
+      "operations": [
+        "adding collateral",
+        "withdrawing assets",
+        "liquidity staking",
+        "trading pairs",
+        "staking rewards claim",
+        "delegating governance tokens",
+        "market making",
+        "synthetic asset creation",
+        "yield harvesting"
+      ],
+      "triggers": [
+        "price volatility",
+        "slippage risk",
+        "flash loan attacks",
+        "protocol upgrade",
+        "token price drop",
+        "liquidity pool imbalance",
+        "gas fee increase",
+        "decentralized exchange (DEX) flash crash",
+        "smart contract exploit"
+      ],
+      "metrics": [
+        "liquidity depth",
+        "trade execution rate",
+        "AMM slippage",
+        "APY (annual percentage yield)",
+        "flash loan size limit",
+        "gas fee cost",
+        "protocol fees collected",
+        "user liquidity share",
+        "pool token value"
+      ],
+      "actors": [
+        "traders",
+        "liquidity providers",
+        "governance token holders",
+        "yield farmers",
+        "smart contract auditors",
+        "auditors",
+        "DEX users",
+        "crypto enthusiasts",
+        "protocol developers"
+      ],
+      "risk_concepts": [
+        "flash loan risk",
+        "oracle attack",
+        "gas fee manipulation",
+        "slippage risk",
+        "liquidity trap",
+        "protocol vulnerability",
+        "decentralization risk",
+        "price oracle dependency",
+        "smart contract failure"
+      ],
+      "generic_refs": [
+        "cryptocurrency exchanges",
+        "blockchain networks",
+        "smart contract platforms",
+        "Decentralized Finance (DeFi) protocols",
+        "Token standards and specifications",
+        "Liquidity provision strategies",
+        "Cryptographic security measures",
+        "Smart contract deployment practices",
+        "Tokenomics"
+      ],
+      "protocols": [
+        "Aave",
+        "Curve Finance",
+        "Compound",
+        "MakerDAO",
+        "Uniswap",
+        "Binance Smart Chain (BSC)",
+        "Ethereum",
+        "Polygon",
+        "Terra",
+        "Uniswap v3",
+        "Chainlink",
+        "Augur"
+      ]
+    },
+    "cryptography": {
+      "mechanisms": [
+        "Zero-Knowledge Proofs",
+        "Commitment Schemes",
+        "Pairing-Based Cryptography",
+        "Homomorphic Encryption",
+        "Threshold Cryptography",
+        "Multi-party Computation (MPC)",
+        "Blockchain Consensus Algorithms",
+        "Key Agreement Protocols",
+        "Symmetric Key Algorithms",
+        "Asymmetric Key Algorithms"
+      ],
+      "operations": [
+        "Generating Keys",
+        "Signing Transactions",
+        "Verifying Signatures",
+        "Encrypting Messages",
+        "Decrypting Encrypted Data",
+        "Updating Keystores",
+        "Deploying Smart Contracts",
+        "Transferring Assets",
+        "Key Management",
+        "Certification Authorities"
+      ],
+      "triggers": [
+        "Data Breaches",
+        "Security Vulnerabilities",
+        "Malicious Attacks",
+        "Regulatory Compliance Issues",
+        "Performance Bottlenecks",
+        "Network Downtime",
+        "Algorithmic Flaws"
+      ],
+      "metrics": [
+        "Transaction Throughput",
+        "Latency",
+        "Cryptography Performance",
+        "Key Size",
+        "Hash Rate",
+        "Block Time",
+        "Round Trip Time (RTT)",
+        "Encryption Speed",
+        "Decryption Efficiency"
+      ],
+      "actors": [
+        "Cryptography Experts",
+        "Security Analysts",
+        "Cryptographers",
+        "Blockchain Developers",
+        "System Administrators",
+        "Network Engineers",
+        "Data Scientists",
+        "Software Engineers",
+        "Legal Compliance Officers"
+      ],
+      "risk_concepts": [
+        "Key Compromise",
+        "Replay Attacks",
+        "Side-Channel Attacks",
+        "Man-in-the-Middle (MitM) Attacks",
+        "Zero-Day Exploits",
+        "Smart Contract Vulnerabilities",
+        "Quantum Computing Threats",
+        "Cryptographic Weaknesses",
+        "Collision Resistance",
+        "Algorithmic Security"
+      ],
+      "generic_refs": [
+        "Encryption Algorithms",
+        "Decryption Techniques",
+        "Secure Communication Protocols",
+        "Digital Security Measures",
+        "Crypto Libraries"
+      ],
+      "protocols": [
+        "zk-SNARKs",
+        "Zero-Knowledge Proofs",
+        "Elliptic Curve Cryptography",
+        "RSA Algorithm",
+        "SHA-256",
+        "Public Key Infrastructure (PKI)",
+        "Hash Functions",
+        "Digital Signatures",
+        "Blockchain Networks",
+        "Cryptographic Hash Functions"
+      ]
+    },
+    "dao": {
+      "mechanisms": [
+        "governance attacks",
+        "voting mechanisms",
+        "quorum thresholds",
+        "timelock contracts",
+        "oracle manipulation"
+      ],
+      "operations": [
+        "proposing a proposal",
+        "voting on proposals",
+        "executing approved actions",
+        "transferring tokens",
+        "adding/removing members"
+      ],
+      "triggers": [
+        "low quorum participation",
+        "unexpected vote outcome",
+        "smart contract exploit",
+        "price oracle failure",
+        "governance token distribution changes"
+      ],
+      "metrics": [
+        "token balance",
+        "proposals approval rate",
+        "member engagement level",
+        "protocol liquidity",
+        "network transaction volume"
+      ],
+      "actors": [
+        "members",
+        "proposers",
+        "executors",
+        "validators",
+        "auditors"
+      ],
+      "risk_concepts": [
+        "governance risk",
+        "smart contract security",
+        "flash loan attacks",
+        "51% voting power",
+        "timelock exploitation"
+      ],
+      "generic_refs": [
+        "tokenized assets",
+        "decentralized finance platforms",
+        "governance tokens",
+        "community governance",
+        "smart contracts"
+      ],
+      "protocols": [
+        "DAO",
+        "Gnosis Safe",
+        "Compound",
+        "MakerDAO",
+        "Aragon"
+      ]
+    },
+    "defi": {
+      "mechanisms": [
+        "yield farming",
+        "liquidity mining",
+        "smart contracts",
+        "automated market makers (AMM)",
+        "over-collateralization",
+        "price oracles",
+        "oracle attacks",
+        "flash loans",
+        "compound interest",
+        "reentrancy"
+      ],
+      "operations": [
+        "adding liquidity",
+        "removing liquidity",
+        "trading tokens",
+        "yield farming",
+        "staking tokens",
+        "borrowing assets",
+        "repaying debts",
+        "claiming rewards",
+        "migrating funds",
+        "liquidating positions"
+      ],
+      "triggers": [
+        "market volatility",
+        "gas prices spike",
+        "protocol hack",
+        "price drops",
+        "liquidity shortages",
+        "unforeseen bugs",
+        "oracle failures",
+        "decreasing collateral value",
+        "unexpected protocol changes",
+        "chain downtime"
+      ],
+      "metrics": [
+        "health factor",
+        "APY (Annual Percentage Yield)",
+        "impermanent loss",
+        "gas fees",
+        "protocol fees",
+        "yield efficiency",
+        "liquidity pool depth",
+        "trading volume",
+        "collateral ratio",
+        "compound interest rate"
+      ],
+      "actors": [
+        "borrowers",
+        "lenders",
+        "traders",
+        "yield farmers",
+        "staking validators",
+        "protocol developers",
+        "auditors",
+        "network operators"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "flash loan attacks",
+        "decentralization risks",
+        "oracle vulnerabilities",
+        "smart contract exploits",
+        "gas price manipulation",
+        "reputation risk",
+        "chain divergence",
+        "protocol forks",
+        " regulatory compliance"
+      ],
+      "generic_refs": [
+        "lending protocols",
+        "yield generation mechanisms",
+        "decentralized exchanges (DEX)",
+        "blockchain networks",
+        "smart contract wallets",
+        "automated market making (AMM) platforms",
+        "financial instruments",
+        "crypto assets"
+      ],
+      "protocols": [
+        "Aave",
+        "Uniswap",
+        "Curve",
+        "Compound",
+        "SushiSwap",
+        "MakerDAO",
+        "Yearn Finance",
+        "Harvest Finance",
+        "Base Protocol",
+        "Ethereum"
+      ]
+    },
+    "ethereum": {
+      "mechanisms": [
+        "gas prices",
+        "blob transactions",
+        "rollups",
+        "account abstraction",
+        "proto-danksharding",
+        "Flashbots Protect"
+      ],
+      "operations": [
+        "bridging assets",
+        "transferring ETH",
+        "running a validator",
+        "staking ETH",
+        "checking staked balance"
+      ],
+      "triggers": [
+        "gas fees",
+        "validator getting slashed"
+      ],
+      "metrics": [
+        "staked ETH",
+        "ETH value",
+        "gas fee rate"
+      ],
+      "actors": [
+        "validators",
+        "users",
+        "flashbots users"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "validator slashing risk",
+        "sandwich attacks"
+      ],
+      "generic_refs": [
+        "ethereum wallets",
+        "staking protocols"
+      ],
+      "protocols": [
+        "Ethereum",
+        "Arbitrum",
+        "Beacon Chain",
+        "Flashbots",
+        "EIP-1559",
+        "EIP-4844",
+        "ERC-4337"
+      ]
+    },
+    "finance": {
+      "mechanisms": [
+        "restaking",
+        "impermanent loss",
+        "protocol-owned liquidity",
+        "prediction markets",
+        "front-running"
+      ],
+      "operations": [
+        "earn interest",
+        "lock-up positions",
+        "add liquidity",
+        "remove liquidity",
+        "pay interest"
+      ],
+      "triggers": [
+        "prices fluctuate",
+        "market drawdown",
+        "drawdown by X%",
+        "HF based on market conditions",
+        "need liquidity now"
+      ],
+      "metrics": [
+        "interest rate",
+        "health factor (HF)",
+        "liquidity",
+        "impermanent loss",
+        "MEV profit"
+      ],
+      "actors": [
+        "borrowers",
+        "lenders",
+        "market participants",
+        "LPs (Liquidity Providers)",
+        "stakers"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "impermanent loss risk",
+        "MEV risk",
+        "drawdown risk",
+        "HF risk"
+      ],
+      "generic_refs": [
+        "decentralized finance (DeFi) protocols",
+        "financial markets",
+        "liquidity providers (LPs)",
+        "smart contracts",
+        "market conditions"
+      ],
+      "protocols": [
+        "Eigenlayer",
+        "Balancer pool",
+        "Polymarket",
+        "front-running",
+        "MEV (Miner Extracted Value)",
+        "lending protocols",
+        "market drawdown",
+        "health factor (HF)"
+      ]
+    },
+    "gaming": {
+      "mechanisms": [
+        "Rekt",
+        "Illiquid Position",
+        "Smart Contract",
+        "Decentralized Finance (DeFi)",
+        "Tokenomics",
+        "Staking Rewards",
+        "Liquidity Pool",
+        "Automated Market Maker (AMM)"
+      ],
+      "operations": [
+        "Adding Liquidity",
+        "Removing Liquidity",
+        "Trading Tokens",
+        "Staking Assets",
+        "Withdrawing Profits",
+        "Claiming Rewards",
+        "Betting on Games"
+      ],
+      "triggers": [
+        "Market Volatility",
+        "Token Price Fluctuations",
+        "Hack Attack",
+        "Smart Contract Glitch",
+        "Gaming Cheats",
+        "Economic Downturn",
+        "Regulatory Changes"
+      ],
+      "metrics": [
+        "Health Factor",
+        "Liquidity Ratio",
+        "Token Value",
+        "Profit Margin",
+        "Risk of Loss",
+        "Staking Reward Rate",
+        "Token Circulation Supply"
+      ],
+      "actors": [
+        "Gamers",
+        "Players",
+        "Traders",
+        "Investors",
+        "DeFi Users",
+        "NFT Collectors",
+        "Smart Contract Developers"
+      ],
+      "risk_concepts": [
+        "Liquidity Risk",
+        "Market Risk",
+        "Smart Contract Risk",
+        "Regulatory Risk",
+        "Hacking Risk",
+        "P2E Scam",
+        "Decentralization Risk"
+      ],
+      "generic_refs": [
+        "Gaming Protocols",
+        "Virtual Economies",
+        "Blockchain Games",
+        "Play-to-Earn Mechanisms",
+        "Crypto-based Gaming"
+      ],
+      "protocols": [
+        "Uni V3",
+        "Aave",
+        "Decentraland",
+        "Play-to-Earn (P2E)",
+        "Metaverse",
+        "Gaming Platform",
+        "NFT Marketplace",
+        "Crypto Games",
+        "Blockchain Gaming",
+        "Virtual World"
+      ]
+    },
+    "general": {
+      "mechanisms": [
+        "whale watching",
+        "front running",
+        "historical analysis",
+        "block level data retrieval",
+        "smart contract execution"
+      ],
+      "operations": [
+        "avoiding front running",
+        "analyzing data",
+        "retrieving historical data",
+        "updating health factors",
+        "tracking user behavior"
+      ],
+      "triggers": [
+        "whale activity",
+        "abnormal blockchain transactions",
+        "user behavior patterns",
+        "data inconsistencies",
+        "health condition changes"
+      ],
+      "metrics": [
+        "health factor",
+        "blockchain transaction volume",
+        "wallet balance",
+        "user activity level",
+        "protocol performance metrics"
+      ],
+      "actors": [
+        "user",
+        "patient",
+        "whale",
+        "analyst",
+        "healthcare provider staff"
+      ],
+      "risk_concepts": [
+        "front running risk",
+        "data privacy risks",
+        "misdiagnosis",
+        "smart contract security",
+        "protocol failure"
+      ],
+      "generic_refs": [
+        "users",
+        "patients",
+        "wallets",
+        "blockchains",
+        "health factors"
+      ],
+      "protocols": [
+        "wallet",
+        "address",
+        "blockchain",
+        "user",
+        "protocol",
+        "lending protocol",
+        "healthcare provider",
+        "sample",
+        "data set"
+      ]
+    },
+    "governance": {
+      "mechanisms": [
+        "proposing changes",
+        "voting process",
+        "delegation",
+        "quorum requirements",
+        "weighting scheme"
+      ],
+      "operations": [
+        "submitting a proposal",
+        "casting votes",
+        "monitoring vote counts",
+        "implementing changes",
+        "receiving notifications"
+      ],
+      "triggers": [
+        "protocol update proposals",
+        "major system changes",
+        "community discussions",
+        "vote deadlines approaching",
+        "network upgrades scheduled"
+      ],
+      "metrics": [
+        "voting power distribution",
+        "proposal success rate",
+        "quorum achieved",
+        "community engagement level",
+        "token holder influence"
+      ],
+      "actors": [
+        "token holders",
+        "protocol administrators",
+        "governance committee members",
+        "stakeholders",
+        "network participants"
+      ],
+      "risk_concepts": [
+        "voting manipulation",
+        "delegation abuse",
+        "quorum risk",
+        "governance deadlock",
+        "malicious proposals"
+      ],
+      "generic_refs": [
+        "governance protocols",
+        "community governance structures",
+        "decentralized autonomous organizations (DAOs)"
+      ],
+      "protocols": [
+        "governance tokens",
+        "proposal",
+        "fee structure",
+        "merger",
+        "voting mechanism"
+      ]
+    },
+    "health": {
+      "mechanisms": [
+        "Symptom tracking",
+        "Remote patient monitoring",
+        "Genetic testing",
+        "Radiological imaging",
+        "Laboratory tests",
+        "Clinical decision support systems",
+        "Telehealth services",
+        "Electronic Health Records (EHR)",
+        "Patient portals"
+      ],
+      "operations": [
+        "Filing a claim",
+        "Scheduling an appointment",
+        "Requesting prescription refills",
+        "Booking an online consultation",
+        "Referring to another provider",
+        "Reporting adverse drug reactions",
+        "Updating personal health information",
+        "Managing medical records",
+        "Enrolling in a clinical trial"
+      ],
+      "triggers": [
+        "Symptoms worsen",
+        "Health conditions change",
+        "Insurance coverage expires",
+        "Medication side effects",
+        "Emergency room visit",
+        "Lab results indicate abnormal values",
+        "Annual check-up due",
+        "Pre-surgical evaluation needed",
+        "Post-operative follow-up required"
+      ],
+      "metrics": [
+        "Blood pressure",
+        "Body mass index (BMI)",
+        "Glucose levels",
+        "Cholesterol levels",
+        "Heart rate variability",
+        "Respiratory rate",
+        "Temperature",
+        "Health factor",
+        "Infection risk score",
+        "Vital signs"
+      ],
+      "actors": [
+        "Patients",
+        "Doctors",
+        "Nurses",
+        "Pharmacists",
+        "Administrative staff",
+        "Insurance agents",
+        "Research assistants",
+        "Healthcare administrators",
+        "Dietitians"
+      ],
+      "risk_concepts": [
+        "Misdiagnosis",
+        "Incorrect treatment",
+        "Medical errors",
+        "Patient non-compliance",
+        "Unforeseen complications",
+        "Data breaches",
+        "Cybersecurity threats",
+        "Fraudulent billing",
+        "Lack of informed consent"
+      ],
+      "generic_refs": [
+        "Lending protocols",
+        "Healthcare providers",
+        "Insurance policies",
+        "Medical treatments",
+        "Patient care"
+      ],
+      "protocols": [
+        "Mayo Clinic",
+        "Healthcare providers",
+        "Insurance companies",
+        "Telemedicine platforms",
+        "Clinical trials",
+        "Pharmaceutical companies",
+        "Hospitals",
+        "Clinics",
+        "Public health departments",
+        "Dental clinics"
+      ]
+    },
+    "investing": {
+      "mechanisms": [
+        "price volatility",
+        "liquidity mining",
+        "yield farming",
+        "smart contracts",
+        "automated market makers (AMM)"
+      ],
+      "operations": [
+        "buying cryptocurrency",
+        "selling assets",
+        "depositing liquidity",
+        "withdrawing funds",
+        "staking"
+      ],
+      "triggers": [
+        "market crashes",
+        "high volatility periods",
+        "price fluctuations",
+        "algorithmic adjustments",
+        "protocol upgrades"
+      ],
+      "metrics": [
+        "liquidity pool balance",
+        "token price",
+        "apy (annual percentage yield)",
+        "APR (annual percentage rate)",
+        "SLP (single liquidity position)"
+      ],
+      "actors": [
+        "traders",
+        "investors",
+        "miners",
+        "stakers",
+        "yield farmers"
+      ],
+      "risk_concepts": [
+        "flash loan attacks",
+        "51% attack",
+        "reentrancy attacks",
+        "gas limit issues",
+        "smart contract vulnerabilities"
+      ],
+      "generic_refs": [
+        "cryptocurrencies",
+        "decentralized finance (DeFi) platforms",
+        "trading pairs",
+        "staking pools",
+        "yield optimization strategies"
+      ],
+      "protocols": [
+        "GLP",
+        "GMX",
+        "BTC",
+        "Aave",
+        "Uniswap"
+      ]
+    },
+    "investment": {
+      "mechanisms": [
+        "Smart contracts",
+        "Liquidity pools",
+        "Tokenomics",
+        "Price oracles",
+        "Automated market makers (AMMs)",
+        "Flash loans",
+        "Staking rewards",
+        "Vaults"
+      ],
+      "operations": [
+        "Buying assets",
+        "Selling assets",
+        "Adding liquidity",
+        "Removing liquidity",
+        "Harvesting profits",
+        "Liquidating positions",
+        "Compounding returns",
+        "Dollar-Cost Averaging (DCA)"
+      ],
+      "triggers": [
+        "Market corrections",
+        "Price volatility",
+        "Regulatory changes",
+        "Hacking incidents",
+        "Smart contract exploits"
+      ],
+      "metrics": [
+        "Total value locked (TVL)",
+        "Daily trading volume",
+        "APY (Annual Percentage Yield)",
+        "Liquidity provision",
+        "Fees earned",
+        "Token distribution",
+        "Price-to-book ratio"
+      ],
+      "actors": [
+        "Traders",
+        "Investors",
+        "Whales",
+        "Market makers",
+        "Gatherers"
+      ],
+      "risk_concepts": [
+        "Flash loan attack",
+        "Reentrancy attacks",
+        "Gas limit issues",
+        "Front-running",
+        "Phishing scams",
+        "Platform downtime",
+        "Smart contract vulnerabilities"
+      ],
+      "generic_refs": [
+        "Trading strategies",
+        "Crypto assets",
+        "Investment vehicles",
+        "Blockchain networks",
+        "Decentralized applications (dApps)"
+      ],
+      "protocols": [
+        "Aave",
+        "Uniswap",
+        "Binance Smart Chain",
+        "DeFi protocols",
+        "Crypto exchange",
+        "HODL strategy",
+        "Compound Finance",
+        "Decentralized finance (DeFi)",
+        "Stablecoins",
+        "Non-fungible tokens (NFTs)"
+      ]
+    },
+    "lending": {
+      "mechanisms": [
+        "flash loan arb",
+        "stability mechanism",
+        "health factor",
+        "efficiency mode (E-Mode)",
+        "price range",
+        "rebalancing",
+        "limit order",
+        "smart contract risk",
+        "liquidation process",
+        "price impact"
+      ],
+      "operations": [
+        "adding collateral",
+        "repaying debt",
+        "staking tokens",
+        "unstaking tokens",
+        "claiming rewards",
+        "deploying flash loans",
+        "moving positions",
+        "setting stop losses",
+        "closing positions",
+        "migrating positions"
+      ],
+      "triggers": [
+        "price drop",
+        "health factor hit threshold",
+        "market price movement",
+        "liquidation risk",
+        "expiration of LP position",
+        "protocol update",
+        "reward distribution",
+        "APY change",
+        "entry price change",
+        "floor price change"
+      ],
+      "metrics": [
+        "health factor",
+        "liquidity ratio",
+        "debt-to-collateral ratio",
+        "liquidation price",
+        "APY (Annual Percentage Yield)",
+        "gas efficiency",
+        "collateral value",
+        "price",
+        "reward amount",
+        "token supply"
+      ],
+      "actors": [
+        "borrowers",
+        "stakers",
+        "liquidity providers",
+        "voters",
+        "traders",
+        "protocol developers"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "price volatility",
+        "APY fluctuation",
+        "smart contract failure",
+        "market manipulation",
+        "gas inefficiency",
+        "reentrancy attack",
+        "exploit risk",
+        "flash loan exploit",
+        "price range"
+      ],
+      "generic_refs": [
+        "lending protocols",
+        "exchange platforms",
+        "liquidity provision services",
+        "yield farming strategies",
+        "governance proposals",
+        "risk management tools",
+        "decentralized finance (DeFi) applications",
+        "smart contract interactions",
+        "liquidity pools",
+        "token staking programs"
+      ],
+      "protocols": [
+        "Aave",
+        "Compound",
+        "MakerDAO",
+        "Uniswap V3",
+        "BendDAO",
+        "dYdX",
+        "Curve 3pool",
+        "Morpho",
+        "Pendle PT position",
+        "CoW Swap"
+      ]
+    },
+    "privacy": {
+      "mechanisms": [
+        "CoinJoin",
+        "Privacy Tokens",
+        "Ring Signatures",
+        "Zero-Knowledge Proofs",
+        "Oblivious Transfer",
+        "Stealth Addresses",
+        "Tumbler Mechanism"
+      ],
+      "operations": [
+        "Mixing Transactions",
+        "Shielding Assets",
+        "Obfuscating Wallets",
+        "Privacy Token Swaps",
+        "Anonymizing Transactions"
+      ],
+      "triggers": [
+        "Regulatory Scrutiny",
+        "Law Enforcement Action",
+        "Marketplace Penalties",
+        "User Privacy Concerns",
+        "Transaction Monitoring"
+      ],
+      "metrics": [
+        "Privacy Score",
+        "Transparency Level",
+        "Anonymity Factor",
+        "Confidentiality Rating",
+        "Security Metrics"
+      ],
+      "actors": [
+        "Users",
+        "Wallet Holders",
+        "Blockchain Analysts",
+        "Regulatory Bodies",
+        "Market Participants"
+      ],
+      "risk_concepts": [
+        "Privacy Breach",
+        "Data Exposure",
+        "Re-identification Risk",
+        "Tracking Vulnerability",
+        "Compliance Failures"
+      ],
+      "generic_refs": [
+        "Privacy Solutions",
+        "Blockchain Privacy Tools",
+        "Onchain Privacy Measures",
+        "Anonymization Techniques",
+        "Confidentiality Enhancements"
+      ],
+      "protocols": [
+        "Tornado Cash",
+        "Mixers",
+        "Privacy Protocols",
+        "Onchain Privacy Solutions",
+        "Decentralized Finance (DeFi)",
+        "Smart Contracts",
+        "Blockchain Privacy",
+        "ZK-SNARKs",
+        "Confidential Transactions"
+      ]
+    },
+    "security": {
+      "mechanisms": [
+        "reentrancy attack",
+        "restaking",
+        "proxy upgrade patterns (UUPS, Transparent Proxy)",
+        "multisig"
+      ],
+      "operations": [
+        "implementing security measures",
+        "deploying smart contracts",
+        "upgrading contracts"
+      ],
+      "triggers": [
+        "vulnerabilities in code",
+        "price manipulation attempts",
+        "security breaches"
+      ],
+      "metrics": [
+        "code audit quality",
+        "transaction throughput",
+        "response time"
+      ],
+      "actors": [
+        "attacker",
+        "developer",
+        "auditor"
+      ],
+      "risk_concepts": [
+        "reentrancy risk",
+        "upgrade risk",
+        "smart contract vulnerability",
+        "permissionless access"
+      ],
+      "generic_refs": [
+        "security protocols",
+        "blockchain security"
+      ],
+      "protocols": [
+        "The DAO",
+        "Eigenlayer",
+        "AVSe",
+        "Gnosis Safe"
+      ]
+    },
+    "smart_contract": {
+      "mechanisms": [
+        "reentrancy attack",
+        "overflow/underflow",
+        "race condition",
+        "state mutability",
+        "storage"
+      ],
+      "operations": [
+        "deploying a contract",
+        "calling a function",
+        "transferring tokens",
+        "adding liquidity",
+        "withdrawing collateral"
+      ],
+      "triggers": [
+        "unauthorized access",
+        "improper permissions",
+        "unexpected conditions",
+        "malicious inputs",
+        "race condition execution"
+      ],
+      "metrics": [
+        "gas limit",
+        "gas usage",
+        "transaction cost",
+        "contract balance",
+        "total supply"
+      ],
+      "actors": [
+        "developer",
+        "user",
+        "attacker",
+        "auditor",
+        "validator"
+      ],
+      "risk_concepts": [
+        "security vulnerability",
+        "exploitation risk",
+        "smart contract failure",
+        "coding errors",
+        "execution issues"
+      ],
+      "generic_refs": [
+        "decentralized finance (DeFi) protocols",
+        "cryptographic algorithms",
+        "ethereum blockchain",
+        "solidity programming language",
+        "blockchain development"
+      ],
+      "protocols": [
+        "smart contract",
+        "Solidity",
+        "Aave",
+        "Compound",
+        "MakerDAO"
+      ]
+    },
+    "smart_contracts": {
+      "mechanisms": [
+        "upgradeability",
+        "self-executing contract",
+        "gas limit",
+        "reentrancy attack",
+        "state mutability",
+        "call stack overflow",
+        "fallback function",
+        "proxy pattern",
+        "cross-domain messaging"
+      ],
+      "operations": [
+        "deploy smart contract",
+        "execute transaction",
+        "update code",
+        "transfer tokens",
+        "set permissions",
+        "log events",
+        "call another contract",
+        "initialize state",
+        "refund user funds"
+      ],
+      "triggers": [
+        "malicious input",
+        "gas limit exceeded",
+        "contract exploit",
+        "code upgrade request",
+        "unexpected transaction flow",
+        "oracle failure",
+        "unauthorized access attempt",
+        "smart contract bug discovery",
+        "external interface change"
+      ],
+      "metrics": [
+        "transaction success rate",
+        "gas consumption",
+        "execution time",
+        "state transition probability",
+        "code coverage",
+        "auditing score",
+        "security rating",
+        "contract interaction frequency",
+        "oracle response latency"
+      ],
+      "actors": [
+        "smart contract developer",
+        "user",
+        "node operator",
+        "auditor",
+        "security analyst",
+        "funds manager",
+        "blockchain participant",
+        "contract owner",
+        "community member"
+      ],
+      "risk_concepts": [
+        "reentrancy risk",
+        "permission abuse",
+        "oracle tampering",
+        "state corruption",
+        "smart contract bug",
+        "gas poisoning",
+        "denial of service (DoS)",
+        "cross-contract vulnerability",
+        "upgradability flaw"
+      ],
+      "generic_refs": [
+        "cryptographic security",
+        "protocol integrity",
+        "network reliability",
+        "transactional consistency",
+        "blockchain interoperability",
+        "decentralized trust",
+        "contract execution reliability",
+        "smart contract governance",
+        "security audit process"
+      ],
+      "protocols": [
+        "smart contract",
+        "Ethereum",
+        "Solidity",
+        "DAO",
+        "Chainlink",
+        "MakerDAO",
+        "Compound",
+        "Decentralized Application (DApp)",
+        "Oracle",
+        "Token",
+        "Smart Contract Vulnerability",
+        "Decentralized Finance (DeFi)"
+      ]
+    },
+    "staking": {
+      "mechanisms": [
+        "staking",
+        "restaking",
+        "unstaking",
+        "slashing risk",
+        "stake splitting"
+      ],
+      "operations": [
+        "adding liquidity",
+        "restaking",
+        "exit staking",
+        "withdrawal",
+        "validator running"
+      ],
+      "triggers": [
+        "staking rewards decrease",
+        "market volatility",
+        "smart contract exploits",
+        "price drops",
+        "APY changes"
+      ],
+      "metrics": [
+        "APY (Annual Percentage Yield)",
+        "health factor",
+        "stake size",
+        "restaking rate",
+        "slashing penalty"
+      ],
+      "actors": [
+        "validators",
+        "stakers",
+        "restakers",
+        "liquidity providers",
+        "protocol administrators"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "smart contract risk",
+        "slashing risk",
+        "market risk",
+        "protocol governance risk"
+      ],
+      "generic_refs": [
+        "staking protocols",
+        "restaking mechanisms",
+        "unstaking processes",
+        "staking rewards distribution",
+        "liquidity provision"
+      ],
+      "protocols": [
+        "Eigenlayer",
+        "Lido",
+        "staking protocols",
+        "restaking",
+        "liquid staking derivatives"
+      ]
+    },
+    "taxes": {
+      "mechanisms": [
+        "Capital gains tax",
+        "Withholding taxes",
+        "Double taxation agreements",
+        "Estate and inheritance taxes",
+        "VAT (Value Added Tax)",
+        "Corporate income tax",
+        "Progressive taxation",
+        "Tax deductions",
+        "Tax credits"
+      ],
+      "operations": [
+        "Filing tax returns",
+        "Claiming deductions",
+        "Amending tax returns",
+        "Hiring a tax preparer",
+        "Submitting tax payments",
+        "Reviewing audit notices",
+        "E-filing taxes",
+        "Withholding income taxes",
+        "Processing tax refunds"
+      ],
+      "triggers": [
+        "Year-end accounting",
+        "Business closures",
+        "Acquisition of assets",
+        "Legal changes in tax laws",
+        "Sale of cryptocurrency",
+        "Change in employment status",
+        "Divorce or partnership dissolution",
+        "Major life events (e.g., birth, death)",
+        "International transactions"
+      ],
+      "metrics": [
+        "Tax liability",
+        "Capital gains",
+        "Gross income",
+        "Adjusted gross income",
+        "Net worth",
+        "Tax rates",
+        "Interest on overdue taxes",
+        "Estimated tax payments",
+        "Tax deductions claimed"
+      ],
+      "actors": [
+        "Taxpayers",
+        "Accountants",
+        "CPAs (Certified Public Accountants)",
+        "Enrolled agents",
+        "Legal counsel",
+        "Financial advisors",
+        "Tax preparers",
+        "Tax attorneys",
+        "Business owners"
+      ],
+      "risk_concepts": [
+        "Underreporting income",
+        "Non-compliance penalties",
+        "Audit risk",
+        "Misclassification of income",
+        "Overpayment of taxes",
+        "Evasion of taxes",
+        "Fraudulent deductions",
+        "Tax havens and offshore accounts"
+      ],
+      "generic_refs": [
+        "Tax strategies",
+        "Tax planning",
+        "Tax avoidance",
+        "Tax evasion",
+        "Tax optimization"
+      ],
+      "protocols": [
+        "tax authorities",
+        "IRS",
+        "Internal Revenue Service",
+        "Taxonomic codes",
+        "W9 forms",
+        "Foreign Account Tax Compliance Act (FATCA)",
+        "Compliance software",
+        "Tax returns",
+        "1099-K forms",
+        "KPMG"
+      ]
+    },
+    "tokenomics": {
+      "mechanisms": [
+        "Vesting",
+        "TimeLocking",
+        "GovernanceTokens",
+        "DecentralizedFinance",
+        "Delegation"
+      ],
+      "operations": [
+        "StakingTokens",
+        "UnstakingTokens",
+        "ClaimRewards",
+        "VoteOnProposals",
+        "AllocateVeTokens"
+      ],
+      "triggers": [
+        "APRIncreases",
+        "MarketCapGrows",
+        "TokenSupplyReduces",
+        "VotingPeriodEnds",
+        "LockupExpiration"
+      ],
+      "metrics": [
+        "APR",
+        "StakedAmount",
+        "VeWeight",
+        "EmissionRate",
+        "GovernanceScore"
+      ],
+      "actors": [
+        "Stakers",
+        "Tokenholders",
+        "Governors",
+        "Miners",
+        "LiquidityProviders"
+      ],
+      "risk_concepts": [
+        "SpoofingAttack",
+        "FlashLoanAttack",
+        "ReentrancyRisk",
+        "VotingPowerGerrymandering",
+        "MarketManipulation"
+      ],
+      "generic_refs": [
+        "StakingProtocols",
+        "TokenizationStrategies",
+        "IncentiveSchemes",
+        "GovernanceMechanisms",
+        "LiquidityPools"
+      ],
+      "protocols": [
+        "veCRV",
+        "veBAL",
+        "Gauge",
+        "Staking",
+        "RewardsPool"
+      ]
+    },
+    "trading": {
+      "mechanisms": [
+        "Decentralized Finance (DeFi)",
+        "Constant Product Market Maker (CPMM)",
+        "Front-Running",
+        "Back-Running",
+        "Sandwich Attack",
+        "TWAP Orders",
+        "Liquidity Pool Manipulation",
+        "Price Impact"
+      ],
+      "operations": [
+        "Adding Liquidity",
+        "Removing Liquidity",
+        "Swapping Assets",
+        "Funding Fees",
+        "Rebalancing Strategies",
+        "Setting Slippage Tolerance",
+        "Deploying Trading Bots",
+        "Monitoring Market Conditions"
+      ],
+      "triggers": [
+        "Price Fluctuations",
+        "Volume Changes",
+        "Slippage Issues",
+        "MEV Activity",
+        "Market Depth Imbalance",
+        "Front-Running Events",
+        "Back-Running Opportunities"
+      ],
+      "metrics": [
+        "Health Factor",
+        "Trading Volume",
+        "Liquidity Pool Size",
+        "Price Impact Percentage",
+        "Slippage Tolerance Level",
+        "MEV Risk Score",
+        "Trade Execution Time"
+      ],
+      "actors": [
+        "Traders",
+        "Miners",
+        "Smart Contract Developers",
+        "Liquidity Providers (LPs)",
+        "DEX Aggregators",
+        "Arbitrageurs",
+        "Market Makers"
+      ],
+      "risk_concepts": [
+        "MEV Risk",
+        "Slippage Risk",
+        "Front-Running Vulnerability",
+        "Sandwich Attack Risk",
+        "Liquidity Risk",
+        "Gas Price Manipulation",
+        "Smart Contract Bugs"
+      ],
+      "generic_refs": [
+        "Trading Protocols",
+        "DEX Platforms",
+        "Lending Markets",
+        "DeFi Applications",
+        "Blockchain Networks"
+      ],
+      "protocols": [
+        "Aave",
+        "Uniswap",
+        "Arbitrum",
+        "TWAP (Time-Weighted Average Price)",
+        "MEV (Miner Extractable Value)",
+        "DYDX",
+        "Slippage Tolerance",
+        "Isolated Margin",
+        "Cross Margin",
+        "Liquidity Providers (LPs)",
+        "DEX Aggregator"
+      ]
+    },
+    "web_analysis": {
+      "mechanisms": [
+        "Page Load Time",
+        "Bounce Rate Calculation",
+        "Session Duration Analysis",
+        "Clickstream Tracking",
+        "Traffic Sources Segmentation"
+      ],
+      "operations": [
+        "Setting Up Tracking Code",
+        "Configuring Goals",
+        "Viewing Real-Time Data",
+        "Generating Reports",
+        "Analyzing User Behavior"
+      ],
+      "triggers": [
+        "High Bounce Rate",
+        "Increased Bandwidth Usage",
+        "Declining Traffic",
+        "New Competitor Entry",
+        "Seasonal Trends"
+      ],
+      "metrics": [
+        "Page Views",
+        "Unique Visitors",
+        "Conversion Rates",
+        "Average Session Duration",
+        "Exit Rate"
+      ],
+      "actors": [
+        "Webmasters",
+        "Content Creators",
+        "Marketing Teams",
+        "Analytics Experts",
+        "SEO Specialists"
+      ],
+      "risk_concepts": [
+        "Data Privacy Violations",
+        "Bot Activity",
+        "Referrer Spam",
+        "Invalid Traffic",
+        "Malware Infection"
+      ],
+      "generic_refs": [
+        "Traffic Sources",
+        "Website Performance Indicators",
+        "User Engagement Metrics",
+        "Analytics Software",
+        "Web Performance Data"
+      ],
+      "protocols": [
+        "Google Analytics",
+        "Webpage Metrics",
+        "Website Health",
+        "URL",
+        "SEO Tools"
+      ]
+    },
+    "yield farming": {
+      "mechanisms": [
+        "yield farming",
+        "liquidity provision",
+        "yield compounding",
+        "staking rewards",
+        "smart contracts",
+        "automated market making (AMM)",
+        "yield optimization",
+        "flash loans",
+        "yieldspace"
+      ],
+      "operations": [
+        "depositing liquidity",
+        "harvesting yield",
+        "claiming rewards",
+        "withdrawing funds",
+        "adding liquidity",
+        "removing liquidity",
+        "optimizing yields",
+        "switching protocols",
+        "claiming fees"
+      ],
+      "triggers": [
+        "market volatility",
+        "price drops",
+        "interest rate changes",
+        "supply and demand fluctuations",
+        "protocol upgrades",
+        "liquidity shortages",
+        "network congestion",
+        "transaction delays",
+        "reward rate reductions"
+      ],
+      "metrics": [
+        "APY (Annual Percentage Yield)",
+        "health factor",
+        "yield efficiency",
+        "compound interest",
+        "stability fee",
+        "slippage",
+        "gas fees",
+        "swap fees",
+        "protocol fees"
+      ],
+      "actors": [
+        "yield farmers",
+        "liquidity providers",
+        "smart contract developers",
+        "protocol operators",
+        "yield optimizers",
+        "market participants",
+        "users",
+        "developers"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "price manipulation",
+        "smart contract vulnerabilities",
+        "slippage risk",
+        "reentrancy attacks",
+        "gas price volatility",
+        "market flash crashes",
+        "protocol downtime",
+        "liquidity risks"
+      ],
+      "generic_refs": [
+        "yield farming protocols",
+        "decentralized exchanges (DEX)",
+        "smart contract systems",
+        "blockchain networks",
+        "cryptocurrency markets",
+        "digital assets",
+        "financial instruments",
+        "investment strategies",
+        "risk management"
+      ],
+      "protocols": [
+        "Aave",
+        "Compound",
+        "Uniswap",
+        "Bancor",
+        "SushiSwap",
+        "Yearn Finance",
+        "MakerDAO",
+        "Rari Capital",
+        "KyberNetwork",
+        "1inch Network"
+      ]
+    },
+    "yield_aggregation": {
+      "mechanisms": [
+        "yield optimization",
+        "yield farming",
+        "yield aggregation protocols"
+      ],
+      "operations": [
+        "depositing assets",
+        "withdrawing earnings",
+        "monitoring yields"
+      ],
+      "triggers": [
+        "market volatility",
+        "interest rate changes",
+        "liquidity pool dynamics"
+      ],
+      "metrics": [
+        "APY (Annual Percentage Yield)",
+        "yield curve",
+        "yield spread"
+      ],
+      "actors": [
+        "yield aggregators",
+        "yield farmers",
+        "asset managers"
+      ],
+      "risk_concepts": [
+        "slippage risk",
+        "gas fee optimization",
+        "yield depletion"
+      ],
+      "generic_refs": [
+        "yield protocols",
+        "decentralized finance (DeFi) platforms"
+      ],
+      "protocols": [
+        "Gnosis Safe",
+        "L2s",
+        "stablecoins"
+      ]
+    },
+    "yield_farming": {
+      "mechanisms": [
+        "yield farming",
+        "automated market maker (AMM)",
+        "liquidity pool",
+        "smart contract",
+        "yield optimizer",
+        "harvesting",
+        "staking",
+        "pooling",
+        "yield aggregation"
+      ],
+      "operations": [
+        "adding liquidity",
+        "stake tokens",
+        "claim rewards",
+        "restake earnings",
+        "exit strategy",
+        "compound interest",
+        "liquidate position",
+        "reinvest profits"
+      ],
+      "triggers": [
+        "APR (annual percentage rate) drops",
+        "market volatility increases",
+        "price of underlying asset fluctuates",
+        "protocol update",
+        "network downtime"
+      ],
+      "metrics": [
+        "APY (annual percentage yield)",
+        "health factor",
+        "liquidity pool depth",
+        "gas fees",
+        "yield boost",
+        "stake duration",
+        "reward distribution",
+        "impermanent loss"
+      ],
+      "actors": [
+        "yield farmers",
+        "yield farmers guilds",
+        "smart contract developers",
+        "protocol administrators",
+        "liquidity providers",
+        "token holders"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "flash loan attack",
+        "reentrancy attacks",
+        "protocol drift",
+        "slippage risk",
+        "gas price fluctuation",
+        "oracle manipulation",
+        "unstoppable protocol"
+      ],
+      "generic_refs": [
+        "yield farming protocols",
+        "automated yield farming solutions",
+        "yield optimization strategies",
+        "risk management in yield farming",
+        "yield farming tools and services"
+      ],
+      "protocols": [
+        "Aave",
+        "Convex",
+        "Yearn",
+        "Harvest",
+        "Sushi",
+        "Balancer",
+        "Curve",
+        "Uniswap",
+        "MakerDAO",
+        "Synthetix"
+      ]
+    }
+  },
+  "templates": [
+    "How does {MECHANISM} affect my {ENTITY} in {GENERIC_REF}?",
+    "What are the factors influencing {METRIC} of {ACTOR}'s {MECHANISM}?",
+    "How do {OPERATION}s impact {TRIGGER}s on {ENTITY}?",
+    "What are the best practices for handling {RISK_CONCEPT}s in {GENERIC_REF}?",
+    "Should I {ACTION} to protect my position during market {TRIGGER}?",
+    "How does {MECHANISM} work in relation to {ENTITY} and what factors should I consider?",
+    "What split or strategy minimizes slippage when swapping {GENERIC_REF}s?",
+    "Is it profitable to execute a {OPERATION} considering the current {METRIC}?",
+    "What are the key metrics for evaluating {ENTITY}’s {MECHANISM}?",
+    "How do I mitigate {RISK_CONCEPT}s while executing a {ACTION} in {GENERIC_REF}?",
+    "Should I add or remove liquidity from {ENTITY} to hedge against market {TRIGGER}s?",
+    "What are the potential outcomes of {OPERATION} on my {ENTITY} position during {TRIGGER}?",
+    "How does {MECHANISM} impact my risk exposure in {GENERIC_REF}?",
+    "What factors should I consider before {ACTION}ing to optimize returns?",
+    "How do {ENTITY}’s {MECHANISM}s work and what are the underlying principles?",
+    "Should I take a position or wait for {TRIGGER} during market fluctuations?",
+    "What is the best approach to manage my portfolio when facing {TRIGGER}?",
+    "How does {GENERIC_REF} handle {RISK_CONCEPT}s in their operations?",
+    "What strategies can I use to ensure liquidity in {ENTITY} without compromising on {METRIC}s?",
+    "How do {OPERATION}s and {TRIGGER}s interact in the context of {ENTITY}?"
+  ],
+  "sensitive_patterns": {
+    "components": {},
+    "amount_patterns_icase": [],
+    "amount_patterns_csense": [],
+    "amount_known_token_pattern": "",
+    "false_positive_words": [
+      "API",
+      "APIs",
+      "APY",
+      "APYs",
+      "CLI",
+      "CPU",
+      "CPUs",
+      "DAI",
+      "DAIs",
+      "DEX",
+      "DEXs",
+      "ETH",
+      "ETHs",
+      "FAQ",
+      "GB",
+      "GPU",
+      "GPUs",
+      "HF",
+      "HFs",
+      "Hz",
+      "IDE",
+      "IL",
+      "ILs",
+      "KB",
+      "MB",
+      "MEV",
+      "MEVs",
+      "PBS",
+      "PBSs",
+      "RAM",
+      "SDK",
+      "SDKs",
+      "TB",
+      "TVL",
+      "TVLs",
+      "USDC",
+      "USDCs",
+      "UUPS",
+      "UUPSs",
+      "V2",
+      "V3",
+      "V4",
+      "V5"
+    ],
+    "address_patterns": [],
+    "ens_pattern": "",
+    "percent_pattern": "\\b\\d+(?:\\.\\d+)?%\\b",
+    "hf_pattern": "",
+    "leverage_pattern": "",
+    "number_words": [
+      "hundred",
+      "thousand",
+      "million",
+      "billion",
+      "trillion",
+      "half a million",
+      "quarter million",
+      "six-figure",
+      "seven-figure",
+      "eight-figure",
+      "double",
+      "triple",
+      "quadruple"
+    ],
+    "number_word_patterns": [],
+    "cardinal_token_pattern": "",
+    "cardinal_known_token": "",
+    "worded_percent_pattern": "",
+    "worded_decimal_pattern": "",
+    "worded_fraction_token": "",
+    "worded_decimal_token": "",
+    "emotional_words": [
+      "worried",
+      "anxious",
+      "urgent",
+      "emergency",
+      "scared",
+      "nervous",
+      "panicking",
+      "desperate",
+      "afraid",
+      "concerned about"
+    ],
+    "timing_patterns": [
+      "\\b(?:by|on|before|after|next)\\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\b",
+      "\\b(?:within|in)\\s+\\d+\\s+(?:hours?|days?|weeks?|months?)\\b",
+      "\\bright now\\b",
+      "\\bimmediately\\b",
+      "\\bASAP\\b",
+      "\\btoday\\b",
+      "\\btomorrow\\b",
+      "\\byesterday\\b"
+    ],
+    "directional_verbs": {},
+    "qualitative_words": [],
+    "entity_names": [
+      "Foreign Account Tax Compliance Act (FATCA)",
+      "TWAP (Time-Weighted Average Price)",
+      "Decentralized Application (DApp)",
+      "Public Key Infrastructure (PKI)",
+      "MEV (Miner Extractable Value)",
+      "Decentralized Finance (DeFi)",
+      "Smart Contract Vulnerability",
+      "Decentralized finance (DeFi)",
+      "Cryptographic Hash Functions",
+      "Elliptic Curve Cryptography",
+      "MEV (Miner Extracted Value)",
+      "liquid staking derivatives",
+      "Non-fungible tokens (NFTs)",
+      "Public health departments",
+      "Binance Smart Chain (BSC)",
+      "liquidity providers (LPs)",
+      "Confidential Transactions",
+      "Liquidity Providers (LPs)",
+      "Onchain Privacy Solutions",
+      "Pharmaceutical companies",
+      "Internal Revenue Service",
+      "coronary artery disease",
+      "Telemedicine platforms",
+      "Zero-Knowledge Proofs",
+      "myocardial infarction",
+      "Healthcare providers",
+      "healthcare provider",
+      "atrial fibrillation",
+      "Blockchain Networks",
+      "Compliance software",
+      "Insurance companies",
+      "Binance Smart Chain",
+      "Blockchain Privacy",
+      "Digital Signatures",
+      "cross-chain bridge",
+      "Play-to-Earn (P2E)",
+      "Slippage Tolerance",
+      "Pendle PT position",
+      "health factor (HF)",
+      "lending protocols",
+      "governance tokens",
+      "optimistic rollup",
+      "Privacy Protocols",
+      "Blockchain Gaming",
+      "staking protocols",
+      "Google Analytics",
+      "lending protocol",
+      "voting mechanism",
+      "Compound Finance",
+      "market drawdown",
+      "token contracts",
+      "Harvest Finance",
+      "tax authorities",
+      "Gaming Platform",
+      "Smart Contracts",
+      "smart contracts",
+      "Isolated Margin",
+      "security audits",
+      "Taxonomic codes",
+      "Webpage Metrics",
+      "Crypto exchange",
+      "Clinical trials",
+      "NFT Marketplace",
+      "cardiac arrest",
+      "DEX Aggregator",
+      "Hash Functions",
+      "Website Health",
+      "Dental clinics",
+      "DeFi protocols",
+      "smart contract",
+      "front-running",
+      "RSA Algorithm",
+      "Balancer pool",
+      "1inch Network",
+      "Goldman Sachs",
+      "audit reports",
+      "Base Protocol",
+      "Virtual World",
+      "trading pools",
+      "Yearn Finance",
+      "HODL strategy",
+      "fee structure",
+      "heart failure",
+      "Curve Finance",
+      "Cross Margin",
+      "Tornado Cash",
+      "Crypto Games",
+      "1099-K forms",
+      "KyberNetwork",
+      "Beacon Chain",
+      "Decentraland",
+      "Rari Capital",
+      "Tax returns",
+      "stablecoins",
+      "RewardsPool",
+      "Stablecoins",
+      "Gnosis Safe",
+      "Mayo Clinic",
+      "Curve 3pool",
+      "blockchain",
+      "Polymarket",
+      "Eigenlayer",
+      "Uniswap V2",
+      "Uniswap V3",
+      "Uniswap v3",
+      "restaking",
+      "ZK-SNARKs",
+      "SEO Tools",
+      "gas token",
+      "Metaverse",
+      "sidechain",
+      "Flashbots",
+      "zk-SNARKs",
+      "Sushiswap",
+      "LayerZero",
+      "zk-rollup",
+      "Synthetix",
+      "Chainlink",
+      "SushiSwap",
+      "Hospitals",
+      "Instadapp",
+      "protocol",
+      "Compound",
+      "Ethereum",
+      "Blast L2",
+      "data set",
+      "proposal",
+      "Arbitrum",
+      "EIP-1559",
+      "ERC-4337",
+      "Solidity",
+      "Wormhole",
+      "MakerDAO",
+      "EIP-4844",
+      "W9 forms",
+      "CoW Swap",
+      "Balancer",
+      "Uniswap",
+      "SHA-256",
+      "Polygon",
+      "BendDAO",
+      "Clinics",
+      "address",
+      "Aave V3",
+      "Staking",
+      "Harvest",
+      "The DAO",
+      "Aave V2",
+      "Uni V3",
+      "rollup",
+      "merger",
+      "Mixers",
+      "Morpho",
+      "Bancor",
+      "wallet",
+      "sample",
+      "Oracle",
+      "Convex",
+      "Aragon",
+      "Gauge",
+      "Augur",
+      "Terra",
+      "Sushi",
+      "Yearn",
+      "DEXes",
+      "veCRV",
+      "Curve",
+      "Token",
+      "veBAL",
+      "3pool",
+      "KPMG",
+      "USDC",
+      "Aave",
+      "Lyra",
+      "AVSe",
+      "user",
+      "Lido",
+      "dYdX",
+      "DYDX",
+      "URL",
+      "MEV",
+      "GLP",
+      "L2s",
+      "IRS",
+      "ETH",
+      "DAO",
+      "BTC",
+      "USD",
+      "GMX",
+      "L2",
+      "L1"
+    ]
+  },
+  "normalization": {
+    "currency_symbols": [
+      "€",
+      "£",
+      "¥",
+      "₹",
+      "₩",
+      "₿"
+    ],
+    "hyphenated_cardinals": [
+      "twenty",
+      "thirty",
+      "forty",
+      "fifty",
+      "sixty",
+      "seventy",
+      "eighty",
+      "ninety"
+    ]
+  },
+  "template_slots": {
+    "MECHANISM": "mechanisms",
+    "OPERATION": "operations",
+    "OPERATION_A": "operations",
+    "OPERATION_B": "operations",
+    "TRIGGER": "triggers",
+    "METRIC": "metrics",
+    "ACTOR": "actors",
+    "GENERIC_REF": "generic_refs",
+    "RISK_CONCEPT": "risk_concepts"
+  }
+}

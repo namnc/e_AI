@@ -4,396 +4,136 @@ Cover query generation — v5 algorithm (template + domain-distribution matching
 The algorithm:
   1. SANITIZE: Strip private params, qualitative descriptors, emotional language
   2. TEMPLATE: Extract sentence structure with domain-specific slots
-  3. DOMAINS: Select k-1 cover domains from top-N DeFi categories
+  3. DOMAINS: Select k-1 cover domains from top-N categories
   4. FILL: Generate covers by filling template with domain vocabulary
   5. VERIFY: Length ±20%, valid question, no cross-domain leakage
   6. SHUFFLE: Randomize position
+
+All domain-specific constants (ontology, patterns, templates) are loaded from
+a domain profile (domains/<name>/profile.json). The DeFi profile is loaded
+by default for backward compatibility.
 """
 
 import random
 import re
 
-# ---------------------------------------------------------------------------
-# Domain frequency distribution (approximated from public DeFi forum data)
-# ---------------------------------------------------------------------------
-
-DOMAIN_DISTRIBUTION = {
-    "lending":     0.25,
-    "dex":         0.30,
-    "staking":     0.15,
-    "derivatives": 0.10,
-    "bridges":     0.08,
-    "governance":  0.05,
-    "aggregators": 0.07,
-}
-
-# Top-4 domains cover ~80% of real queries — used for v5 equiprobable matching
-TOP_DOMAINS = ["lending", "dex", "staking", "derivatives"]
+from core.profile_loader import get_default_profile
 
 # ---------------------------------------------------------------------------
-# DeFi domain ontology — vocabulary for slot filling
+# Module state — initialized from domain profile
 # ---------------------------------------------------------------------------
+# These module-level variables are populated by _init_from_profile().
+# They exist as module-level vars for backward compatibility with code
+# that imports them directly (tests, benchmarks, migration scripts).
 
-DOMAIN_ONTOLOGY = {
-    "lending": {
-        "protocols": ["Aave", "Compound", "Morpho", "Spark", "Radiant"],
-        "mechanisms": [
-            "interest rate", "health factor", "liquidation", "collateral ratio",
-            "borrow rate", "supply rate", "utilization rate", "reserve factor",
-            "liquidation threshold", "loan-to-value ratio",
-        ],
-        "operations": [
-            "modifying collateral", "repaying debt", "entering a borrow position",
-            "closing a position", "adding collateral", "withdrawing collateral",
-        ],
-        "triggers": [
-            "utilization rates shift", "collateral prices drop", "rate models update",
-            "governance parameters change", "market volatility increases",
-        ],
-        "metrics": [
-            "health factor", "utilization rate", "borrow APY", "supply APY",
-            "liquidation threshold", "reserve factor",
-        ],
-        "actors": ["borrowers", "lenders", "liquidators", "lending protocol users"],
-        "risk_concepts": [
-            "liquidation risk", "bad debt accumulation", "oracle manipulation risk",
-            "interest rate volatility", "collateral correlation risk",
-        ],
-        "generic_refs": [
-            "lending protocols", "borrowing platforms", "lending markets",
-            "lending systems", "decentralized lending platforms",
-        ],
-    },
-    "dex": {
-        "protocols": ["Uniswap", "Curve", "Balancer", "SushiSwap", "Maverick"],
-        "mechanisms": [
-            "routing", "slippage", "liquidity depth", "fee tiers",
-            "impermanent loss", "concentrated liquidity", "price impact",
-            "order routing", "batch auctions", "swap execution",
-        ],
-        "operations": [
-            "executing swaps", "providing liquidity", "rebalancing positions",
-            "collecting fees", "adjusting price ranges", "routing trades",
-        ],
-        "triggers": [
-            "volume patterns shift", "liquidity becomes fragmented", "prices diverge",
-            "fee tiers are adjusted", "pools rebalance",
-        ],
-        "metrics": [
-            "swap fee", "price impact", "liquidity depth", "volume",
-            "impermanent loss", "fee APR",
-        ],
-        "actors": ["traders", "liquidity providers", "swap users", "LP participants"],
-        "risk_concepts": [
-            "impermanent loss", "sandwich attack exposure", "MEV extraction risk",
-            "liquidity fragmentation", "price oracle deviation",
-        ],
-        "generic_refs": [
-            "exchange protocols", "AMM markets", "decentralized exchanges",
-            "exchange platforms", "trading protocols",
-        ],
-    },
-    "staking": {
-        "protocols": ["Lido", "Rocket Pool", "Eigenlayer", "Frax", "Swell"],
-        "mechanisms": [
-            "reward rate", "slashing", "cooldown period", "withdrawal queue",
-            "delegation", "validator selection", "restaking", "unbonding",
-            "reward distribution", "stake weighting",
-        ],
-        "operations": [
-            "staking assets", "unstaking assets", "delegating stake",
-            "claiming rewards", "rotating validators", "migrating stake",
-        ],
-        "triggers": [
-            "participation rates shift", "validator counts change", "reward rates update",
-            "slashing events occur", "exit demand increases",
-        ],
-        "metrics": [
-            "staking yield", "slashing rate", "validator uptime",
-            "withdrawal delay", "delegation fee", "reward APR",
-        ],
-        "actors": ["validators", "delegators", "staking participants", "node operators"],
-        "risk_concepts": [
-            "slashing risk", "validator downtime exposure", "liquid staking depeg",
-            "withdrawal queue delays", "centralization risk",
-        ],
-        "generic_refs": [
-            "staking protocols", "consensus protocols", "staking systems",
-            "staking markets", "decentralized consensus platforms",
-        ],
-    },
-    "derivatives": {
-        "protocols": ["dYdX", "GMX", "Synthetix", "Lyra", "Opyn"],
-        "mechanisms": [
-            "funding rate", "margin requirement", "liquidation engine",
-            "settlement", "premium calculation", "open interest",
-            "mark price", "index price", "leverage multiplier",
-        ],
-        "operations": [
-            "adding margin", "reducing leverage", "closing positions",
-            "rolling contracts", "settling expiries", "adjusting exposure",
-        ],
-        "triggers": [
-            "open interest shifts", "skew becomes extreme",
-            "funding rates diverge", "volatility spikes", "settlement occurs",
-        ],
-        "metrics": [
-            "funding rate", "open interest", "margin ratio",
-            "liquidation price", "mark-index spread", "option premium",
-        ],
-        "actors": ["futures traders", "options traders", "market makers", "hedgers"],
-        "risk_concepts": [
-            "margin call risk", "funding rate bleed", "liquidation cascade",
-            "basis risk", "counterparty risk",
-        ],
-        "generic_refs": [
-            "perpetual protocols", "derivatives platforms", "derivatives markets",
-            "futures protocols", "decentralized derivatives platforms",
-        ],
-    },
-    "bridges": {
-        "protocols": ["Across", "Stargate", "LayerZero", "Wormhole", "Orbiter"],
-        "mechanisms": [
-            "finality verification", "capacity allocation", "relay mechanism",
-            "message passing", "liquidity pooling", "withdrawal delay",
-        ],
-        "operations": [
-            "bridging assets", "verifying finality", "claiming transfers",
-            "providing bridge liquidity", "routing cross-chain",
-        ],
-        "triggers": [
-            "demand patterns shift", "congestion occurs", "chains reorganize",
-            "capacity limits are reached", "fees spike",
-        ],
-        "metrics": [
-            "transfer time", "bridge fee", "capacity utilization",
-            "liquidity depth", "finality delay",
-        ],
-        "actors": ["bridge users", "relayers", "liquidity providers", "validators"],
-        "risk_concepts": [
-            "bridge exploit risk", "finality assumptions", "liquidity fragmentation",
-            "message verification failure", "chain reorganization risk",
-        ],
-        "generic_refs": [
-            "bridge protocols", "cross-chain systems", "bridging platforms",
-            "interoperability protocols", "cross-chain bridges",
-        ],
-    },
-    "governance": {
-        "protocols": ["Compound Gov", "Aave Gov", "Uniswap Gov", "Curve Gov", "MakerDAO"],
-        "mechanisms": [
-            "quorum requirement", "delegation mechanism", "timelock",
-            "proposal lifecycle", "voting power calculation", "vote escrow",
-        ],
-        "operations": [
-            "submitting proposals", "delegating votes", "executing timelocks",
-            "adjusting quorum", "claiming voting rights",
-        ],
-        "triggers": [
-            "delegation patterns change", "quorum thresholds shift",
-            "proposals are submitted", "voting periods change",
-        ],
-        "metrics": [
-            "quorum percentage", "voter participation", "proposal pass rate",
-            "delegation concentration", "timelock duration",
-        ],
-        "actors": ["delegates", "token holders", "governance participants", "proposers"],
-        "risk_concepts": [
-            "governance attack risk", "voter apathy", "plutocratic capture",
-            "proposal spam", "flash loan governance attack",
-        ],
-        "generic_refs": [
-            "governance protocols", "DAO systems", "governance frameworks",
-            "decentralized governance platforms", "voting systems",
-        ],
-    },
-    "aggregators": {
-        "protocols": ["Yearn", "Beefy", "Convex", "Pendle", "Sommelier"],
-        "mechanisms": [
-            "auto-compounding", "vault strategy", "rebalancing",
-            "fee structure", "APY calculation", "yield tokenization",
-        ],
-        "operations": [
-            "depositing into vaults", "withdrawing from vaults",
-            "migrating between strategies", "claiming compounded yield",
-        ],
-        "triggers": [
-            "strategies rotate", "yield thresholds change",
-            "TVL shifts", "underlying protocols update",
-        ],
-        "metrics": [
-            "net APY", "TVL", "management fee", "performance fee",
-            "strategy allocation", "compound frequency",
-        ],
-        "actors": ["vault depositors", "strategists", "yield farmers", "vault users"],
-        "risk_concepts": [
-            "smart contract risk", "strategy failure", "impermanent loss amplification",
-            "composability risk", "withdrawal queue delays",
-        ],
-        "generic_refs": [
-            "yield aggregators", "vault protocols", "aggregation platforms",
-            "yield optimization systems", "DeFi aggregators",
-        ],
-    },
-}
+DOMAIN_DISTRIBUTION: dict = {}
+TOP_DOMAINS: list = []
+DOMAIN_ONTOLOGY: dict = {}
 
-# ---------------------------------------------------------------------------
-# Sanitization patterns
-# ---------------------------------------------------------------------------
+_AMOUNT_PATTERNS_ICASE: list = []
+_AMOUNT_PATTERNS_CSENSE: list = []
+_AMOUNT_KNOWN_TOKEN_PATTERN: str = ""
+_KNOWN_TOKENS: str = ""
+_FALSE_POSITIVE_WORDS: set = set()
+_ADDRESS_PATTERNS: list = []
+_ENS_PATTERN: str = ""
+_PERCENT_PATTERN: str = ""
+_HF_PATTERN: str = ""
+_LEVERAGE_PATTERN: str = ""
+_NUMBER_WORDS: list = []
+_NUMBER_WORD_PATTERNS: list = []
+_CARDINAL_TOKEN_PATTERN: str = ""
+_CARDINAL_KNOWN_TOKEN: str = ""
+_CARDINALS: str = ""
+_COMPOUND_CARDINAL: str = ""
+_WORDED_PERCENT_PATTERN: str = ""
+_WORDED_DECIMAL_PATTERN: str = ""
+_WORDED_FRACTION_TOKEN: str = ""
+_WORDED_DECIMAL_TOKEN: str = ""
+_EMOTIONAL_WORDS: list = []
+_TIMING_PATTERNS: list = []
+_DIRECTIONAL_VERBS: dict = {}
+_QUALITATIVE: list = []
+_PROTOCOL_NAMES: list = []
 
-# Amount patterns applied with re.IGNORECASE (safe for these patterns)
-_AMOUNT_PATTERNS_ICASE = [
-    r'\$[\d,]+(?:\.\d+)?[KkMmBb]?',                    # $1,000, $1.5M
-    r'[\d,]+(?:\.\d+)?[KkMmBb]\s+(?:in|worth|of|notional|exposure)\b',  # 1.8M worth, 500K of, 1.5m notional
-    r'\b\d+(?:\.\d+)?[KkMmBb]\b',                       # bare 500k, 2m, 1.5m (standalone magnitude)
-    r'(?<![-])\b\d{2,}(?:,\d{3})*\s+(?:tokens?|coins?)\b',  # "1000 tokens" but not "ERC-20 token" (negative lookbehind for hyphen)
-    r'\b\d{1,3}(?:,\d{3})+\b',                          # 1,000 or 1,000,000
-    # (scientific notation handled separately in Pass 0 of sanitize_query)
-    r'\b\d+\s\d{3}(?:\s\d{3})*(?:\s*[a-zA-Z]\w*)?\b',    # 1 000 ETH, 123 456 (space-separated, optional trailing token)
-]
-# Amount + ANY token-like word — BROAD catch-all with exception carve-outs.
-# A "token-like word" is any word starting with a letter that contains at least
-# one uppercase letter and is 2-12 chars. This catches eETH, swETH, ankrETH,
-# pumpBTC, USD0, usdt0, etc. without needing an allowlist.
-# Known false positives (version strings, common words) are carved out.
-_FALSE_POSITIVE_WORDS = {
-    # Version strings
-    'V2', 'V3', 'V4', 'V5',
-    # Common words that happen to have uppercase
-    'DeFi', 'WiFi', 'IoT', 'API', 'SDK', 'CLI', 'GPU', 'CPU', 'RAM',
-    'TVL', 'APY', 'APR', 'ROI', 'NFT', 'DAO', 'DEX', 'AMM', 'MEV',
-    'FAQ', 'EVM', 'RPC', 'ABI', 'IDE',
-    # Plurals of common acronyms
-    'APIs', 'SDKs', 'RPCs', 'ABIs', 'IDEs', 'NFTs', 'DAOs', 'DEXs', 'AMMs',
-    'FAQs', 'EVMs', 'GPUs', 'CPUs',
-    # Time/measurement
-    'Hz', 'MB', 'GB', 'TB', 'KB',
-}
-_AMOUNT_PATTERNS_CSENSE = [
-    # Broad: number + token-like word (starts with letter, may contain digits like USD0/usdt0)
-    # Requires at least one uppercase letter somewhere. Negative lookbehind for V/v and hyphen.
-    r'(?<![Vv\-])[\d,]+(?:\.\d+)?[KkMmBb]?\s+(?=[a-zA-Z0-9]*[A-Z])[a-zA-Z][a-zA-Z0-9]{1,11}(?:\.\w+)?\b',
-    # Lowercase tokens ending in crypto suffixes: pumpbtc, wsteth, ankrbtc, etc.
-    r'(?<![Vv\-])[\d,]+(?:\.\d+)?[KkMmBb]?\s+\w*(?:btc|eth|usd[a-z]*|dai|sol|bnb|avax|matic)\b',
-]
-# Amount + KNOWN token symbol — CASE INSENSITIVE (catches "500 usdc", "1.8m eth")
-# This is a curated list of common DeFi tokens. Must be maintained as new tokens emerge.
-_KNOWN_TOKENS = (
-    r'eth|btc|usdc|usdt|dai|weth|wbtc|link|aave|uni|crv|glp|sol|ens|'
-    r'matic|arb|op|pepe|shib|doge|avax|dot|atom|near|ftm|apt|sui|'
-    r'steth|wsteth|cbeth|ezeth|weeth|frxeth|reth|rseth|meth|'
-    r'usde|susde|sdai|gho|rlusd|susds|mkr|comp|snx|bal|yfi|'
-    r'pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|usdt0|usd0|'
-    r'usdc\.e|weth\.e|usdt\.e|dai\.e|wbtc\.e'  # bridged dotted tokens
-)
-_AMOUNT_KNOWN_TOKEN_PATTERN = (
-    r'(?<![Vv])[\d,]+(?:\.\d+)?[KkMmBb]?\s*(?:' + _KNOWN_TOKENS + r')\b'  # \s* allows joined: 500OP, 500usdc
-)
+TEMPLATES: list = []
 
-_ADDRESS_PATTERNS = [
-    r'0[xX][a-fA-F0-9]{3,}',                              # EVM: 0x742d...
-    r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b',               # Bitcoin legacy (P2PKH/P2SH)
-    r'\bbc1[a-zA-HJ-NP-Z0-9]{25,90}\b',                   # Bitcoin bech32
-    r'\b(?:cosmos|osmo|terra|inj|sei|dydx)1[a-z0-9]{10,58}\b',  # Cosmos ecosystem (10+ chars to catch truncated addresses)
-    r'\b[1-9A-HJ-NP-Za-km-z]{32,44}\b',                   # Solana base58 (broad — may FP on long words)
-]
-_ENS_PATTERN = r'\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.eth\b'  # vitalik.eth, name.eth
-_PERCENT_PATTERN = r'\b\d+(?:\.\d+)?%(?!\s*attack)'  # skip "51% attack" (concept name, not private param)
-_HF_PATTERN = r'(?:health factor|HF)\s*(?:is|of|at|=|:)?\s*(?:approximately|about|around|roughly|nearly|~|≈)?\s*\.?\d+(?:\.\d+)?'
-_LEVERAGE_PATTERN = r'\b\d+\s*[xX×](?=\s|$|\b)'  # 5x, 5X, 5×, 5 x, 6 X (with optional space)
+# Normalization config
+_CURRENCY_SYMBOLS: list = []
+_HYPHENATED_CARDINALS: set = set()
 
-# Natural language quantity patterns (secondary NLP filter)
-_NUMBER_WORDS = [
-    'hundred', 'thousand', 'million', 'billion', 'trillion',
-    'half a million', 'quarter million', 'half a billion',
-    'a few hundred', 'a few thousand', 'a few million',
-    'several hundred', 'several thousand', 'several million',
-    'dozens of', 'hundreds of', 'thousands of',
-    'six-figure', 'seven-figure', 'eight-figure',
-    'five-figure', 'four-figure',
-    'double', 'triple', 'quadruple',
-]
-_NUMBER_WORD_PATTERNS = [
-    # "half a million USDC", "roughly two thousand ETH"
-    r'\b(?:about|approximately|roughly|around|nearly|over|under|almost|close to|just under|just over|more than|less than|at least|up to)\s+'
-    r'(?:a\s+)?(?:half\s+(?:a\s+)?)?'
-    r'(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)\s*'
-    r'(?:hundred|thousand|million|billion)?\s*'
-    r'(?:[A-Z]{2,10}|dollars|bucks|worth)',
-    # "my six-figure position", "a seven-figure portfolio"
-    r'\b(?:four|five|six|seven|eight|nine|ten)-figure\s+(?:position|portfolio|amount|sum|balance|holding|stake)',
-    # "half a million", "quarter million" standalone
-    r'\b(?:half|quarter|third)\s+(?:a\s+)?(?:million|billion|thousand)\b',
-    # "a few hundred thousand"
-    r'\b(?:a\s+)?(?:few|couple|several|many)\s+(?:hundred|thousand|million)\s*(?:thousand|million|billion)?\s*(?:[A-Z]{2,10}|dollars|bucks|worth)?',
-]
+# Derived
+_DOMAIN_KEYWORDS: dict = {}
 
-# Cardinal number + UPPERCASE token symbol (case-sensitive for the token part).
-# Separate from _NUMBER_WORD_PATTERNS because those run with re.IGNORECASE.
-_CARDINALS = (
-    r'(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|'
-    r'thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|'
-    r'forty|fifty|sixty|seventy|eighty|ninety)'
-)
-# Compound cardinal: "twenty five", "one hundred and five", "two thousand five hundred"
-# Matches the longest possible chain of cardinal words before a token
-_COMPOUND_CARDINAL = (
-    r'(?i:\b' + _CARDINALS + r')'
-    r'(?:\s+(?:and\s+)?(?:hundred|thousand|million|billion|' + _CARDINALS + r'))*'
-)
-_CARDINAL_TOKEN_PATTERN = (
-    _COMPOUND_CARDINAL + r'\s+[A-Z]{2,10}\b'
-)
-# Cardinal + known token (case-insensitive): "twenty eth", "twenty five eth", "two thousand five hundred eth"
-_CARDINAL_KNOWN_TOKEN = (
-    _COMPOUND_CARDINAL + r'\s+(?i:' + _KNOWN_TOKENS + r')\b'
-)
-# Worded percentages: "eighty percent", "five percent of my ETH"
-_WORDED_PERCENT_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+(?:percent|per\s*cent)\b'
-# Worded decimals: "one point two", "two point five"
-_WORDED_DECIMAL_PATTERN = r'(?i:\b' + _CARDINALS + r')\s+point\s+(?i:' + _CARDINALS + r'|zero)\b'
-# Fractions + token: "X and a half ETH", "half ETH", "quarter ETH", "half an ETH",
-# "three quarters ETH", "quarter of an ETH"
-_WORDED_FRACTION_TOKEN = (
-    r'(?i:(?:\b' + _CARDINALS + r'\s+and\s+)?'
-    r'(?:a\s+)?(?:half|quarter|third|three\s+quarters?)(?:\s+(?:a|an|of\s+a|of\s+an))?\s+'
-    r'(?:' + _KNOWN_TOKENS + r'|[A-Z]{2,10}))\b'
-)
-# "zero point five eth"
-_WORDED_DECIMAL_TOKEN = (
-    r'(?i:\b(?:zero|' + _CARDINALS + r')\s+point\s+(?:' + _CARDINALS + r'|zero)\s+'
-    r'(?:' + _KNOWN_TOKENS + r'|[A-Z]{2,10}))\b'
-)
 
-_EMOTIONAL_WORDS = [
-    'worried', 'anxious', 'urgent', 'emergency', 'should I', 'scared',
-    'nervous', 'panicking', 'desperate', 'afraid', 'concerned about',
-]
-_DAYS = r'(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)'
-_MONTHS = r'(?:January|February|March|April|May|June|July|August|September|October|November|December)'
-_WORDED_NUMS = r'(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)'
-_TIME_UNITS = r'(?:hours?|days?|minutes?|weeks?|months?|years?)'
-_TIMING_PATTERNS = [
-    rf'\b(?:by|on|before|after|next)\s+{_DAYS}\b',
-    rf'\b(?:by|on|before|after)\s+{_MONTHS}\s+\d{{1,2}}(?:st|nd|rd|th)?\b',
-    rf'\b(?:within|in)\s+\d+\s+{_TIME_UNITS}\b',
-    rf'\b(?:within|in)\s+{_WORDED_NUMS}\s+{_TIME_UNITS}\b',  # "in two days", "within two days"
-    r'\bbefore\s+(?:the\s+)?(?:upgrade|fork|merge|vote|deadline|unlock|expiry|migration)\b',
-    r'\bright now\b', r'\bimmediately\b', r'\bASAP\b', r'\btoday\b', r'\btomorrow\b', r'\byesterday\b',
-    rf'\bnext\s+(?:week|month|day|hour|{_DAYS})\b',  # "next Friday"
-    r'\b(?:lock-?up|unlock|vesting)\s+(?:ends?|period)\s+in\s+\d+\s+\w+\b',
-    r'\b(?:by|before)\s+(?:end\s+of\s+)?(?:Q[1-4]|EOD|EOW|EOM|EOY)\b',
-]
-_DIRECTIONAL_VERBS = {
-    'buy': 'modify', 'sell': 'modify', 'long': 'leveraged', 'short': 'leveraged',
-    'close': 'modify', 'exit': 'modify', 'enter': 'modify',
-    'unstake': 'modify', 'withdraw': 'modify',
-}
-_QUALITATIVE = [
-    'underwater', 'close to liquidation', 'about to be liquidated',
-    'significantly imbalanced', 'dangerously', 'barely above',
-    'dropping fast', 'plummeting', 'mooning', 'dumping',
-]
+def _init_from_profile(profile: dict | None = None):
+    """Initialize all module-level constants from a domain profile.
+
+    Called once at module load with the default DeFi profile.
+    Can be called again to switch to a different domain.
+    """
+    global DOMAIN_DISTRIBUTION, TOP_DOMAINS, DOMAIN_ONTOLOGY
+    global _AMOUNT_PATTERNS_ICASE, _AMOUNT_PATTERNS_CSENSE
+    global _AMOUNT_KNOWN_TOKEN_PATTERN, _KNOWN_TOKENS, _FALSE_POSITIVE_WORDS
+    global _ADDRESS_PATTERNS, _ENS_PATTERN
+    global _PERCENT_PATTERN, _HF_PATTERN, _LEVERAGE_PATTERN
+    global _NUMBER_WORDS, _NUMBER_WORD_PATTERNS
+    global _CARDINAL_TOKEN_PATTERN, _CARDINAL_KNOWN_TOKEN
+    global _CARDINALS, _COMPOUND_CARDINAL
+    global _WORDED_PERCENT_PATTERN, _WORDED_DECIMAL_PATTERN
+    global _WORDED_FRACTION_TOKEN, _WORDED_DECIMAL_TOKEN
+    global _EMOTIONAL_WORDS, _TIMING_PATTERNS, _DIRECTIONAL_VERBS, _QUALITATIVE
+    global _PROTOCOL_NAMES, TEMPLATES
+    global _CURRENCY_SYMBOLS, _HYPHENATED_CARDINALS
+    global _DOMAIN_KEYWORDS
+
+    if profile is None:
+        profile = get_default_profile()
+
+    sp = profile["sensitive_patterns"]
+    comp = sp.get("components", {})
+
+    DOMAIN_DISTRIBUTION = profile["domain_distribution"]
+    TOP_DOMAINS = profile["top_domains"]
+    DOMAIN_ONTOLOGY = profile["subdomains"]
+
+    _AMOUNT_PATTERNS_ICASE = sp["amount_patterns_icase"]
+    _AMOUNT_PATTERNS_CSENSE = sp["amount_patterns_csense"]
+    _AMOUNT_KNOWN_TOKEN_PATTERN = sp["amount_known_token_pattern"]
+    _KNOWN_TOKENS = comp.get("KNOWN_TOKENS", "")
+    _FALSE_POSITIVE_WORDS = set(sp["false_positive_words"])
+    _ADDRESS_PATTERNS = sp["address_patterns"]
+    _ENS_PATTERN = sp["ens_pattern"]
+    _PERCENT_PATTERN = sp["percent_pattern"]
+    _HF_PATTERN = sp["hf_pattern"]
+    _LEVERAGE_PATTERN = sp["leverage_pattern"]
+    _NUMBER_WORDS = sp["number_words"]
+    _NUMBER_WORD_PATTERNS = sp["number_word_patterns"]
+    _CARDINALS = comp.get("CARDINALS", "")
+    _COMPOUND_CARDINAL = comp.get("COMPOUND_CARDINAL", "")
+    _CARDINAL_TOKEN_PATTERN = sp["cardinal_token_pattern"]
+    _CARDINAL_KNOWN_TOKEN = sp["cardinal_known_token"]
+    _WORDED_PERCENT_PATTERN = sp["worded_percent_pattern"]
+    _WORDED_DECIMAL_PATTERN = sp["worded_decimal_pattern"]
+    _WORDED_FRACTION_TOKEN = sp["worded_fraction_token"]
+    _WORDED_DECIMAL_TOKEN = sp["worded_decimal_token"]
+    _EMOTIONAL_WORDS = sp["emotional_words"]
+    _TIMING_PATTERNS = sp["timing_patterns"]
+    _DIRECTIONAL_VERBS = sp["directional_verbs"]
+    _QUALITATIVE = sp["qualitative_words"]
+    _PROTOCOL_NAMES = sp["entity_names"]
+
+    TEMPLATES = profile["templates"]
+
+    norm = profile.get("normalization", {})
+    _CURRENCY_SYMBOLS = norm.get("currency_symbols", ["€", "£", "¥", "₹", "₩", "₿"])
+    _HYPHENATED_CARDINALS = set(norm.get("hyphenated_cardinals", [
+        "twenty", "thirty", "forty", "fifty",
+        "sixty", "seventy", "eighty", "ninety",
+    ]))
+
+    # Rebuild derived data structures
+    _DOMAIN_KEYWORDS = _build_domain_keywords()
 
 
 def _normalize_input(text: str) -> str:
@@ -410,7 +150,11 @@ def _normalize_input(text: str) -> str:
     text = text.replace('\u2044', '/')
     text = re.sub(r'\b\d+/\d+\b', '', text)  # strip fractions like 1/2, 2/3
     # Normalize currency symbols to $ (so €500k, ¥500000, £1000 get caught by $ patterns)
-    text = re.sub(r'[€£¥₹₩₿]', '$', text)
+    if _CURRENCY_SYMBOLS:
+        syms = ''.join(re.escape(s) for s in _CURRENCY_SYMBOLS)
+        text = re.sub(f'[{syms}]', '$', text)
+    else:
+        text = re.sub(r'[€£¥₹₩₿]', '$', text)
     # Normalize locale decimal separators: Arabic decimal (٫), comma-as-decimal (1,15 → 1.15)
     # Note: comma-as-decimal is ambiguous with thousand separators; we handle both
     text = text.replace('\u066b', '.')  # Arabic decimal separator
@@ -434,7 +178,7 @@ def _normalize_input(text: str) -> str:
     )
     # Normalize hyphenated cardinals: "twenty-five" → "twenty five"
     text = re.sub(r'\b(\w+)-(\w+)\b', lambda m: f'{m.group(1)} {m.group(2)}'
-                  if m.group(1).lower() in {'twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'}
+                  if m.group(1).lower() in _HYPHENATED_CARDINALS
                   else m.group(0), text)
     # Insert space between digit and letter when joined: 125eth → 125 eth
     text = re.sub(r'(\d)([a-z])', r'\1 \2', text)
@@ -565,9 +309,6 @@ def _build_domain_keywords() -> dict[str, set[str]]:
                         words.add(w)
         keywords[domain] = words
     return keywords
-
-
-_DOMAIN_KEYWORDS = _build_domain_keywords()
 
 
 def classify_domain(query: str) -> str:
@@ -971,3 +712,9 @@ def generate_per_provider(
         f"Collisions: {colliding_pairs}. Reduce k or number of providers, "
         f"or expand the domain vocabulary."
     )
+
+
+# ---------------------------------------------------------------------------
+# Initialize from default profile at module load
+# ---------------------------------------------------------------------------
+_init_from_profile()

@@ -5,3 +5,6 @@ __pycache__/
 models/
 data/classifier_training_data.json
 data/test_indices.json
+# Generated profiles are tracked (they're artifacts worth keeping)
+# but validation reports are regenerable
+domains/*/profile_validation.json

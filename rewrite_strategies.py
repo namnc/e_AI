@@ -20,6 +20,7 @@ from cover_generator import (
     DOMAIN_ONTOLOGY, TOP_DOMAINS, TEMPLATES,
     sanitize_query, classify_domain, extract_template,
     generate_cover_set, _generate,
+    _PROTOCOL_NAMES,
 )
 from llm_backend import init_backend, call_llm, is_local
 from dataset import COMPLEX_QUERIES
@@ -29,15 +30,6 @@ from dataset import COMPLEX_QUERIES
 # Approach A: Regex-based genericization
 # ─────────────────────────────────────────────
 
-# Protocol names to strip (case-insensitive)
-_PROTOCOL_NAMES = [
-    "Aave V3", "Aave V2", "Aave", "Compound V3", "Compound V2", "Compound",
-    "Uniswap V3", "Uniswap V2", "Uniswap", "Curve", "Balancer", "SushiSwap",
-    "MakerDAO", "Maker", "dYdX", "GMX", "Synthetix", "Lyra", "Opyn",
-    "Lido", "Rocket Pool", "Eigenlayer", "Pendle", "Yearn", "Convex",
-    "Morpho", "Radiant", "Spark", "Frax", "Swell",
-]
-
 def approach_a_regex(sub_query: str) -> str:
     """Strip protocol names, replace with generic domain reference."""
     result = sub_query
@@ -45,8 +37,8 @@ def approach_a_regex(sub_query: str) -> str:
     onto = DOMAIN_ONTOLOGY.get(domain, {})
     generic_ref = onto.get("generic_refs", ["DeFi protocols"])[0]
 
-    # Sort by length (longest first) to avoid partial matches
-    for proto in sorted(_PROTOCOL_NAMES, key=len, reverse=True):
+    # _PROTOCOL_NAMES is already sorted longest-first by the profile loader
+    for proto in _PROTOCOL_NAMES:
         result = re.sub(rf'\b{re.escape(proto)}\b', generic_ref, result, flags=re.IGNORECASE)
 
     # Clean up "on lending protocols protocols" etc.

@@ -1,0 +1,776 @@
+{
+  "meta": {
+    "domain_name": "defi",
+    "version": "1.0.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "audited"
+  },
+  "domain_distribution": {
+    "lending": 0.25,
+    "dex": 0.3,
+    "staking": 0.15,
+    "derivatives": 0.1,
+    "bridges": 0.08,
+    "governance": 0.05,
+    "aggregators": 0.07
+  },
+  "top_domains": [
+    "lending",
+    "dex",
+    "staking",
+    "derivatives"
+  ],
+  "subdomains": {
+    "lending": {
+      "protocols": [
+        "Aave",
+        "Compound",
+        "Morpho",
+        "Spark",
+        "Radiant"
+      ],
+      "mechanisms": [
+        "interest rate",
+        "health factor",
+        "liquidation",
+        "collateral ratio",
+        "borrow rate",
+        "supply rate",
+        "utilization rate",
+        "reserve factor",
+        "liquidation threshold",
+        "loan-to-value ratio"
+      ],
+      "operations": [
+        "modifying collateral",
+        "repaying debt",
+        "entering a borrow position",
+        "closing a position",
+        "adding collateral",
+        "withdrawing collateral"
+      ],
+      "triggers": [
+        "utilization rates shift",
+        "collateral prices drop",
+        "rate models update",
+        "governance parameters change",
+        "market volatility increases"
+      ],
+      "metrics": [
+        "health factor",
+        "utilization rate",
+        "borrow APY",
+        "supply APY",
+        "liquidation threshold",
+        "reserve factor"
+      ],
+      "actors": [
+        "borrowers",
+        "lenders",
+        "liquidators",
+        "lending protocol users"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "bad debt accumulation",
+        "oracle manipulation risk",
+        "interest rate volatility",
+        "collateral correlation risk"
+      ],
+      "generic_refs": [
+        "lending protocols",
+        "borrowing platforms",
+        "lending markets",
+        "lending systems",
+        "decentralized lending platforms"
+      ]
+    },
+    "dex": {
+      "protocols": [
+        "Uniswap",
+        "Curve",
+        "Balancer",
+        "SushiSwap",
+        "Maverick"
+      ],
+      "mechanisms": [
+        "routing",
+        "slippage",
+        "liquidity depth",
+        "fee tiers",
+        "impermanent loss",
+        "concentrated liquidity",
+        "price impact",
+        "order routing",
+        "batch auctions",
+        "swap execution"
+      ],
+      "operations": [
+        "executing swaps",
+        "providing liquidity",
+        "rebalancing positions",
+        "collecting fees",
+        "adjusting price ranges",
+        "routing trades"
+      ],
+      "triggers": [
+        "volume patterns shift",
+        "liquidity becomes fragmented",
+        "prices diverge",
+        "fee tiers are adjusted",
+        "pools rebalance"
+      ],
+      "metrics": [
+        "swap fee",
+        "price impact",
+        "liquidity depth",
+        "volume",
+        "impermanent loss",
+        "fee APR"
+      ],
+      "actors": [
+        "traders",
+        "liquidity providers",
+        "swap users",
+        "LP participants"
+      ],
+      "risk_concepts": [
+        "impermanent loss",
+        "sandwich attack exposure",
+        "MEV extraction risk",
+        "liquidity fragmentation",
+        "price oracle deviation"
+      ],
+      "generic_refs": [
+        "exchange protocols",
+        "AMM markets",
+        "decentralized exchanges",
+        "exchange platforms",
+        "trading protocols"
+      ]
+    },
+    "staking": {
+      "protocols": [
+        "Lido",
+        "Rocket Pool",
+        "Eigenlayer",
+        "Frax",
+        "Swell"
+      ],
+      "mechanisms": [
+        "reward rate",
+        "slashing",
+        "cooldown period",
+        "withdrawal queue",
+        "delegation",
+        "validator selection",
+        "restaking",
+        "unbonding",
+        "reward distribution",
+        "stake weighting"
+      ],
+      "operations": [
+        "staking assets",
+        "unstaking assets",
+        "delegating stake",
+        "claiming rewards",
+        "rotating validators",
+        "migrating stake"
+      ],
+      "triggers": [
+        "participation rates shift",
+        "validator counts change",
+        "reward rates update",
+        "slashing events occur",
+        "exit demand increases"
+      ],
+      "metrics": [
+        "staking yield",
+        "slashing rate",
+        "validator uptime",
+        "withdrawal delay",
+        "delegation fee",
+        "reward APR"
+      ],
+      "actors": [
+        "validators",
+        "delegators",
+        "staking participants",
+        "node operators"
+      ],
+      "risk_concepts": [
+        "slashing risk",
+        "validator downtime exposure",
+        "liquid staking depeg",
+        "withdrawal queue delays",
+        "centralization risk"
+      ],
+      "generic_refs": [
+        "staking protocols",
+        "consensus protocols",
+        "staking systems",
+        "staking markets",
+        "decentralized consensus platforms"
+      ]
+    },
+    "derivatives": {
+      "protocols": [
+        "dYdX",
+        "GMX",
+        "Synthetix",
+        "Lyra",
+        "Opyn"
+      ],
+      "mechanisms": [
+        "funding rate",
+        "margin requirement",
+        "liquidation engine",
+        "settlement",
+        "premium calculation",
+        "open interest",
+        "mark price",
+        "index price",
+        "leverage multiplier"
+      ],
+      "operations": [
+        "adding margin",
+        "reducing leverage",
+        "closing positions",
+        "rolling contracts",
+        "settling expiries",
+        "adjusting exposure"
+      ],
+      "triggers": [
+        "open interest shifts",
+        "skew becomes extreme",
+        "funding rates diverge",
+        "volatility spikes",
+        "settlement occurs"
+      ],
+      "metrics": [
+        "funding rate",
+        "open interest",
+        "margin ratio",
+        "liquidation price",
+        "mark-index spread",
+        "option premium"
+      ],
+      "actors": [
+        "futures traders",
+        "options traders",
+        "market makers",
+        "hedgers"
+      ],
+      "risk_concepts": [
+        "margin call risk",
+        "funding rate bleed",
+        "liquidation cascade",
+        "basis risk",
+        "counterparty risk"
+      ],
+      "generic_refs": [
+        "perpetual protocols",
+        "derivatives platforms",
+        "derivatives markets",
+        "futures protocols",
+        "decentralized derivatives platforms"
+      ]
+    },
+    "bridges": {
+      "protocols": [
+        "Across",
+        "Stargate",
+        "LayerZero",
+        "Wormhole",
+        "Orbiter"
+      ],
+      "mechanisms": [
+        "finality verification",
+        "capacity allocation",
+        "relay mechanism",
+        "message passing",
+        "liquidity pooling",
+        "withdrawal delay"
+      ],
+      "operations": [
+        "bridging assets",
+        "verifying finality",
+        "claiming transfers",
+        "providing bridge liquidity",
+        "routing cross-chain"
+      ],
+      "triggers": [
+        "demand patterns shift",
+        "congestion occurs",
+        "chains reorganize",
+        "capacity limits are reached",
+        "fees spike"
+      ],
+      "metrics": [
+        "transfer time",
+        "bridge fee",
+        "capacity utilization",
+        "liquidity depth",
+        "finality delay"
+      ],
+      "actors": [
+        "bridge users",
+        "relayers",
+        "liquidity providers",
+        "validators"
+      ],
+      "risk_concepts": [
+        "bridge exploit risk",
+        "finality assumptions",
+        "liquidity fragmentation",
+        "message verification failure",
+        "chain reorganization risk"
+      ],
+      "generic_refs": [
+        "bridge protocols",
+        "cross-chain systems",
+        "bridging platforms",
+        "interoperability protocols",
+        "cross-chain bridges"
+      ]
+    },
+    "governance": {
+      "protocols": [
+        "Compound Gov",
+        "Aave Gov",
+        "Uniswap Gov",
+        "Curve Gov",
+        "MakerDAO"
+      ],
+      "mechanisms": [
+        "quorum requirement",
+        "delegation mechanism",
+        "timelock",
+        "proposal lifecycle",
+        "voting power calculation",
+        "vote escrow"
+      ],
+      "operations": [
+        "submitting proposals",
+        "delegating votes",
+        "executing timelocks",
+        "adjusting quorum",
+        "claiming voting rights"
+      ],
+      "triggers": [
+        "delegation patterns change",
+        "quorum thresholds shift",
+        "proposals are submitted",
+        "voting periods change"
+      ],
+      "metrics": [
+        "quorum percentage",
+        "voter participation",
+        "proposal pass rate",
+        "delegation concentration",
+        "timelock duration"
+      ],
+      "actors": [
+        "delegates",
+        "token holders",
+        "governance participants",
+        "proposers"
+      ],
+      "risk_concepts": [
+        "governance attack risk",
+        "voter apathy",
+        "plutocratic capture",
+        "proposal spam",
+        "flash loan governance attack"
+      ],
+      "generic_refs": [
+        "governance protocols",
+        "DAO systems",
+        "governance frameworks",
+        "decentralized governance platforms",
+        "voting systems"
+      ]
+    },
+    "aggregators": {
+      "protocols": [
+        "Yearn",
+        "Beefy",
+        "Convex",
+        "Pendle",
+        "Sommelier"
+      ],
+      "mechanisms": [
+        "auto-compounding",
+        "vault strategy",
+        "rebalancing",
+        "fee structure",
+        "APY calculation",
+        "yield tokenization"
+      ],
+      "operations": [
+        "depositing into vaults",
+        "withdrawing from vaults",
+        "migrating between strategies",
+        "claiming compounded yield"
+      ],
+      "triggers": [
+        "strategies rotate",
+        "yield thresholds change",
+        "TVL shifts",
+        "underlying protocols update"
+      ],
+      "metrics": [
+        "net APY",
+        "TVL",
+        "management fee",
+        "performance fee",
+        "strategy allocation",
+        "compound frequency"
+      ],
+      "actors": [
+        "vault depositors",
+        "strategists",
+        "yield farmers",
+        "vault users"
+      ],
+      "risk_concepts": [
+        "smart contract risk",
+        "strategy failure",
+        "impermanent loss amplification",
+        "composability risk",
+        "withdrawal queue delays"
+      ],
+      "generic_refs": [
+        "yield aggregators",
+        "vault protocols",
+        "aggregation platforms",
+        "yield optimization systems",
+        "DeFi aggregators"
+      ]
+    }
+  },
+  "sensitive_patterns": {
+    "components": {
+      "KNOWN_TOKENS": "eth|btc|usdc|usdt|dai|weth|wbtc|link|aave|uni|crv|glp|sol|ens|matic|arb|op|pepe|shib|doge|avax|dot|atom|near|ftm|apt|sui|steth|wsteth|cbeth|ezeth|weeth|frxeth|reth|rseth|meth|usde|susde|sdai|gho|rlusd|susds|mkr|comp|snx|bal|yfi|pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|usdt0|usd0|usdc\\.e|weth\\.e|usdt\\.e|dai\\.e|wbtc\\.e",
+      "CARDINALS": "(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)",
+      "COMPOUND_CARDINAL": "(?i:\\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))(?:\\s+(?:and\\s+)?(?:hundred|thousand|million|billion|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)))*",
+      "DAYS": "(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)",
+      "MONTHS": "(?:January|February|March|April|May|June|July|August|September|October|November|December)",
+      "WORDED_NUMS": "(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)",
+      "TIME_UNITS": "(?:hours?|days?|minutes?|weeks?|months?|years?)"
+    },
+    "amount_patterns_icase": [
+      "\\$[\\d,]+(?:\\.\\d+)?[KkMmBb]?",
+      "[\\d,]+(?:\\.\\d+)?[KkMmBb]\\s+(?:in|worth|of|notional|exposure)\\b",
+      "\\b\\d+(?:\\.\\d+)?[KkMmBb]\\b",
+      "(?<![-])\\b\\d{2,}(?:,\\d{3})*\\s+(?:tokens?|coins?)\\b",
+      "\\b\\d{1,3}(?:,\\d{3})+\\b",
+      "\\b\\d+\\s\\d{3}(?:\\s\\d{3})*(?:\\s*[a-zA-Z]\\w*)?\\b"
+    ],
+    "amount_patterns_csense": [
+      "(?<![Vv\\-])[\\d,]+(?:\\.\\d+)?[KkMmBb]?\\s+(?=[a-zA-Z0-9]*[A-Z])[a-zA-Z][a-zA-Z0-9]{1,11}(?:\\.\\w+)?\\b",
+      "(?<![Vv\\-])[\\d,]+(?:\\.\\d+)?[KkMmBb]?\\s+\\w*(?:btc|eth|usd[a-z]*|dai|sol|bnb|avax|matic)\\b"
+    ],
+    "amount_known_token_pattern": "(?<![Vv])[\\d,]+(?:\\.\\d+)?[KkMmBb]?\\s*(?:eth|btc|usdc|usdt|dai|weth|wbtc|link|aave|uni|crv|glp|sol|ens|matic|arb|op|pepe|shib|doge|avax|dot|atom|near|ftm|apt|sui|steth|wsteth|cbeth|ezeth|weeth|frxeth|reth|rseth|meth|usde|susde|sdai|gho|rlusd|susds|mkr|comp|snx|bal|yfi|pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|usdt0|usd0|usdc\\.e|weth\\.e|usdt\\.e|dai\\.e|wbtc\\.e)\\b",
+    "false_positive_words": [
+      "ABI",
+      "ABIs",
+      "AMM",
+      "AMMs",
+      "API",
+      "APIs",
+      "APR",
+      "APY",
+      "CLI",
+      "CPU",
+      "CPUs",
+      "DAO",
+      "DAOs",
+      "DEX",
+      "DEXs",
+      "DeFi",
+      "EVM",
+      "EVMs",
+      "FAQ",
+      "FAQs",
+      "GB",
+      "GPU",
+      "GPUs",
+      "Hz",
+      "IDE",
+      "IDEs",
+      "IoT",
+      "KB",
+      "MB",
+      "MEV",
+      "NFT",
+      "NFTs",
+      "RAM",
+      "ROI",
+      "RPC",
+      "RPCs",
+      "SDK",
+      "SDKs",
+      "TB",
+      "TVL",
+      "V2",
+      "V3",
+      "V4",
+      "V5",
+      "WiFi"
+    ],
+    "address_patterns": [
+      "0[xX][a-fA-F0-9]{3,}",
+      "\\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\\b",
+      "\\bbc1[a-zA-HJ-NP-Z0-9]{25,90}\\b",
+      "\\b(?:cosmos|osmo|terra|inj|sei|dydx)1[a-z0-9]{10,58}\\b",
+      "\\b[1-9A-HJ-NP-Za-km-z]{32,44}\\b"
+    ],
+    "ens_pattern": "\\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.eth\\b",
+    "percent_pattern": "\\b\\d+(?:\\.\\d+)?%(?!\\s*attack)",
+    "hf_pattern": "(?:health factor|HF)\\s*(?:is|of|at|=|:)?\\s*(?:approximately|about|around|roughly|nearly|~|≈)?\\s*\\.?\\d+(?:\\.\\d+)?",
+    "leverage_pattern": "\\b\\d+\\s*[xX×](?=\\s|$|\\b)",
+    "number_words": [
+      "hundred",
+      "thousand",
+      "million",
+      "billion",
+      "trillion",
+      "half a million",
+      "quarter million",
+      "half a billion",
+      "a few hundred",
+      "a few thousand",
+      "a few million",
+      "several hundred",
+      "several thousand",
+      "several million",
+      "dozens of",
+      "hundreds of",
+      "thousands of",
+      "six-figure",
+      "seven-figure",
+      "eight-figure",
+      "five-figure",
+      "four-figure",
+      "double",
+      "triple",
+      "quadruple"
+    ],
+    "number_word_patterns": [
+      "\\b(?:about|approximately|roughly|around|nearly|over|under|almost|close to|just under|just over|more than|less than|at least|up to)\\s+(?:a\\s+)?(?:half\\s+(?:a\\s+)?)?(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)\\s*(?:hundred|thousand|million|billion)?\\s*(?:[A-Z]{2,10}|dollars|bucks|worth)",
+      "\\b(?:four|five|six|seven|eight|nine|ten)-figure\\s+(?:position|portfolio|amount|sum|balance|holding|stake)",
+      "\\b(?:half|quarter|third)\\s+(?:a\\s+)?(?:million|billion|thousand)\\b",
+      "\\b(?:a\\s+)?(?:few|couple|several|many)\\s+(?:hundred|thousand|million)\\s*(?:thousand|million|billion)?\\s*(?:[A-Z]{2,10}|dollars|bucks|worth)?"
+    ],
+    "cardinal_token_pattern": "(?i:\\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))(?:\\s+(?:and\\s+)?(?:hundred|thousand|million|billion|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)))*\\s+[A-Z]{2,10}\\b",
+    "cardinal_known_token": "(?i:\\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))(?:\\s+(?:and\\s+)?(?:hundred|thousand|million|billion|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)))*\\s+(?i:eth|btc|usdc|usdt|dai|weth|wbtc|link|aave|uni|crv|glp|sol|ens|matic|arb|op|pepe|shib|doge|avax|dot|atom|near|ftm|apt|sui|steth|wsteth|cbeth|ezeth|weeth|frxeth|reth|rseth|meth|usde|susde|sdai|gho|rlusd|susds|mkr|comp|snx|bal|yfi|pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|usdt0|usd0|usdc\\.e|weth\\.e|usdt\\.e|dai\\.e|wbtc\\.e)\\b",
+    "worded_percent_pattern": "(?i:\\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))\\s+(?:percent|per\\s*cent)\\b",
+    "worded_decimal_pattern": "(?i:\\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))\\s+point\\s+(?i:(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)|zero)\\b",
+    "worded_fraction_token": "(?i:(?:\\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\\s+and\\s+)?(?:a\\s+)?(?:half|quarter|third|three\\s+quarters?)(?:\\s+(?:a|an|of\\s+a|of\\s+an))?\\s+(?:eth|btc|usdc|usdt|dai|weth|wbtc|link|aave|uni|crv|glp|sol|ens|matic|arb|op|pepe|shib|doge|avax|dot|atom|near|ftm|apt|sui|steth|wsteth|cbeth|ezeth|weeth|frxeth|reth|rseth|meth|usde|susde|sdai|gho|rlusd|susds|mkr|comp|snx|bal|yfi|pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|usdt0|usd0|usdc\\.e|weth\\.e|usdt\\.e|dai\\.e|wbtc\\.e|[A-Z]{2,10}))\\b",
+    "worded_decimal_token": "(?i:\\b(?:zero|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))\\s+point\\s+(?:(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)|zero)\\s+(?:eth|btc|usdc|usdt|dai|weth|wbtc|link|aave|uni|crv|glp|sol|ens|matic|arb|op|pepe|shib|doge|avax|dot|atom|near|ftm|apt|sui|steth|wsteth|cbeth|ezeth|weeth|frxeth|reth|rseth|meth|usde|susde|sdai|gho|rlusd|susds|mkr|comp|snx|bal|yfi|pendle|gmx|dydx|ldo|rpl|eigen|ondo|tia|jup|usdt0|usd0|usdc\\.e|weth\\.e|usdt\\.e|dai\\.e|wbtc\\.e|[A-Z]{2,10}))\\b",
+    "emotional_words": [
+      "worried",
+      "anxious",
+      "urgent",
+      "emergency",
+      "should I",
+      "scared",
+      "nervous",
+      "panicking",
+      "desperate",
+      "afraid",
+      "concerned about"
+    ],
+    "timing_patterns": [
+      "\\b(?:by|on|before|after|next)\\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\b",
+      "\\b(?:by|on|before|after)\\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2}(?:st|nd|rd|th)?\\b",
+      "\\b(?:within|in)\\s+\\d+\\s+(?:hours?|days?|minutes?|weeks?|months?|years?)\\b",
+      "\\b(?:within|in)\\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\\s+(?:hours?|days?|minutes?|weeks?|months?|years?)\\b",
+      "\\bbefore\\s+(?:the\\s+)?(?:upgrade|fork|merge|vote|deadline|unlock|expiry|migration)\\b",
+      "\\bright now\\b",
+      "\\bimmediately\\b",
+      "\\bASAP\\b",
+      "\\btoday\\b",
+      "\\btomorrow\\b",
+      "\\byesterday\\b",
+      "\\bnext\\s+(?:week|month|day|hour|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))\\b",
+      "\\b(?:lock-?up|unlock|vesting)\\s+(?:ends?|period)\\s+in\\s+\\d+\\s+\\w+\\b",
+      "\\b(?:by|before)\\s+(?:end\\s+of\\s+)?(?:Q[1-4]|EOD|EOW|EOM|EOY)\\b"
+    ],
+    "directional_verbs": {
+      "buy": "modify",
+      "sell": "modify",
+      "long": "leveraged",
+      "short": "leveraged",
+      "close": "modify",
+      "exit": "modify",
+      "enter": "modify",
+      "unstake": "modify",
+      "withdraw": "modify"
+    },
+    "qualitative_words": [
+      "underwater",
+      "close to liquidation",
+      "about to be liquidated",
+      "significantly imbalanced",
+      "dangerously",
+      "barely above",
+      "dropping fast",
+      "plummeting",
+      "mooning",
+      "dumping"
+    ],
+    "entity_names": [
+      "Compound III",
+      "CoW Protocol",
+      "Compound Gov",
+      "Morpho Blue",
+      "Compound V3",
+      "Compound V2",
+      "Rocket Pool",
+      "Gnosis Safe",
+      "Hyperliquid",
+      "MEV Blocker",
+      "Uniswap Gov",
+      "Uniswap V3",
+      "Uniswap V2",
+      "Eigenlayer",
+      "EigenLayer",
+      "Trader Joe",
+      "Centrifuge",
+      "DeFi Saver",
+      "Polymarket",
+      "SushiSwap",
+      "Synthetix",
+      "LayerZero",
+      "Aerodrome",
+      "Velodrome",
+      "Sommelier",
+      "Goldfinch",
+      "Instadapp",
+      "Flashbots",
+      "Chainlink",
+      "Berachain",
+      "Perennial",
+      "Curve Gov",
+      "UniswapX",
+      "Balancer",
+      "Compound",
+      "MakerDAO",
+      "Stargate",
+      "Wormhole",
+      "CoW Swap",
+      "Friktion",
+      "RedStone",
+      "Marginfi",
+      "Maverick",
+      "Aave Gov",
+      "Aave V3",
+      "Aave V2",
+      "Uniswap",
+      "Radiant",
+      "BendDAO",
+      "OpenSea",
+      "Orbiter",
+      "Camelot",
+      "Raydium",
+      "Jupiter",
+      "Gearbox",
+      "Meteora",
+      "EtherFi",
+      "Morpho",
+      "Pendle",
+      "Convex",
+      "Morpho",
+      "Across",
+      "Ribbon",
+      "Kamino",
+      "Ethena",
+      "Vertex",
+      "Kwenta",
+      "Puffer",
+      "Mantle",
+      "Curve",
+      "Maker",
+      "Yearn",
+      "Spark",
+      "Swell",
+      "Blast",
+      "Beefy",
+      "Maple",
+      "Drift",
+      "Mango",
+      "Euler",
+      "Angle",
+      "Renzo",
+      "Venus",
+      "Aave",
+      "dYdX",
+      "Lyra",
+      "Opyn",
+      "Lido",
+      "Frax",
+      "Blur",
+      "Orca",
+      "Jito",
+      "Pyth",
+      "Aevo",
+      "Kelp",
+      "GMX"
+    ]
+  },
+  "normalization": {
+    "currency_symbols": [
+      "€",
+      "£",
+      "¥",
+      "₹",
+      "₩",
+      "₿"
+    ],
+    "hyphenated_cardinals": [
+      "twenty",
+      "thirty",
+      "forty",
+      "fifty",
+      "sixty",
+      "seventy",
+      "eighty",
+      "ninety"
+    ]
+  },
+  "templates": [
+    "How does the {MECHANISM} respond to {TRIGGER} in {GENERIC_REF}?",
+    "What are the cost tradeoffs between {OPERATION_A} and {OPERATION_B} for {ACTOR}?",
+    "How do {GENERIC_REF} handle {MECHANISM} during {TRIGGER}?",
+    "What factors determine the {METRIC} for {MECHANISM} on {GENERIC_REF}?",
+    "What is the risk profile of {MECHANISM} strategies in {GENERIC_REF}?",
+    "How does the {MECHANISM} process work for {OPERATION} in {GENERIC_REF}?",
+    "How do {MECHANISM} characteristics change with {TRIGGER} in {GENERIC_REF}?",
+    "How do {METRIC} costs compare across {GENERIC_REF} for {OPERATION}?",
+    "What are the mechanics of {MECHANISM} using {OPERATION} in {GENERIC_REF}?",
+    "How does the {MECHANISM} adjustment mechanism work when {TRIGGER} in {GENERIC_REF}?",
+    "What are the tradeoffs of different {MECHANISM} approaches for {ACTOR}?",
+    "How does the {MECHANISM} queue mechanism handle {TRIGGER} in {GENERIC_REF}?",
+    "What determines the {METRIC} for {MECHANISM} in {GENERIC_REF}?",
+    "How do {RISK_CONCEPT} risks scale with {TRIGGER} in {GENERIC_REF}?",
+    "What are the mechanics of {MECHANISM} optimization in {GENERIC_REF}?",
+    "How does the {METRIC} calculation work for {MECHANISM} in {GENERIC_REF}?",
+    "What is the cost structure of {OPERATION} on {GENERIC_REF}?",
+    "How do {GENERIC_REF} manage {MECHANISM} during {TRIGGER}?",
+    "What factors influence the {METRIC} of {MECHANISM} in {GENERIC_REF}?",
+    "How does {MECHANISM} impact {METRIC} for {ACTOR}?"
+  ],
+  "template_slots": {
+    "MECHANISM": "mechanisms",
+    "OPERATION": "operations",
+    "OPERATION_A": "operations",
+    "OPERATION_B": "operations",
+    "TRIGGER": "triggers",
+    "METRIC": "metrics",
+    "ACTOR": "actors",
+    "GENERIC_REF": "generic_refs",
+    "RISK_CONCEPT": "risk_concepts"
+  }
+}
