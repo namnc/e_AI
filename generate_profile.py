@@ -90,8 +90,25 @@ def main():
     args = parser.parse_args()
     progress = not args.quiet
 
+    # Validate domain name (prevent path traversal)
+    if args.domain and not args.domain.replace("_", "").replace("-", "").isalnum():
+        print(f"ERROR: Invalid domain name '{args.domain}'. "
+              f"Use only letters, numbers, hyphens, underscores.",
+              file=sys.stderr)
+        sys.exit(1)
+
     # --- Validate-only mode ---
     if args.validate_only:
+        if not os.path.exists(args.validate_only):
+            print(f"ERROR: Profile not found: {args.validate_only}", file=sys.stderr)
+            sys.exit(1)
+        try:
+            with open(args.validate_only) as f:
+                json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"ERROR: Invalid JSON in {args.validate_only}: {e}", file=sys.stderr)
+            sys.exit(1)
+
         from meta.validation_engine import validate_profile
         print(f"Validating profile: {args.validate_only}")
         report = validate_profile(

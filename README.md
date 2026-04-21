@@ -67,7 +67,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 │   ├── analyzer.py              # Phase 1: LLM analyzes dataset (sensitivity, clustering, vocabulary, templates)
 │   ├── pattern_generator.py     # Phase 2a: generates regex patterns + entity lists from spans
 │   ├── refiner.py               # Phase 2c: iterative repair loop (validate → fix → re-validate)
-│   ├── validation_engine.py     # 6 automated property checks with traffic-light verdicts
+│   ├── validation_engine.py     # 9 property checks (6 functional + 3 anti-malicious-LLM guardrails)
 │   ├── web_enrichment.py        # Web search integration (ontology, threat model, false positives)
 │   └── prompts.py               # All LLM prompts for the meta pipeline
 │
@@ -139,7 +139,7 @@ Dataset (JSONL)  ──┐
 python generate_profile.py \
   --dataset data/benchmark_dataset.jsonl \
   --domain defi \
-  --backend ollama --model qwen2.5:32b \
+  --backend ollama --model qwen2.5:14b \
   --output domains/defi/profile.json
 
 # With web search to enrich vocabulary and threat model
@@ -183,7 +183,7 @@ A `profile.json` contains all domain-specific constants:
 
 ### Formal Properties
 
-The validation engine checks 6 properties:
+The validation engine checks 9 properties (including 3 anti-malicious-LLM guardrails):
 
 | Property | Definition | Threshold | Test |
 |----------|-----------|-----------|------|
@@ -193,6 +193,9 @@ The validation engine checks 6 properties:
 | Template Coverage | Dataset queries match templates | >=60% match rate | Template matching |
 | Vocabulary Depth | Each subdomain has sufficient vocabulary | >=3 items per slot | Schema check |
 | k-Indistinguishability | Adversary detection rate on cover sets | <=40% (vs 25% random) | Quick classifier |
+| Entity Completeness | Dataset entities covered by entity_names | >=70% coverage | Anti-omission guardrail |
+| Held-Out Sanitizer | Independent test data not from generating LLM | 0% param leakage | Anti-self-certification |
+| Ontology Balance | Subdomain vocabulary sizes balanced | >=0.40 min/max ratio | Anti-fingerprinting |
 
 ### Round-Trip Validation (DeFi)
 

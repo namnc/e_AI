@@ -23,27 +23,43 @@ class SubdomainEntry(TypedDict, total=False):
     generic_refs: list[str]    # anonymized category names
 
 
-class StructuralPattern(TypedDict, total=False):
-    """One regex pattern for sanitization."""
-    pattern: str               # regex string
-    flags: str                 # "IGNORECASE" | "CASESENSITIVE"
-    category: str              # "amount", "address", "identifier", etc.
-    replacement: str           # what to replace with (default: "")
+class PatternComponents(TypedDict, total=False):
+    """Building-block regex fragments referenced by other patterns."""
+    KNOWN_TOKENS: str          # regex alternation of token symbols
+    CARDINALS: str             # cardinal number words alternation
+    COMPOUND_CARDINAL: str     # compound cardinal (e.g., "twenty five")
+    DAYS: str                  # day names alternation
+    MONTHS: str                # month names alternation
+    WORDED_NUMS: str           # worded number alternation (one-twelve)
+    TIME_UNITS: str            # time unit alternation (hours, days, ...)
 
 
 class SensitivePatterns(TypedDict, total=False):
     """All sanitization patterns for a domain."""
-    # Regex patterns grouped by application phase
+    # Building-block components used in other patterns
+    components: PatternComponents
+
+    # Pre-normalization patterns (applied before input normalization)
+    pre_normalization_patterns: list[str]
+
+    # Amount patterns grouped by case sensitivity
     amount_patterns_icase: list[str]
     amount_patterns_csense: list[str]
     amount_known_token_pattern: str
-    known_tokens: str                    # regex alternation of known token symbols
+
+    # False positive words to preserve during broad matching
     false_positive_words: list[str]
+
+    # Identifier patterns
     address_patterns: list[str]
     ens_pattern: str
+
+    # Domain-specific metric patterns
     percent_pattern: str
-    hf_pattern: str                      # health-factor / domain-specific metric pattern
+    hf_pattern: str            # health-factor or domain-specific metric
     leverage_pattern: str
+
+    # Natural language quantity patterns
     number_words: list[str]
     number_word_patterns: list[str]
     cardinal_token_pattern: str
@@ -52,6 +68,8 @@ class SensitivePatterns(TypedDict, total=False):
     worded_decimal_pattern: str
     worded_fraction_token: str
     worded_decimal_token: str
+
+    # Qualitative/emotional/timing filters
     emotional_words: list[str]
     timing_patterns: list[str]
     directional_verbs: dict[str, str]
@@ -65,19 +83,6 @@ class NormalizationConfig(TypedDict, total=False):
     """Input normalization settings."""
     currency_symbols: list[str]          # symbols to normalize to $
     hyphenated_cardinals: list[str]      # words that form hyphenated compounds
-
-
-class TemplateSlots(TypedDict, total=False):
-    """Maps template slot names to ontology categories."""
-    MECHANISM: str
-    OPERATION: str
-    OPERATION_A: str
-    OPERATION_B: str
-    TRIGGER: str
-    METRIC: str
-    ACTOR: str
-    GENERIC_REF: str
-    RISK_CONCEPT: str
 
 
 class ProfileMeta(TypedDict, total=False):
@@ -97,4 +102,4 @@ class DomainProfile(TypedDict, total=False):
     sensitive_patterns: SensitivePatterns
     normalization: NormalizationConfig
     templates: list[str]
-    template_slots: dict[str, str]
+    template_slots: dict[str, str]    # maps {SLOT} names to ontology categories

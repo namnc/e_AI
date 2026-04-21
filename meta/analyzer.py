@@ -26,40 +26,7 @@ from meta.prompts import (
     VOCABULARY_EXTRACTION,
     TEMPLATE_EXTRACTION,
 )
-
-
-def _extract_json(text: str) -> dict | list | None:
-    """Extract the first JSON object or array from LLM output."""
-    for start_char, end_char in [('{', '}'), ('[', ']')]:
-        start = text.find(start_char)
-        if start == -1:
-            continue
-        depth = 0
-        in_string = False
-        escape = False
-        for i in range(start, len(text)):
-            ch = text[i]
-            if escape:
-                escape = False
-                continue
-            if ch == '\\':
-                escape = True
-                continue
-            if ch == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if ch == start_char:
-                depth += 1
-            elif ch == end_char:
-                depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(text[start:i + 1])
-                    except json.JSONDecodeError:
-                        break
-    return None
+from meta.util import extract_json as _extract_json
 
 
 def load_dataset(path: str) -> list[dict]:
@@ -163,11 +130,43 @@ def cluster_subdomains(queries: list[dict], progress: bool = True) -> dict:
             taxonomy = {l: l for l in unique_labels}
             descriptions = {}
 
+    # --- Pass 2: Programmatic enforcement of 4-8 limit ---
+    # If LLM consolidation still produced too many subdomains, merge the
+    # smallest ones into "general" or the largest neighbor.
+    consolidated_counts = Counter()
+    for r in raw_labels:
+        consolidated_counts[taxonomy.get(r["raw_label"], r["raw_label"])] += 1
+
+    if len(consolidated_counts) > 8:
+        if progress:
+            print(f"  [pass 2] LLM produced {len(consolidated_counts)} subdomains, "
+                  f"enforcing 4-8 limit")
+        # Keep the top 7 by count, merge everything else into "general"
+        top_labels = [label for label, _ in consolidated_counts.most_common(7)]
+        top_set = set(top_labels)
+        # Remap existing taxonomy entries
+        for orig_label, cons_label in list(taxonomy.items()):
+            if cons_label not in top_set:
+                taxonomy[orig_label] = "general"
+        # Also catch raw labels not in taxonomy at all (fallthrough case)
+        all_raw = set(r["raw_label"] for r in raw_labels)
+        for raw_label in all_raw:
+            if raw_label not in taxonomy:
+                taxonomy[raw_label] = "general"
+            elif taxonomy[raw_label] not in top_set:
+                taxonomy[raw_label] = "general"
+        if progress:
+            new_counts = Counter()
+            for r in raw_labels:
+                new_counts[taxonomy.get(r["raw_label"], "general")] += 1
+            print(f"  [pass 2] Merged to {len(new_counts)} subdomains: "
+                  f"{dict(new_counts.most_common())}")
+
     # Apply taxonomy
     assignments = []
     distribution = Counter()
     for r in raw_labels:
-        consolidated = taxonomy.get(r["raw_label"], r["raw_label"])
+        consolidated = taxonomy.get(r["raw_label"], "general")
         assignments.append({"text": r["text"], "subdomain": consolidated})
         distribution[consolidated] += 1
 
@@ -196,6 +195,15 @@ def extract_vocabulary(
     by_subdomain: dict[str, list[str]] = defaultdict(list)
     for a in assignments:
         by_subdomain[a["subdomain"]].append(a["text"])
+
+    # Skip subdomains with too few queries (merge into "general")
+    min_queries = 2
+    small = [sd for sd, qs in by_subdomain.items() if len(qs) < min_queries and sd != "general"]
+    if small:
+        for sd in small:
+            by_subdomain.setdefault("general", []).extend(by_subdomain.pop(sd))
+        if progress:
+            print(f"  Merged {len(small)} tiny subdomains into 'general': {small}")
 
     subdomains = {}
     total = len(by_subdomain)

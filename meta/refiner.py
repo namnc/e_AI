@@ -17,6 +17,7 @@ import re
 
 from llm_backend import call_llm
 from meta.validation_engine import check_sanitizer_completeness
+from meta.util import extract_json as _extract_json
 
 
 # ---------------------------------------------------------------------------
@@ -46,38 +47,6 @@ Output JSON:
     }
   ]
 }"""
-
-
-def _extract_json(text: str) -> dict | None:
-    start = text.find('{')
-    if start == -1:
-        return None
-    depth = 0
-    in_string = False
-    escape = False
-    for i in range(start, len(text)):
-        ch = text[i]
-        if escape:
-            escape = False
-            continue
-        if ch == '\\':
-            escape = True
-            continue
-        if ch == '"':
-            in_string = not in_string
-            continue
-        if in_string:
-            continue
-        if ch == '{':
-            depth += 1
-        elif ch == '}':
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(text[start:i + 1])
-                except json.JSONDecodeError:
-                    return None
-    return None
 
 
 def _validate_regex(pattern: str) -> bool:

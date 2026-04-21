@@ -33,7 +33,6 @@ DOMAIN_ONTOLOGY: dict = {}
 _AMOUNT_PATTERNS_ICASE: list = []
 _AMOUNT_PATTERNS_CSENSE: list = []
 _AMOUNT_KNOWN_TOKEN_PATTERN: str = ""
-_KNOWN_TOKENS: str = ""
 _FALSE_POSITIVE_WORDS: set = set()
 _ADDRESS_PATTERNS: list = []
 _ENS_PATTERN: str = ""
@@ -58,6 +57,9 @@ _PROTOCOL_NAMES: list = []
 
 TEMPLATES: list = []
 
+# Pre-normalization patterns (applied before input normalization)
+_PRE_NORM_PATTERNS: list = []
+
 # Normalization config
 _CURRENCY_SYMBOLS: list = []
 _HYPHENATED_CARDINALS: set = set()
@@ -71,10 +73,11 @@ def _init_from_profile(profile: dict | None = None):
 
     Called once at module load with the default DeFi profile.
     Can be called again to switch to a different domain.
+    Not thread-safe — call only from the main thread or with external locking.
     """
     global DOMAIN_DISTRIBUTION, TOP_DOMAINS, DOMAIN_ONTOLOGY
     global _AMOUNT_PATTERNS_ICASE, _AMOUNT_PATTERNS_CSENSE
-    global _AMOUNT_KNOWN_TOKEN_PATTERN, _KNOWN_TOKENS, _FALSE_POSITIVE_WORDS
+    global _AMOUNT_KNOWN_TOKEN_PATTERN, _FALSE_POSITIVE_WORDS
     global _ADDRESS_PATTERNS, _ENS_PATTERN
     global _PERCENT_PATTERN, _HF_PATTERN, _LEVERAGE_PATTERN
     global _NUMBER_WORDS, _NUMBER_WORD_PATTERNS
@@ -84,6 +87,7 @@ def _init_from_profile(profile: dict | None = None):
     global _WORDED_FRACTION_TOKEN, _WORDED_DECIMAL_TOKEN
     global _EMOTIONAL_WORDS, _TIMING_PATTERNS, _DIRECTIONAL_VERBS, _QUALITATIVE
     global _PROTOCOL_NAMES, TEMPLATES
+    global _PRE_NORM_PATTERNS
     global _CURRENCY_SYMBOLS, _HYPHENATED_CARDINALS
     global _DOMAIN_KEYWORDS
 
@@ -100,7 +104,6 @@ def _init_from_profile(profile: dict | None = None):
     _AMOUNT_PATTERNS_ICASE = sp["amount_patterns_icase"]
     _AMOUNT_PATTERNS_CSENSE = sp["amount_patterns_csense"]
     _AMOUNT_KNOWN_TOKEN_PATTERN = sp["amount_known_token_pattern"]
-    _KNOWN_TOKENS = comp.get("KNOWN_TOKENS", "")
     _FALSE_POSITIVE_WORDS = set(sp["false_positive_words"])
     _ADDRESS_PATTERNS = sp["address_patterns"]
     _ENS_PATTERN = sp["ens_pattern"]
@@ -124,6 +127,13 @@ def _init_from_profile(profile: dict | None = None):
     _PROTOCOL_NAMES = sp["entity_names"]
 
     TEMPLATES = profile["templates"]
+
+    _PRE_NORM_PATTERNS = sp.get("pre_normalization_patterns", [
+        r'\b\d+(?:\.\d+)?[eE][+-]?\d+\s*\w*\b',
+        r'\b\d+(?:\.\d+)?[KkMmBb]\b',
+        r'\b\d+(?:\.\d+)?[+~≈><]\s*\w*\b',
+        r'\b\d+(?:\.\d+)?-\d+(?:\.\d+)?[xX×]?\s*\w*\b',
+    ])
 
     norm = profile.get("normalization", {})
     _CURRENCY_SYMBOLS = norm.get("currency_symbols", ["€", "£", "¥", "₹", "₩", "₿"])
@@ -206,10 +216,8 @@ def sanitize_query(query: str) -> str:
     result = re.sub(_ENS_PATTERN, '', result)
 
     # Step 0b: Strip patterns that normalization would break by inserting spaces
-    result = re.sub(r'\b\d+(?:\.\d+)?[eE][+-]?\d+\s*\w*\b', '', result, flags=re.IGNORECASE)  # sci notation
-    result = re.sub(r'\b\d+(?:\.\d+)?[KkMmBb]\b', '', result)  # bare magnitudes (500k, 2m, 1.5b)
-    result = re.sub(r'\b\d+(?:\.\d+)?[+~≈><]\s*\w*\b', '', result)  # 500+ ETH, ~1000, >500, ≈500
-    result = re.sub(r'\b\d+(?:\.\d+)?-\d+(?:\.\d+)?[xX×]?\s*\w*\b', '', result)  # ranges: 500-1000 ETH, 10-20x leveraged
+    for pat in _PRE_NORM_PATTERNS:
+        result = re.sub(pat, '', result, flags=re.IGNORECASE)
 
     # Step 0c: Strip space-separated thousands BEFORE normalization splits them further
     result = re.sub(r'\b\d+\s\d{3}(?:\s\d{3})*(?:\s*[a-zA-Z]\w*)?\b', '', result, flags=re.IGNORECASE)
@@ -239,9 +247,10 @@ def sanitize_query(query: str) -> str:
     # (addresses and ENS names already stripped in Step 0a)
 
     # Remove amounts: four passes with different case handling.
-    # Pass 0: scientific notation + trailing token (must run first — "1e6 usdc")
-    result = re.sub(r'\b\d+(?:\.\d+)?[eE][+-]?\d+\s*\w*\b', '', result, flags=re.IGNORECASE)
-    # Pass 1: case-insensitive known DeFi tokens (catches "500 usdc", "1.8m eth")
+    # Pass 0: pre-normalization patterns again (catches residuals after normalization)
+    for pat in _PRE_NORM_PATTERNS:
+        result = re.sub(pat, '', result, flags=re.IGNORECASE)
+    # Pass 1: case-insensitive known tokens (catches "500 usdc", "1.8m eth")
     result = re.sub(_AMOUNT_KNOWN_TOKEN_PATTERN, '', result, flags=re.IGNORECASE)
     # Pass 2: case-insensitive dollar amounts and suffixed numbers
     for pat in _AMOUNT_PATTERNS_ICASE:

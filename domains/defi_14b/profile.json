@@ -1,0 +1,615 @@
+{
+  "meta": {
+    "domain_name": "defi_14b",
+    "version": "0.1.0",
+    "generated_by": "meta/analyzer.py",
+    "validation_status": "marginal"
+  },
+  "domain_distribution": {
+    "general": 0.55,
+    "lending": 0.2,
+    "staking": 0.1,
+    "liquidity": 0.05,
+    "trading": 0.04,
+    "smart_contracts": 0.04,
+    "yield": 0.03
+  },
+  "top_domains": [
+    "general",
+    "lending",
+    "staking"
+  ],
+  "subdomains": {
+    "general": {
+      "mechanisms": [
+        "slippage",
+        "flash loan",
+        "liquidity pool",
+        "DAO treasury diversification",
+        "TWAP execution",
+        "cross-chain bridge migration",
+        "fraud proofs handling",
+        "EIP-1559 mechanism",
+        "blob transactions"
+      ],
+      "operations": [
+        "swap tokens",
+        "add margin",
+        "vote on proposals",
+        "consolidate funds",
+        "remove liquidity",
+        "realize losses",
+        "execute large TWAP orders",
+        "decentralized oracle aggregation",
+        "avoid MEV bots detection"
+      ],
+      "triggers": [
+        "market price changes",
+        "price peg deviations",
+        "ERC standard adoption",
+        "network upgrades (Shanghai upgrade)",
+        "cross-chain bridge usage"
+      ],
+      "metrics": [
+        "health factor",
+        "liquidation price",
+        "slippage ratio",
+        "execution cost",
+        "gas price",
+        "historical IV"
+      ],
+      "actors": [
+        "traders",
+        "investors",
+        "treasury managers",
+        "DAO members",
+        "liquidity providers"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "market slippage",
+        "price manipulation risks",
+        "MEV (miner extractable value)",
+        "cross-chain bridge risks"
+      ],
+      "generic_refs": [
+        "DEX aggregators",
+        "stablecoin protocols",
+        "leveraged trading platforms",
+        "decentralized exchange (DEX) liquidity pools",
+        "rollup mechanisms"
+      ],
+      "protocols": [
+        "Uniswap V3",
+        "Curve 3pool",
+        "GMX",
+        "Gnosis Safe",
+        "Aave",
+        "Lyra",
+        "Tornado Cash"
+      ]
+    },
+    "lending": {
+      "mechanisms": [
+        "health factor",
+        "liquidation ratio",
+        "stability mechanism",
+        "efficiency mode (E-Mode)",
+        "flash loan",
+        "margin system",
+        "collateralization ratio",
+        "debt ceiling"
+      ],
+      "operations": [
+        "adding collateral",
+        "repaying debt",
+        "borrowing funds",
+        "migrating position",
+        "deploying flash loan arb",
+        "leveraged staking",
+        "swapping assets",
+        "liquidity provision (LP)"
+      ],
+      "triggers": [
+        "prices drop",
+        "collateral ratio drops below safe level",
+        "health factor falls below threshold",
+        "stability mechanism triggers",
+        "flash loan rate spread hits target"
+      ],
+      "metrics": [
+        "health factor",
+        "liquidation price",
+        "borrowing interest rates (APY)",
+        "price impact",
+        "liquidity depth"
+      ],
+      "actors": [
+        "lenders",
+        "borrowers",
+        "collateral providers",
+        "protocol users",
+        "governance participants"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "smart contract risks",
+        "depeg risk",
+        "flash loan attack",
+        "repayment failure",
+        "market volatility impact",
+        "protocol governance risks"
+      ],
+      "generic_refs": [
+        "lending protocols",
+        "borrowing platforms",
+        "collateralized debt positions (CDP)",
+        "flash lending services",
+        "yield farming opportunities"
+      ],
+      "protocols": [
+        "Aave",
+        "Compound",
+        "MakerDAO",
+        "Morpho",
+        "Instadapp",
+        "BendDAO",
+        "Uniswap",
+        "Curve"
+      ]
+    },
+    "liquidity": {
+      "mechanisms": [
+        "impermanent loss",
+        "rebalancing",
+        "liquidity provision"
+      ],
+      "operations": [
+        "adding liquidity",
+        "moving LP position",
+        "calculating IL comparison"
+      ],
+      "triggers": [
+        "position out of range",
+        "gas fees increase",
+        "prices fluctuate"
+      ],
+      "metrics": [
+        "health factor",
+        "protocol-owned liquidity amount",
+        "impermanent loss percentage"
+      ],
+      "actors": [
+        "liquidity providers (LPs)",
+        "traders",
+        "investors"
+      ],
+      "risk_concepts": [
+        "impermanent loss risk",
+        "rebalancing risk",
+        "gas fee risk"
+      ],
+      "generic_refs": [
+        "DEXes",
+        "ammunition liquidity pools",
+        "blockchain networks"
+      ],
+      "protocols": [
+        "Uniswap V3",
+        "Balancer",
+        "Protocol-owned liquidity"
+      ]
+    },
+    "smart_contracts": {
+      "mechanisms": [
+        "reentrancy attack",
+        "account abstraction",
+        "proxy upgrade patterns",
+        "front running",
+        "formal verification"
+      ],
+      "operations": [
+        "adding collateral",
+        "implementing security measures",
+        "claiming airdrop tokens"
+      ],
+      "triggers": [
+        "contract being compromised",
+        "prices drop",
+        "fraudulent activities detected"
+      ],
+      "metrics": [
+        "health factor",
+        "transaction confirmation time",
+        "security score"
+      ],
+      "actors": [
+        "smart contract developers",
+        "attackers",
+        "whale watchers",
+        "users"
+      ],
+      "risk_concepts": [
+        "reentrancy risk",
+        "upgradeability risks",
+        "scam risks",
+        "front running threat"
+      ],
+      "generic_refs": [
+        "lending protocols",
+        "transaction security systems",
+        "fraud detection mechanisms"
+      ],
+      "protocols": [
+        "The DAO",
+        "ERC-4337",
+        "UUPS",
+        "Transparent Proxy"
+      ]
+    },
+    "staking": {
+      "mechanisms": [
+        "restaking",
+        "slashing",
+        "liquidation module",
+        "validator security",
+        "gas optimization"
+      ],
+      "operations": [
+        "unstaking",
+        "adding collateral",
+        "rolling over positions",
+        "claiming rewards",
+        "exit staking"
+      ],
+      "triggers": [
+        "exploit rumors",
+        "slashing risk",
+        "lock-up expiration",
+        "market performance decline",
+        "pending rewards accumulation"
+      ],
+      "metrics": [
+        "staking reward rate",
+        "APY (Annual Percentage Yield)",
+        "slashed amount",
+        "health factor",
+        "staked ETH balance"
+      ],
+      "actors": [
+        "validators",
+        "delegators",
+        "protocol users",
+        "stakers",
+        "participants"
+      ],
+      "risk_concepts": [
+        "liquidation risk",
+        "slashing risk",
+        "market volatility risk",
+        "protocol exploit risk",
+        "yield mismatch risk"
+      ],
+      "generic_refs": [
+        "staking protocols",
+        "decentralized finance platforms (DeFi)",
+        "validator services",
+        "restaking solutions",
+        "smart contract ecosystems"
+      ],
+      "protocols": [
+        "Aave",
+        "Eigenlayer",
+        "Lido",
+        "Pendle PT",
+        "Beacon Chain"
+      ]
+    },
+    "trading": {
+      "mechanisms": [
+        "backrunning",
+        "flash loan",
+        "arbitrage",
+        "liquid staking derivatives",
+        "cross margin",
+        "isolated margin",
+        "health factor calculation"
+      ],
+      "operations": [
+        "submit via Flashbots",
+        "arbitraging against imbalanced pools",
+        "adding collateral",
+        "reducing position size",
+        "switching from isolated to cross margin"
+      ],
+      "triggers": [
+        "large trades hitting the pool",
+        "price imbalance in Curve 3pool",
+        "prices drop below liquidation threshold",
+        "position reaches critical health factor",
+        "health factor falls below required level"
+      ],
+      "metrics": [
+        "profit per trade",
+        "average profit from arbitrage",
+        "drawdown percentage before liquidation",
+        "critical health factor threshold"
+      ],
+      "actors": [
+        "traders",
+        "arbitrageurs",
+        "liquidators",
+        "borrowers",
+        "lenders"
+      ],
+      "risk_concepts": [
+        "backrun risk",
+        "flash loan arbitrage risk",
+        "over-leveraging risk",
+        "liquidation risk",
+        "margin call risk"
+      ],
+      "generic_refs": [
+        "trading platforms",
+        "decentralized exchanges (DEX)",
+        "stablecoin pools",
+        "lending protocols",
+        "stake-based derivatives",
+        "liquidity pools"
+      ],
+      "protocols": [
+        "Uniswap V3",
+        "Sushiswap",
+        "Curve 3pool",
+        "Aave",
+        "MakerDAO",
+        "dydx",
+        "Flashbots"
+      ]
+    },
+    "yield": {
+      "mechanisms": [
+        "yield farming",
+        "yield aggregation",
+        "tokenizing yield",
+        "staking"
+      ],
+      "operations": [
+        "exit a position",
+        "automate staking",
+        "claim rewards",
+        "restake"
+      ],
+      "triggers": [
+        "prices drop",
+        "stablecoin interest rates change",
+        "new protocols launch"
+      ],
+      "metrics": [
+        "annual percentage rate (APR)",
+        "total value locked (TVL)"
+      ],
+      "actors": [
+        "yield farmers",
+        "protocol users"
+      ],
+      "risk_concepts": [
+        "liquidity risk",
+        "smart contract risk"
+      ],
+      "generic_refs": [
+        "stablecoins",
+        "lending and borrowing platforms",
+        "NFTs"
+      ],
+      "protocols": [
+        "Convex",
+        "Yearn",
+        "Harvest",
+        "Gnosis Safe",
+        "Pendle"
+      ]
+    }
+  },
+  "templates": [
+    "How does {MECHANISM} work in {GENERIC_REF}?",
+    "What are the risks of using {MECHANISM} for {OPERATION}?",
+    "How do I minimize slippage when performing {OPERATION} on {GENERIC_REF}?",
+    "Should I add collateral or start repaying to maintain a healthy health factor on {MECHANISM}?",
+    "What factors should I consider before moving my funds from {ENTITY} to {ENTITY}?",
+    "How does {MECHANISM} handle risks associated with {TRIGGER}?",
+    "Is it worth the risk to execute a flash loan for {OPERATION} on {GENERIC_REF}?",
+    "Should I wait or act now if {TRIGGER} is likely to occur in relation to my {ENTITY} position?",
+    "How does {MECHANISM}'s risk management change between version {GENERIC_REF} and {GENERIC_REF}?",
+    "Should I unstake or wait for official response when there is a rumor of an exploit on {ENTITY}?",
+    "What determines impermanent loss and when does it become permanent for traders on {GENERIC_REF}?",
+    "Should I repay debt or add collateral when my liquidation threshold is approaching on {GENERIC_REF}?"
+  ],
+  "sensitive_patterns": {
+    "components": {},
+    "amount_patterns_icase": [
+      "\\$\\d{1,3}(?:,\\d{3})*(\\.\\d+)?[KMB]?",
+      "\\(\\d{1,3}(?:,\\d{3})*(\\.\\d+)?[ KMB]?(ETH|WBTC|USDC)?\\)",
+      "\\d{1,3}(?:,\\d{3})*[. ]?\\d*%?",
+      "\\d{1,3}(?:,\\d{3})*(\\.\\d+)?[KMB]? ETH",
+      "\\$\\d{1,3}(?:,\\d{3})*(\\.\\d+)? USDC",
+      "\\$[0-9]{1,3}(,[0-9]{3})*([.][0-9]+)?"
+    ],
+    "amount_patterns_csense": [],
+    "amount_known_token_pattern": "",
+    "false_positive_words": [
+      "API",
+      "APIs",
+      "APY",
+      "APYs",
+      "CLI",
+      "CPU",
+      "CPUs",
+      "DAI",
+      "DAIs",
+      "DEX",
+      "DEXs",
+      "ETH",
+      "ETHs",
+      "FAQ",
+      "GB",
+      "GPU",
+      "GPUs",
+      "HF",
+      "HFs",
+      "Hz",
+      "IDE",
+      "IL",
+      "ILs",
+      "KB",
+      "MB",
+      "MEV",
+      "MEVs",
+      "PBS",
+      "PBSs",
+      "RAM",
+      "SDK",
+      "SDKs",
+      "TB",
+      "TVL",
+      "TVLs",
+      "USDC",
+      "USDCs",
+      "UUPS",
+      "UUPSs",
+      "V2",
+      "V3",
+      "V4",
+      "V5"
+    ],
+    "address_patterns": [],
+    "ens_pattern": "",
+    "percent_pattern": "\\b\\d+(?:\\.\\d+)?%\\b",
+    "hf_pattern": "",
+    "leverage_pattern": "",
+    "number_words": [
+      "hundred",
+      "thousand",
+      "million",
+      "billion",
+      "trillion",
+      "half a million",
+      "quarter million",
+      "six-figure",
+      "seven-figure",
+      "eight-figure",
+      "double",
+      "triple",
+      "quadruple"
+    ],
+    "number_word_patterns": [],
+    "cardinal_token_pattern": "",
+    "cardinal_known_token": "",
+    "worded_percent_pattern": "",
+    "worded_decimal_pattern": "",
+    "worded_fraction_token": "",
+    "worded_decimal_token": "",
+    "emotional_words": [
+      "worried",
+      "anxious",
+      "urgent",
+      "emergency",
+      "scared",
+      "nervous",
+      "panicking",
+      "desperate",
+      "afraid",
+      "concerned about"
+    ],
+    "timing_patterns": [
+      "\\b(?:by|on|before|after|next)\\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\b",
+      "\\b(?:within|in)\\s+\\d+\\s+(?:hours?|days?|weeks?|months?)\\b",
+      "\\bright now\\b",
+      "\\bimmediately\\b",
+      "\\bASAP\\b",
+      "\\btoday\\b",
+      "\\btomorrow\\b",
+      "\\byesterday\\b"
+    ],
+    "directional_verbs": {},
+    "qualitative_words": [],
+    "entity_names": [
+      "Protocol-owned liquidity",
+      "Transparent Proxy",
+      "Harvest Finance",
+      "Orbiter Finance",
+      "Convex Finance",
+      "Goldman Sachs",
+      "Yearn Finance",
+      "Beacon Chain",
+      "Lido Finance",
+      "Tornado Cash",
+      "Gnosis Safe",
+      "Morpho Aave",
+      "Mayo Clinic",
+      "Curve 3pool",
+      "EigenLayer",
+      "Eigenlayer",
+      "Uniswap V3",
+      "Pendle PT",
+      "Instadapp",
+      "Flashbots",
+      "Sushiswap",
+      "Arbitrum",
+      "Wormhole",
+      "Compound",
+      "ERC-4337",
+      "MakerDAO",
+      "Balancer",
+      "Harvest",
+      "Aave V3",
+      "Uniswap",
+      "The DAO",
+      "BendDAO",
+      "Morpho",
+      "Convex",
+      "Pendle",
+      "Yearn",
+      "Curve",
+      "UUPS",
+      "Lido",
+      "Aave",
+      "dydx",
+      "Lyra",
+      "dYdX",
+      "DAO",
+      "GMX"
+    ]
+  },
+  "normalization": {
+    "currency_symbols": [
+      "€",
+      "£",
+      "¥",
+      "₹",
+      "₩",
+      "₿"
+    ],
+    "hyphenated_cardinals": [
+      "twenty",
+      "thirty",
+      "forty",
+      "fifty",
+      "sixty",
+      "seventy",
+      "eighty",
+      "ninety"
+    ]
+  },
+  "template_slots": {
+    "MECHANISM": "mechanisms",
+    "OPERATION": "operations",
+    "OPERATION_A": "operations",
+    "OPERATION_B": "operations",
+    "TRIGGER": "triggers",
+    "METRIC": "metrics",
+    "ACTOR": "actors",
+    "GENERIC_REF": "generic_refs",
+    "RISK_CONCEPT": "risk_concepts"
+  }
+}

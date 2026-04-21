@@ -31,43 +31,28 @@ from collections import defaultdict
 from typing import Callable
 
 from llm_backend import call_llm
+from meta.util import extract_json as _extract_json
 
 
 # Type alias for search functions
 SearchFn = Callable[[str], list[str]]
 
 
-def _extract_json(text: str) -> dict | list | None:
-    for start_char, end_char in [('{', '}'), ('[', ']')]:
-        start = text.find(start_char)
-        if start == -1:
-            continue
-        depth = 0
-        in_string = False
-        escape = False
-        for i in range(start, len(text)):
-            ch = text[i]
-            if escape:
-                escape = False
-                continue
-            if ch == '\\':
-                escape = True
-                continue
-            if ch == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if ch == start_char:
-                depth += 1
-            elif ch == end_char:
-                depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(text[start:i + 1])
-                    except json.JSONDecodeError:
-                        break
-    return None
+def _sanitize_snippet(text: str, max_len: int = 500) -> str:
+    """Sanitize a search result snippet before including in LLM prompt.
+
+    Truncates, strips control characters, and removes common prompt
+    injection patterns to reduce risk from malicious search results.
+    """
+    # Truncate
+    text = text[:max_len]
+    # Strip control characters
+    text = ''.join(ch for ch in text if ch == '\n' or ch == '\t' or (ord(ch) >= 32))
+    # Remove common prompt injection markers
+    for marker in ("SYSTEM:", "OVERRIDE:", "IGNORE PREVIOUS", "ASSISTANT:",
+                    "```", "<|", "|>"):
+        text = text.replace(marker, "")
+    return text.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +170,7 @@ def enrich_ontology(
             continue
 
         # Extract terms from results via LLM
-        snippet_block = "\n".join(f"- {s}" for s in all_snippets[:30])
+        snippet_block = "\n".join(f"- {_sanitize_snippet(s)}" for s in all_snippets[:30])
         resp = call_llm(
             prompt=f"Subdomain: {sd_name}\n\nSearch results:\n{snippet_block}",
             system=EXTRACT_TERMS_PROMPT,
@@ -260,7 +245,7 @@ def enrich_threat_model(
             print(f"    No search results for threat model")
         return profile
 
-    snippet_block = "\n".join(f"- {s}" for s in all_snippets[:30])
+    snippet_block = "\n".join(f"- {_sanitize_snippet(s)}" for s in all_snippets[:30])
     resp = call_llm(
         prompt=f"Domain: {domain_name}\n\nSearch results:\n{snippet_block}",
         system=THREAT_SEARCH_PROMPT,
@@ -316,7 +301,7 @@ def enrich_false_positives(
     if not all_snippets:
         return profile
 
-    snippet_block = "\n".join(f"- {s}" for s in all_snippets[:20])
+    snippet_block = "\n".join(f"- {_sanitize_snippet(s)}" for s in all_snippets[:20])
     resp = call_llm(
         prompt=f"Domain: {domain_name}\n\nSearch results:\n{snippet_block}",
         system=FP_SEARCH_PROMPT,
@@ -388,7 +373,10 @@ def make_ddgs_search(max_results: int = 5) -> SearchFn:
             )
 
     def search_fn(query: str) -> list[str]:
-        results = list(DDGS().text(query, max_results=max_results))
-        return [r.get("body", "") for r in results if r.get("body")]
+        try:
+            results = list(DDGS(timeout=15).text(query, max_results=max_results))
+            return [r.get("body", "") for r in results if r.get("body")]
+        except Exception:
+            return []  # graceful degradation on timeout/network error
 
     return search_fn

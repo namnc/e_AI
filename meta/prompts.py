@@ -28,24 +28,35 @@ If no sensitive spans exist, output: {"spans": []}
 Be thorough — miss nothing. False positives are acceptable; false negatives are not."""
 
 SUBDOMAIN_CLASSIFICATION = """\
-You are a domain analyst. Classify the following query into a subdomain category.
+You are a domain analyst. Classify the following query into a subdomain category \
+within the domain it belongs to.
 
 Rules:
-- Use a short, lowercase label (e.g., "lending", "cardiology", "contract_review")
+- Use a short, lowercase label (1-2 words, e.g., "lending", "trading", "staking")
+- The label must describe the FUNCTIONAL area, not the technology or format
 - If the query spans multiple subdomains, pick the primary one
 - If the query is generic/uncategorizable, use "general"
+- Do NOT create labels for tangential topics — classify by the core subject
 
 Output JSON: {"subdomain": "...", "confidence": "high" | "medium" | "low"}"""
 
 SUBDOMAIN_CONSOLIDATION = """\
 You are organizing a taxonomy. Given these subdomain labels extracted from a query dataset, \
-consolidate them into a clean taxonomy of 4-8 subdomains.
+consolidate them into exactly 4-8 clean subdomains.
+
+This is a MERGING task. You must aggressively combine related labels. Examples:
+- "crypto" + "cryptocurrencies" + "crypto_trading" + "blockchain" → "trading"
+- "smart_contract" + "smart_contracts" + "security" → "smart_contracts"
+- "investing" + "investment" + "finance" → "investing"
+- "yield_farming" + "yield_aggregation" → "yield"
+- "health" + "cardiology" + "gaming" → "general" (if off-topic for the domain)
 
 Rules:
-- Merge synonyms ("contract review" + "agreement analysis" → "contract_review")
-- Keep labels that represent genuinely distinct topic areas
-- Each label should be lowercase_with_underscores
-- Output the mapping from original labels to consolidated labels
+- Output MUST have between 4 and 8 consolidated labels, no more
+- Merge ALL synonyms, plurals, and closely related labels into one
+- Labels that appear only 1-2 times should be absorbed into a larger category
+- Off-topic or hallucinated labels should map to "general"
+- Each consolidated label should be lowercase_with_underscores
 
 Output JSON: {"taxonomy": {"original_label": "consolidated_label", ...}, \
 "subdomain_descriptions": {"consolidated_label": "one-line description", ...}}"""
@@ -130,21 +141,3 @@ Rules:
 
 Output JSON: {"entities": [{"name": "...", "generic_ref": "..."}]}"""
 
-# ---------------------------------------------------------------------------
-# Phase 2b: Threat model
-# ---------------------------------------------------------------------------
-
-THREAT_MODEL = """\
-You are a privacy threat analyst. Given a domain description and example queries, \
-identify the threat model: what could an adversary (the cloud AI provider or someone \
-with access to query logs) extract and exploit?
-
-For each exploit category, describe:
-- "name": short name (e.g., "front_running", "insider_trading", "blackmail")
-- "description": what the adversary does
-- "requires": which types of sensitive information enable this exploit
-- "estimated_severity": "low" | "medium" | "high" | "critical"
-- "real_world_analogy": a known real-world instance of this type of exploitation
-
-Output JSON: {"adversary_types": ["passive_observer", ...], \
-"exploit_categories": [...]}"""

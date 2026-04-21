@@ -459,6 +459,12 @@
       "WORDED_NUMS": "(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)",
       "TIME_UNITS": "(?:hours?|days?|minutes?|weeks?|months?|years?)"
     },
+    "pre_normalization_patterns": [
+      "\\b\\d+(?:\\.\\d+)?[eE][+-]?\\d+\\s*\\w*\\b",
+      "\\b\\d+(?:\\.\\d+)?[KkMmBb]\\b",
+      "\\b\\d+(?:\\.\\d+)?[+~≈><]\\s*\\w*\\b",
+      "\\b\\d+(?:\\.\\d+)?-\\d+(?:\\.\\d+)?[xX×]?\\s*\\w*\\b"
+    ],
     "amount_patterns_icase": [
       "\\$[\\d,]+(?:\\.\\d+)?[KkMmBb]?",
       "[\\d,]+(?:\\.\\d+)?[KkMmBb]\\s+(?:in|worth|of|notional|exposure)\\b",

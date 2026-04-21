@@ -68,7 +68,12 @@ def clear_cache():
 
 
 def _validate(profile: dict, source: str):
-    """Basic structural validation."""
+    """Structural validation: required keys, subdomain vocabulary, regex compilation.
+
+    Raises ValueError on missing keys or invalid regex patterns.
+    """
+    import re as _re
+
     missing = _REQUIRED_KEYS - set(profile.keys())
     if missing:
         raise ValueError(f"Profile {source} missing required keys: {missing}")
@@ -84,6 +89,45 @@ def _validate(profile: dict, source: str):
     # Check templates exist
     if not profile.get("templates"):
         raise ValueError(f"Profile {source} has no templates")
+
+    # Validate regex patterns compile and aren't pathologically greedy
+    sp = profile.get("sensitive_patterns", {})
+
+    def _check_pat(pat: str, key: str):
+        compiled = _re.compile(pat)
+        # Reject patterns that match the empty string (would strip everything)
+        if compiled.match("") is not None:
+            raise ValueError(
+                f"Pathological regex in {source} sensitive_patterns.{key}: "
+                f"{pat!r} matches empty string"
+            )
+
+    for key in ("amount_patterns_icase", "amount_patterns_csense",
+                "address_patterns", "pre_normalization_patterns",
+                "number_word_patterns", "timing_patterns"):
+        for pat in sp.get(key, []):
+            if isinstance(pat, str) and pat:
+                try:
+                    _check_pat(pat, key)
+                except _re.error as e:
+                    raise ValueError(
+                        f"Invalid regex in {source} sensitive_patterns.{key}: "
+                        f"{pat!r} — {e}"
+                    )
+    for key in ("amount_known_token_pattern", "ens_pattern", "percent_pattern",
+                "hf_pattern", "leverage_pattern", "cardinal_token_pattern",
+                "cardinal_known_token", "worded_percent_pattern",
+                "worded_decimal_pattern", "worded_fraction_token",
+                "worded_decimal_token"):
+        pat = sp.get(key, "")
+        if isinstance(pat, str) and pat:
+            try:
+                _re.compile(pat)
+            except _re.error as e:
+                raise ValueError(
+                    f"Invalid regex in {source} sensitive_patterns.{key}: "
+                    f"{pat!r} — {e}"
+                )
 
     # Check top_domains reference valid subdomains
     valid_domains = set(profile.get("subdomains", {}).keys())
