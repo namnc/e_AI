@@ -1,0 +1,43 @@
+{
+  "domain": "defi_14b",
+  "acceptance": {
+    "status": "ACCEPTED",
+    "reason": "4 PASS, 2 MARGINAL",
+    "fail_checks": [],
+    "marginal_checks": [
+      "vocabulary_depth",
+      "cover_quality"
+    ],
+    "usability_score": 5.0
+  },
+  "summary": {
+    "pass": 4,
+    "marginal": 2,
+    "fail": 0,
+    "skip": 0
+  },
+  "properties": {
+    "sanitizer_completeness": {
+      "verdict": "PASS"
+    },
+    "false_positive_rate": {
+      "verdict": "PASS"
+    },
+    "profile_completeness": {
+      "verdict": "PASS"
+    },
+    "template_coverage": {
+      "verdict": "PASS"
+    },
+    "vocabulary_depth": {
+      "verdict": "MARGINAL"
+    },
+    "cover_quality": {
+      "verdict": "MARGINAL"
+    }
+  },
+  "generation": {
+    "model": "qwen2.5:14b",
+    "queries": 216
+  }
+}

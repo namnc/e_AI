@@ -159,6 +159,10 @@ def refine_profile(
 ) -> tuple[dict, dict]:
     """Iterate: validate → repair → validate until PASS or max_rounds.
 
+    Circuit breaker: if no improvement between rounds, stops early and
+    reports what failed. This prevents wasting LLM calls on repairs
+    that don't help.
+
     Args:
         profile: the generated DomainProfile dict
         queries: the original dataset
@@ -171,6 +175,8 @@ def refine_profile(
     """
     if progress:
         print(f"\nRefinement loop (max {max_rounds} rounds)")
+
+    prev_fn_count = None
 
     for round_num in range(1, max_rounds + 1):
         if progress:
@@ -190,10 +196,27 @@ def refine_profile(
             return profile, result
 
         if fn_count == 0:
-            # Shouldn't happen, but guard against it
             if progress:
                 print(f"  No false negatives to repair")
             return profile, result
+
+        # Circuit breaker: no improvement or regression from last round
+        if prev_fn_count is not None:
+            if fn_count > prev_fn_count:
+                # Regression — repairs made things worse
+                if progress:
+                    print(f"  REGRESSION ({prev_fn_count} -> {fn_count}). Stopping.")
+                result["stalled"] = True
+                result["escalation"] = f"Regression: {prev_fn_count} -> {fn_count} FN."
+                return profile, result
+            elif fn_count == prev_fn_count:
+                # Stall — no improvement
+                if progress:
+                    print(f"  No improvement ({fn_count} FN). Stopping.")
+                result["stalled"] = True
+                result["escalation"] = f"Stalled at {fn_count} FN."
+                return profile, result
+        prev_fn_count = fn_count
 
         # Repair
         repairs = repair_patterns(result["false_negatives"], progress=progress)
@@ -201,6 +224,8 @@ def refine_profile(
         if not repairs:
             if progress:
                 print(f"  LLM could not generate valid repairs. Stopping.")
+            result["stalled"] = True
+            result["escalation"] = "LLM failed to generate valid repair patterns."
             return profile, result
 
         # Apply repairs
@@ -212,9 +237,131 @@ def refine_profile(
     if progress:
         print(f"\n--- Final validation ---")
     result = check_sanitizer_completeness(profile, span_results)
+    fn_count = len(result.get("false_negatives", []))
     if progress:
-        fn_count = len(result.get("false_negatives", []))
         print(f"  Sanitizer: {result['passed']}/{result['total']} "
               f"({result['verdict']}), {fn_count} false negatives remaining")
+    if result["verdict"] != "PASS":
+        result["stalled"] = True
+        result["escalation"] = (
+            f"Exhausted {max_rounds} rounds with {fn_count} false negatives remaining. "
+            f"Recommend: larger model, more training data, or manual pattern crafting."
+        )
 
+    return profile, result
+
+
+# ---------------------------------------------------------------------------
+# Usability refinement
+# ---------------------------------------------------------------------------
+
+USABILITY_REPAIR_PROMPT = """\
+You are a regex engineer improving a privacy sanitizer's USABILITY. The \
+sanitizer is stripping too much from certain queries, destroying their meaning. \
+For each destroyed query, identify which words are being incorrectly removed \
+and suggest false-positive exception words that should be PRESERVED.
+
+Rules:
+- Only suggest words that are NOT sensitive (not amounts, addresses, or private data)
+- Suggest domain terminology, protocol names, or technical terms that happen to match amount patterns
+- Output words that should be added to the false_positive_words list
+
+Output JSON:
+{
+  "false_positive_additions": ["word1", "word2"],
+  "reasoning": "why these words should be preserved"
+}"""
+
+
+def refine_usability(
+    profile: dict,
+    queries: list[dict],
+    max_rounds: int = 2,
+    progress: bool = True,
+) -> tuple[dict, dict]:
+    """Iterate: check usability → add false-positive exceptions → re-check.
+
+    When the sanitizer destroys queries (score 1), this identifies
+    over-broad patterns and adds false-positive exceptions to preserve
+    domain terminology.
+
+    Returns:
+        (refined_profile, final_usability_result)
+    """
+    from meta.validation_engine import check_usability
+
+    if progress:
+        print(f"\nUsability refinement (max {max_rounds} rounds)")
+
+    for round_num in range(1, max_rounds + 1):
+        if progress:
+            print(f"\n--- Usability round {round_num}/{max_rounds} ---")
+
+        result = check_usability(profile, queries, n_samples=10, progress=progress)
+
+        if progress:
+            print(f"  Usability: {result.get('avg_score', 'N/A')}/5 ({result['verdict']})")
+
+        if result["verdict"] == "SKIP":
+            return profile, result
+
+        # Refine queries that scored 1 (destroyed) or 2 (key info lost)
+        bad_queries = [d for d in result.get("details", []) if d["score"] <= 2]
+        if not bad_queries:
+            # Also check legacy key for backwards compatibility
+            bad_queries = result.get("low_quality_queries", [])
+        if not bad_queries:
+            if progress:
+                print(f"  No low-quality queries — usability acceptable")
+            return profile, result
+
+        if progress:
+            print(f"  {len(bad_queries)} low-quality queries (score<=2) — attempting repair")
+
+        # Ask LLM to identify over-stripping
+        examples = "\n".join(
+            f"  Original: {d['original']}\n  Sanitized: {d['sanitized']}\n"
+            for d in bad_queries[:5]
+        )
+        resp = call_llm(
+            prompt=f"Destroyed queries:\n{examples}",
+            system=USABILITY_REPAIR_PROMPT,
+            max_tokens=1024,
+        )
+        parsed = _extract_json(resp)
+        if not isinstance(parsed, dict):
+            if progress:
+                print(f"  LLM could not suggest repairs")
+            return profile, result
+
+        # Apply false-positive additions
+        fp_additions = parsed.get("false_positive_additions", [])
+        sp = profile.setdefault("sensitive_patterns", {})
+        existing_fp = set(sp.get("false_positive_words", []))
+        added = 0
+        for word in fp_additions:
+            if isinstance(word, str) and word not in existing_fp:
+                sp.setdefault("false_positive_words", []).append(word)
+                existing_fp.add(word)
+                added += 1
+
+        if progress:
+            print(f"  Added {added} false-positive exceptions: {fp_additions[:5]}")
+
+        if added == 0:
+            if progress:
+                print(f"  No new exceptions — stopping")
+            return profile, result
+
+    # Final check
+    result = check_usability(profile, queries, n_samples=10, progress=progress)
+    if progress:
+        print(f"  Final usability: {result.get('avg_score', 'N/A')}/5 ({result['verdict']})")
+    if result.get("verdict") == "FAIL":
+        result["stalled"] = True
+        result["escalation"] = (
+            f"Usability refinement exhausted {max_rounds} rounds. "
+            f"Score: {result.get('avg_score', 'N/A')}/5. "
+            f"Recommend: review patterns for over-stripping, or use Tier 1 pipeline."
+        )
     return profile, result

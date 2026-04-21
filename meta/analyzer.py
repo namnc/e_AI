@@ -25,6 +25,7 @@ from meta.prompts import (
     SUBDOMAIN_CONSOLIDATION,
     VOCABULARY_EXTRACTION,
     TEMPLATE_EXTRACTION,
+    HEURISTIC_DISCOVERY,
 )
 from meta.util import extract_json as _extract_json
 
@@ -291,6 +292,64 @@ def extract_templates(queries: list[dict], progress: bool = True) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Step 5: Domain-specific heuristic discovery
+# ---------------------------------------------------------------------------
+
+def discover_heuristics(
+    domain_name: str,
+    queries: list[dict],
+    progress: bool = True,
+) -> dict:
+    """Discover domain-specific sensitivity heuristics via LLM.
+
+    These regex patterns are used by check_sensitivity_labels (check 10) to
+    independently verify the LLM's sensitivity labeling — WITHOUT relying
+    on hardcoded DeFi patterns.
+
+    Returns: {amounts: [regex], timing: [regex], emotional: [regex]}
+    """
+    import re as _re
+
+    if progress:
+        print("  Discovering domain-specific heuristics...")
+
+    sensitive = [q for q in queries if q.get("label") == "sensitive"][:20]
+    sample_block = "\n".join(f"- {q['text'][:120]}" for q in sensitive)
+
+    resp = call_llm(
+        prompt=f"Domain: {domain_name}\n\nSensitive query examples:\n{sample_block}",
+        system=HEURISTIC_DISCOVERY,
+        max_tokens=1024,
+    )
+    parsed = _extract_json(resp)
+    if not isinstance(parsed, dict):
+        if progress:
+            print("    [warn] Could not discover heuristics, using universal defaults")
+        return {}
+
+    # Validate regex patterns
+    heuristics = {}
+    for category in ("amounts", "timing", "emotional"):
+        patterns = parsed.get(category, [])
+        valid = []
+        for pat in patterns:
+            if isinstance(pat, str):
+                try:
+                    _re.compile(pat)
+                    valid.append(pat)
+                except _re.error:
+                    pass
+        if valid:
+            heuristics[category] = valid
+
+    if progress:
+        for cat, pats in heuristics.items():
+            print(f"    {cat}: {len(pats)} patterns")
+
+    return heuristics
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -298,8 +357,18 @@ def analyze_dataset(
     dataset_path: str,
     domain_name: str,
     progress: bool = True,
+    feedback_adjustments: dict | None = None,
+    queries_override: list[dict] | None = None,
 ) -> dict:
     """Run the full Phase 1 analysis pipeline.
+
+    Args:
+        dataset_path: path to JSONL (used if queries_override is None)
+        queries_override: if provided, use these queries instead of loading from disk.
+            This is used when the dataset was enriched in-memory and the disk file
+            is stale.
+        feedback_adjustments: optional dict from meta.feedback.get_prompt_adjustments()
+            to improve generation based on previous run diagnostics.
 
     Returns a partial profile dict with:
       - meta
@@ -307,13 +376,30 @@ def analyze_dataset(
       - templates
       - _analysis (raw analysis data for Phase 2)
     """
-    print(f"Phase 1: Analyzing dataset ({dataset_path})")
-    queries = load_dataset(dataset_path)
+    if queries_override is not None:
+        queries = queries_override
+        print(f"Phase 1: Analyzing dataset ({len(queries)} queries, in-memory)")
+    else:
+        print(f"Phase 1: Analyzing dataset ({dataset_path})")
+        queries = load_dataset(dataset_path)
     print(f"  Loaded {len(queries)} queries")
 
     if len(queries) < 20:
         print(f"  [warn] Very small dataset ({len(queries)} queries). "
               f"Results will be thin. Recommend 200+.")
+
+    # Apply feedback from previous runs to prompts
+    if feedback_adjustments:
+        from meta.feedback import apply_adjustments_to_prompt
+        global SENSITIVITY_EXTRACTION, VOCABULARY_EXTRACTION
+        SENSITIVITY_EXTRACTION = apply_adjustments_to_prompt(
+            SENSITIVITY_EXTRACTION, feedback_adjustments
+        )
+        VOCABULARY_EXTRACTION = apply_adjustments_to_prompt(
+            VOCABULARY_EXTRACTION, feedback_adjustments
+        )
+        if progress:
+            print(f"  Applied feedback adjustments: {list(feedback_adjustments.keys())}")
 
     # Step 1: sensitivity extraction
     print("\nStep 1: Extracting sensitive spans...")
@@ -337,6 +423,10 @@ def analyze_dataset(
     print("\nStep 4: Extracting templates...")
     templates = extract_templates(queries, progress=progress)
     print(f"  Extracted {len(templates)} templates")
+
+    # Step 5: Discover domain-specific heuristics
+    print("\nStep 5: Discovering domain-specific heuristics...")
+    heuristics = discover_heuristics(domain_name, queries, progress=progress)
 
     # Build domain distribution and top domains
     total_q = sum(cluster_results["distribution"].values())
@@ -370,6 +460,8 @@ def analyze_dataset(
         "top_domains": top_domains,
         "subdomains": subdomains,
         "templates": templates,
+        # Domain-specific heuristics for validation check 10
+        "domain_heuristics": heuristics if heuristics else None,
         # Raw analysis data for Phase 2 (not persisted in final profile)
         "_analysis": {
             "span_results": span_results,

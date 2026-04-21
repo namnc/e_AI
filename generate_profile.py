@@ -125,9 +125,63 @@ def main():
 
     # --- Full generation pipeline ---
 
-    # Initialize LLM backend
-    from llm_backend import init_backend, is_local
-    init_backend(backend=args.backend, model=args.model)
+    # Pre-flight: validate input dataset
+    from meta.analyzer import load_dataset
+    from meta.input_validator import validate_dataset
+    preflight_queries = load_dataset(args.dataset)
+    input_report = validate_dataset(preflight_queries, progress=progress)
+
+    if input_report["overall"] == "FAIL":
+        if progress:
+            print(f"\nDataset quality insufficient. Attempting enrichment...")
+
+        # Initialize LLM for enrichment
+        from llm_backend import init_backend, is_local
+        init_backend(backend=args.backend, model=args.model)
+
+        # Try to enrich the dataset
+        from meta.data_enrichment import enrich_dataset
+        search_fn = None
+        if args.web_search:
+            try:
+                from meta.web_enrichment import make_ddgs_search
+                search_fn = make_ddgs_search(max_results=5)
+            except ImportError:
+                pass
+
+        preflight_queries, input_report = enrich_dataset(
+            queries=preflight_queries,
+            domain_name=args.domain,
+            search_fn=search_fn,
+            progress=progress,
+        )
+
+        if input_report["overall"] == "FAIL":
+            print(f"\nERROR: Dataset still fails after enrichment: {input_report['reason']}",
+                  file=sys.stderr)
+            print(f"Provide a better initial dataset (min 20 queries, "
+                  f"labeled sensitive + non_sensitive).", file=sys.stderr)
+            sys.exit(1)
+
+        # Save enriched dataset for reproducibility
+        enriched_path = args.dataset.replace(".jsonl", "_enriched.jsonl")
+        with open(enriched_path, "w") as f:
+            for q in preflight_queries:
+                f.write(json.dumps(q, ensure_ascii=False) + "\n")
+        if progress:
+            print(f"Enriched dataset saved to {enriched_path}")
+
+        # LLM already initialized above
+        _llm_initialized = True
+    else:
+        _llm_initialized = False
+
+    # Initialize LLM backend (if not already done during enrichment)
+    if not _llm_initialized:
+        from llm_backend import init_backend, is_local
+        init_backend(backend=args.backend, model=args.model)
+    else:
+        from llm_backend import is_local
 
     if not is_local():
         print("WARNING: Using cloud backend for profile generation. "
@@ -135,17 +189,28 @@ def main():
               "Use --backend ollama for privacy-preserving generation.",
               file=sys.stderr)
 
-    # Phase 1: Analyze dataset
-    from meta.analyzer import analyze_dataset, load_dataset
+    # Load feedback from previous runs (if any)
+    from meta.feedback import get_prompt_adjustments, save_diagnostics, assess_acceptance
+    adjustments = get_prompt_adjustments(args.domain)
+    if adjustments and progress:
+        print(f"Loaded feedback from previous run: {list(adjustments.keys())}")
+
+    # Use enriched queries if available, otherwise load from disk
+    # (preflight_queries may have been enriched by data_enrichment above)
+    queries = preflight_queries
+
+    # Phase 1: Analyze dataset (uses in-memory queries, not disk reload)
+    from meta.analyzer import analyze_dataset
     profile = analyze_dataset(
         dataset_path=args.dataset,
         domain_name=args.domain,
         progress=progress,
+        feedback_adjustments=adjustments if adjustments else None,
+        queries_override=queries,  # uses enriched in-memory queries if available
     )
 
-    # Phase 2: Generate patterns
+    # Phase 2: Generate patterns (uses same in-memory queries)
     from meta.pattern_generator import generate_all_patterns
-    queries = load_dataset(args.dataset)
     analysis = profile.pop("_analysis", {})
     sensitive_patterns, normalization = generate_all_patterns(
         analysis=analysis,
@@ -198,6 +263,16 @@ def main():
         if progress:
             print("\nRefinement skipped")
 
+    # Phase 2d: Usability refinement
+    if not args.no_refine:
+        from meta.refiner import refine_usability
+        profile, usability_result = refine_usability(
+            profile=profile,
+            queries=queries,
+            max_rounds=2,
+            progress=progress,
+        )
+
     # Determine output path
     out_path = args.output
     if out_path is None:
@@ -240,6 +315,22 @@ def main():
 
         with open(out_path, "w") as f:
             json.dump(profile, f, indent=2, ensure_ascii=False)
+
+        # Save diagnostics for feedback loop
+        diag_path = save_diagnostics(args.domain, report)
+        if progress:
+            print(f"Diagnostics saved to {diag_path}")
+
+        # Acceptance assessment
+        acceptance = assess_acceptance(report)
+        print(f"\n{'='*60}")
+        print(f"ACCEPTANCE: {acceptance['status']}")
+        print(f"  {acceptance['reason']}")
+        if acceptance["status"] == "REJECTED":
+            print(f"  Re-run with a larger model or review failed checks.")
+        elif acceptance["status"] == "NEEDS_WORK":
+            print(f"  Re-run to use feedback from this run's diagnostics.")
+        print(f"{'='*60}")
     else:
         print("Validation skipped (--skip-validation)")
 

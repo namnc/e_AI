@@ -141,3 +141,30 @@ Rules:
 
 Output JSON: {"entities": [{"name": "...", "generic_ref": "..."}]}"""
 
+# ---------------------------------------------------------------------------
+# Phase 2b: Domain-specific heuristic discovery
+# ---------------------------------------------------------------------------
+
+HEURISTIC_DISCOVERY = """\
+You are a privacy analyst designing domain-specific detection heuristics. \
+Given a domain and examples of sensitive queries, identify regex patterns that \
+can detect sensitive information WITHOUT needing an LLM.
+
+These patterns will be used as an INDEPENDENT check on whether the LLM's \
+sensitivity labels are complete. They should catch common leakage categories:
+
+1. AMOUNTS: numbers with domain-specific units (e.g., "500 ETH" for DeFi, \
+   "PSA 8.5" for medical, "$50,000" for legal)
+2. TIMING: urgency or scheduling that reveals intent (e.g., "before Friday", \
+   "next appointment", "court date")
+3. EMOTIONAL: words revealing personal state (e.g., "worried", "terrified", \
+   "desperate")
+
+For each category, provide 2-5 regex patterns in Python re module syntax.
+
+Output JSON: {
+  "amounts": ["regex1", "regex2"],
+  "timing": ["regex1", "regex2"],
+  "emotional": ["regex1", "regex2"]
+}"""
+

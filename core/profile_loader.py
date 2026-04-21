@@ -58,7 +58,17 @@ def load_profile(path: str) -> dict[str, Any]:
 
 
 def get_default_profile() -> dict[str, Any]:
-    """Load the default DeFi profile. Used for backward compatibility."""
+    """Load the default DeFi profile.
+
+    Used for backward compatibility when cover_generator is imported without
+    an explicit profile. For new domains, always use load_profile() with an
+    explicit path — do not rely on this fallback.
+    """
+    if not os.path.exists(_DEFAULT_PROFILE):
+        raise FileNotFoundError(
+            f"No default profile at {_DEFAULT_PROFILE}. "
+            f"Generate one with: python generate_profile.py --dataset <data.jsonl> --domain <name>"
+        )
     return load_profile(_DEFAULT_PROFILE)
 
 
@@ -86,9 +96,14 @@ def _validate(profile: dict, source: str):
                 f"Subdomain '{name}' in {source} missing keys: {missing_sub}"
             )
 
-    # Check templates exist
-    if not profile.get("templates"):
+    # Check templates exist and are a list
+    templates = profile.get("templates")
+    if not templates:
         raise ValueError(f"Profile {source} has no templates")
+    if not isinstance(templates, list):
+        raise ValueError(
+            f"Profile {source} templates must be a list, got {type(templates).__name__}"
+        )
 
     # Validate regex patterns compile and aren't pathologically greedy
     sp = profile.get("sensitive_patterns", {})

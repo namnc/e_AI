@@ -180,7 +180,8 @@ def enrich_ontology(
         if not isinstance(parsed, dict):
             continue
 
-        # Merge new terms (deduplicate)
+        # Merge new terms (deduplicate) with caps to limit blast radius
+        MAX_ADDITIONS_PER_SLOT = 10  # cap per subdomain per slot
         new_entities = parsed.get("entities", [])
         new_mechanisms = parsed.get("mechanisms", [])
 
@@ -189,20 +190,30 @@ def enrich_ontology(
 
         added_p = 0
         for ent in new_entities:
-            if isinstance(ent, str) and ent.lower() not in existing_protocols:
+            if added_p >= MAX_ADDITIONS_PER_SLOT:
+                break
+            if isinstance(ent, str) and ent.lower() not in existing_protocols and len(ent) > 1:
                 sd_data.setdefault("protocols", []).append(ent)
                 existing_protocols.add(ent.lower())
                 added_p += 1
 
         added_m = 0
         for mech in new_mechanisms:
-            if isinstance(mech, str) and mech.lower() not in existing_mechanisms:
+            if added_m >= MAX_ADDITIONS_PER_SLOT:
+                break
+            if isinstance(mech, str) and mech.lower() not in existing_mechanisms and len(mech) > 1:
                 sd_data.setdefault("mechanisms", []).append(mech)
                 existing_mechanisms.add(mech.lower())
                 added_m += 1
 
+        # Provenance tracking: record what web search added
+        sd_data.setdefault("_web_added", []).extend(
+            [f"protocol:{e}" for e in new_entities[:added_p]] +
+            [f"mechanism:{m}" for m in new_mechanisms[:added_m]]
+        )
+
         if progress:
-            print(f"    Added {added_p} entities, {added_m} mechanisms")
+            print(f"    Added {added_p} entities, {added_m} mechanisms (cap: {MAX_ADDITIONS_PER_SLOT})")
 
     return profile
 

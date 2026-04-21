@@ -1,0 +1,42 @@
+{
+  "domain": "defi_generated",
+  "acceptance": {
+    "status": "REJECTED",
+    "reason": "1 checks FAIL: ['vocabulary_depth']",
+    "fail_checks": [
+      "vocabulary_depth"
+    ],
+    "marginal_checks": [],
+    "usability_score": 5.0
+  },
+  "summary": {
+    "pass": 5,
+    "marginal": 0,
+    "fail": 1,
+    "skip": 0
+  },
+  "properties": {
+    "sanitizer_completeness": {
+      "verdict": "PASS"
+    },
+    "false_positive_rate": {
+      "verdict": "PASS"
+    },
+    "profile_completeness": {
+      "verdict": "PASS"
+    },
+    "template_coverage": {
+      "verdict": "PASS"
+    },
+    "vocabulary_depth": {
+      "verdict": "FAIL"
+    },
+    "cover_quality": {
+      "verdict": "PASS"
+    }
+  },
+  "generation": {
+    "model": "qwen2.5:7b",
+    "queries": 216
+  }
+}
