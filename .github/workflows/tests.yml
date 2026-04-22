@@ -49,7 +49,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install classifier dependencies
-        run: pip install torch transformers scikit-learn numpy
+        run: pip install -r requirements.txt
 
       - name: Generate classifier data and train
         run: python3 classifier_validation.py run --n-sets 500 --epochs 5

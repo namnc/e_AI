@@ -225,6 +225,14 @@ def sanitize_query(query: str) -> str:
     # Step 0d: Normalize remaining input (fixes Unicode bypasses, joined tokens)
     result = _normalize_input(result)
 
+    # Step 0e: Strip bare large numbers (4+ digits) that survived normalization.
+    # These are amounts without token suffixes (e.g., "1234567" from "1,234,567",
+    # or "1234.56" from locale normalization). Safe to strip because 4+ digit
+    # numbers in natural text are almost always amounts, not concepts.
+    result = re.sub(r'\b\d{4,}(?:\.\d+)?\b', '', result)
+    # Also strip residual comma fragments from partially-stripped thousands
+    result = re.sub(r'\b\d+,\s', ' ', result)
+
     # Remove natural language quantities (secondary NLP filter)
     for pat in _NUMBER_WORD_PATTERNS:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
@@ -251,9 +259,12 @@ def sanitize_query(query: str) -> str:
     for pat in _PRE_NORM_PATTERNS:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
     # Pass 0b: catch split-token amounts — normalization may have inserted spaces
-    # into obfuscated inputs (e.g., "10⁠000-da i" → "10000 da i").
-    # Strip: bare number followed by short fragments that look like split tokens.
-    result = re.sub(r'\b\d{3,}\s+[a-zA-Z]{1,3}(?:\s+[a-zA-Z]{1,3})*\b', '', result)
+    # or left punctuation glued to amounts from obfuscated inputs.
+    # Catches: "10000 da i", "10000-u sdT", "50000-s ol", "100 0LI nk"
+    # Pattern: bare 3+ digit number followed by separator + short alpha fragments
+    result = re.sub(r'\b\d{3,}[\s\-/]*[a-zA-Z]{1,4}(?:[\s\-/]+[a-zA-Z]{1,4})*\b', '', result)
+    # Also catch: digit sequences with embedded spaces (e.g., "100 0LI nk" from "100⁠0link")
+    result = re.sub(r'\b\d+\s+\d+[a-zA-Z]{1,4}(?:\s+[a-zA-Z]{1,4})*\b', '', result)
     # Pass 1: case-insensitive known tokens (catches "500 usdc", "1.8m eth")
     result = re.sub(_AMOUNT_KNOWN_TOKEN_PATTERN, '', result, flags=re.IGNORECASE)
     # Pass 2: case-insensitive dollar amounts and suffixed numbers
@@ -294,7 +305,11 @@ def sanitize_query(query: str) -> str:
     for verb, replacement in _DIRECTIONAL_VERBS.items():
         result = re.sub(rf'\b{verb}\b', replacement, result, flags=re.IGNORECASE)
 
-    # Clean up whitespace and punctuation artifacts
+    # Clean up whitespace, punctuation artifacts, and orphan fragments
+    # Strip orphan short fragments left after amount removal (e.g., "-u sdT", "-s ol")
+    result = re.sub(r'(?:^|\s)[-/][a-zA-Z]{1,4}(?:\s+[a-zA-Z]{1,4})*(?=\s|$)', ' ', result)
+    # Strip orphan commas/periods from partially-stripped numbers
+    result = re.sub(r'(?:^|\s)[,.](?:\s|$)', ' ', result)
     result = re.sub(r'\s+', ' ', result)
     result = re.sub(r'\s([?.!,])', r'\1', result)
     result = re.sub(r'[,]{2,}', ',', result)
