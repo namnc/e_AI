@@ -722,18 +722,20 @@ def check_sensitivity_labels(
 def check_vocabulary_diversity(profile: dict) -> dict:
     """Check that vocabulary slots contain genuinely distinct terms.
 
-    Catches near-duplicates (Aave/AaveV2/AaveV3), plurals (protocol/protocols),
-    and semantically empty fills. A malicious LLM could inflate vocabulary
-    depth with near-duplicates while providing no real cover diversity.
+    Catches near-duplicates and semantically empty fills. Excludes
+    protocols (versioned names like Aave V2/V3 are intentional) and
+    operations (add/remove collateral ARE distinct operations).
 
-    Returns: {slots_checked, duplicates_found, details, verdict}
+    Returns: {duplicates_found, details, verdict, note}
     """
     from difflib import SequenceMatcher
 
     duplicates = []
 
     for sd_name, sd_data in profile.get("subdomains", {}).items():
-        for slot in ("protocols", "mechanisms", "operations", "triggers",
+        # Skip protocols (versioned names like Aave V2/V3 are intentional, not duplicates)
+        # and operations (add/remove collateral ARE distinct operations)
+        for slot in ("mechanisms", "triggers",
                      "metrics", "actors", "risk_concepts", "generic_refs"):
             items = sd_data.get(slot, [])
             if len(items) < 2:

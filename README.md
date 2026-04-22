@@ -22,6 +22,7 @@ This repository contains:
 **Walkthroughs:**
 - **[Hand-crafted pipeline](docs/walkthrough_handcrafted.md)** — how the DeFi privacy pipeline works, step by step (Alice example, Tier 0 + Tier 1)
 - **[Meta-framework](docs/walkthrough_meta_framework.md)** — how the auto-generation pipeline works (input validation → analysis → generation → refinement → validation → feedback)
+- **[Deployment guide](docs/deployment_guide.md)** — dataset privacy model, runtime tiers, quality tradeoffs, benchmarking generated profiles
 
 ## Key Finding
 
@@ -78,6 +79,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 │   ├── data_enrichment.py       # Dataset enrichment (web search + LLM synthesis + refinement loop)
 │   ├── feedback.py              # Diagnostics, acceptance thresholds, cross-domain feedback loop
 │   ├── validation_engine.py     # 13 property checks (6 functional + 5 security + 2 quality)
+│   ├── profile_sanitizer.py      # Genericize profiles for safe cloud review
 │   ├── util.py                  # Shared utilities (extract_json)
 │   ├── web_enrichment.py        # Web search integration (ontology, threat model, false positives)
 │   └── prompts.py               # All LLM prompts for the meta pipeline
@@ -88,6 +90,7 @@ Cover query indistinguishability depends critically on the generation strategy. 
 ├── docs/
 │   ├── walkthrough_handcrafted.md  # Step-by-step: how the DeFi pipeline works
 │   ├── walkthrough_meta_framework.md # Step-by-step: how auto-generation works
+│   ├── deployment_guide.md      # Dataset privacy, runtime tiers, quality tradeoffs
 │   ├── adversary_prompt.md      # All LLM prompts used in benchmarks
 │   ├── scoring_rubric.md        # Benchmark D quality scoring rubric
 │   ├── transport_assumptions.md # Tor circuit pool, mixnet, timing mitigations
@@ -215,20 +218,28 @@ The validation engine checks 13 properties (6 functional + 5 anti-malicious-LLM 
 | Tier 1 Pipeline | End-to-end decompose→genericize→answer→synthesize | >=70% quality retained | Blinded A/B vs direct |
 | Tier 0 Usability | Sanitized queries still coherent and answerable | >=2.0/5 avg, no destroyed | LLM-as-judge |
 
-### Round-Trip Validation (DeFi)
+### Experimental Results (DeFi, 216-Query Benchmark)
 
-The meta-framework was validated by generating a DeFi profile from the 216-query dataset using Qwen 7B, then comparing to the hand-crafted profile:
+Six generation strategies tested, all validated by the same 13 programmatic checks:
 
-| Metric | Hand-Crafted | Auto-Generated (7B) |
-|--------|-------------|---------------------|
-| Sanitizer completeness | — | **302/302 PASS** |
-| Template coverage | 55% MARGINAL | **96% PASS** |
-| Cover detection | 26% PASS | **24% PASS** |
-| Subdomains | 7 (curated) | 31 (noisy, needs 32B+) |
-| Entity names | 96 | 191 |
-| Vocabulary recall | baseline | 51% entities, 12% mechanisms |
+| Profile | Subdomains | Templates | Entities | Cover Detection | Acceptance |
+|---------|:-:|:-:|:-:|:-:|:-:|
+| **Hand-crafted** | 7 | 20 | 96 | **20%** | **ACCEPTED** |
+| Local 7B | 31 | 20 | 191 | 50% | REJECTED |
+| Local 14B | 7 | 12 | 45 | 66% | REJECTED |
+| **Local 14B+web** | **5** | **18** | **56** | **32%** | **ACCEPTED** |
+| Cloud Claude | 9 | 20 | 102 | **22%** | NEEDS_WORK |
+| Bootstrap (cloud+local) | 9 | 20 | 102 | **22%** | NEEDS_WORK |
 
-The 7B model's main weakness is taxonomy consolidation (31 subdomains instead of 7) and regex generation (0 valid patterns produced). A 32B+ model is recommended for production use.
+Tier 1 pipeline quality (blinded A/B, local judge):
+
+| Profile | Pipeline Score | Quality Retained |
+|---------|:-:|:-:|
+| **Cloud Claude** | **3.8/5** | **87%** |
+| Hand-crafted | 3.25/5 | 81% |
+| Bootstrap | 3.2/5 | 78% |
+
+**Key findings**: Local 14B+web is the best private-data-safe option (ACCEPTED). Cloud Claude produces the best Tier 1 quality (3.8/5, outperforms hand-crafted). See [deployment guide](docs/deployment_guide.md) for full analysis and configuration options.
 
 ## Benchmark Results
 

@@ -1,0 +1,96 @@
+{
+  "domain": "defi_bootstrap",
+  "acceptance": {
+    "status": "REJECTED",
+    "reason": "2 checks FAIL: ['sanitizer_completeness', 'sensitivity_labels']",
+    "fail_checks": [
+      "sanitizer_completeness",
+      "sensitivity_labels"
+    ],
+    "marginal_checks": [
+      "template_coverage",
+      "entity_completeness",
+      "ontology_balance",
+      "vocabulary_diversity",
+      "usability"
+    ],
+    "usability_score": 2.4
+  },
+  "summary": {
+    "pass": 6,
+    "marginal": 5,
+    "fail": 2,
+    "skip": 0
+  },
+  "properties": {
+    "sanitizer_completeness": {
+      "verdict": "FAIL"
+    },
+    "false_positive_rate": {
+      "verdict": "PASS"
+    },
+    "profile_completeness": {
+      "verdict": "PASS"
+    },
+    "template_coverage": {
+      "verdict": "MARGINAL"
+    },
+    "vocabulary_depth": {
+      "verdict": "PASS"
+    },
+    "cover_quality": {
+      "verdict": "PASS"
+    },
+    "entity_completeness": {
+      "verdict": "MARGINAL",
+      "missed_entities": [
+        "Arbitrum",
+        "Bored Apes",
+        "Can I",
+        "DEXes",
+        "Flashbots Protect",
+        "Floor",
+        "Health",
+        "If I",
+        "Liquidation",
+        "My Aave"
+      ]
+    },
+    "held_out_sanitizer": {
+      "verdict": "PASS"
+    },
+    "ontology_balance": {
+      "verdict": "MARGINAL",
+      "ratio": 0.375,
+      "subdomains": {
+        "lending": 40,
+        "dex": 36,
+        "staking": 32,
+        "derivatives": 32,
+        "bridges": 22,
+        "governance": 25,
+        "aggregators": 21,
+        "nft_finance": 16,
+        "cross_chain": 15
+      }
+    },
+    "sensitivity_labels": {
+      "verdict": "FAIL",
+      "weak_categories": [
+        "emotional"
+      ]
+    },
+    "vocabulary_diversity": {
+      "verdict": "MARGINAL",
+      "duplicate_count": 5
+    },
+    "tier1_pipeline": {
+      "verdict": "PASS"
+    },
+    "usability": {
+      "verdict": "MARGINAL",
+      "avg_score": 2.4,
+      "destroyed": 5
+    }
+  }
+}

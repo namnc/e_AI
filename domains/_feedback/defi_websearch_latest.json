@@ -1,0 +1,89 @@
+{
+  "domain": "defi_websearch",
+  "acceptance": {
+    "status": "REJECTED",
+    "reason": "2 checks FAIL: ['sensitivity_labels', 'usability']",
+    "fail_checks": [
+      "sensitivity_labels",
+      "usability"
+    ],
+    "marginal_checks": [
+      "cover_quality",
+      "entity_completeness",
+      "vocabulary_diversity"
+    ],
+    "usability_score": 1.0
+  },
+  "summary": {
+    "pass": 8,
+    "marginal": 3,
+    "fail": 2,
+    "skip": 0
+  },
+  "properties": {
+    "sanitizer_completeness": {
+      "verdict": "PASS"
+    },
+    "false_positive_rate": {
+      "verdict": "PASS"
+    },
+    "profile_completeness": {
+      "verdict": "PASS"
+    },
+    "template_coverage": {
+      "verdict": "PASS"
+    },
+    "vocabulary_depth": {
+      "verdict": "PASS"
+    },
+    "cover_quality": {
+      "verdict": "MARGINAL"
+    },
+    "entity_completeness": {
+      "verdict": "MARGINAL",
+      "missed_entities": [
+        "Across",
+        "Bored Apes",
+        "Can I",
+        "DEXes",
+        "Flashbots Protect",
+        "Floor",
+        "Health",
+        "If I",
+        "Liquidation",
+        "My Aave"
+      ]
+    },
+    "held_out_sanitizer": {
+      "verdict": "PASS"
+    },
+    "ontology_balance": {
+      "verdict": "PASS",
+      "ratio": 0.675,
+      "subdomains": {
+        "lending": 37,
+        "scaling": 27,
+        "staking": 40,
+        "trading": 40
+      }
+    },
+    "sensitivity_labels": {
+      "verdict": "FAIL",
+      "weak_categories": [
+        "emotional"
+      ]
+    },
+    "vocabulary_diversity": {
+      "verdict": "MARGINAL",
+      "duplicate_count": 5
+    },
+    "tier1_pipeline": {
+      "verdict": "PASS"
+    },
+    "usability": {
+      "verdict": "FAIL",
+      "avg_score": 1.0,
+      "destroyed": 5
+    }
+  }
+}
