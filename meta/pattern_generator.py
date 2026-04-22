@@ -91,11 +91,13 @@ def generate_patterns(
                 if isinstance(pat_group, dict):
                     all_patterns.append(pat_group)
 
-    # Separate into icase vs csense patterns
+    # Separate into category-specific pattern buckets
     amount_patterns_icase = []
     amount_patterns_csense = []
     address_patterns = []
-    other_structural = []
+    timing_patterns_generated = []
+    emotional_words_generated = []
+    qualitative_words_generated = []
 
     for pat_group in all_patterns:
         category = pat_group.get("category", "unknown")
@@ -115,8 +117,16 @@ def generate_patterns(
                 amount_patterns_csense.extend(valid)
         elif category in ("identifier", "address", "credential", "account"):
             address_patterns.extend(valid)
+        elif category in ("timing", "temporal", "schedule"):
+            timing_patterns_generated.extend(valid)
+        elif category in ("emotional", "sentiment", "feeling"):
+            emotional_words_generated.extend(valid)
+        elif category in ("qualitative", "descriptive", "strategy"):
+            qualitative_words_generated.extend(valid)
         else:
-            other_structural.extend(valid)
+            # Unknown category — add to amount patterns as a safe default
+            # (over-stripping is safer than under-stripping for privacy)
+            amount_patterns_icase.extend(valid)
 
     # Build the sensitive_patterns dict
     # Start with core patterns, add domain-agnostic defaults
@@ -144,18 +154,18 @@ def generate_patterns(
         "worded_decimal_pattern": "",
         "worded_fraction_token": "",
         "worded_decimal_token": "",
-        "emotional_words": [
+        "emotional_words": emotional_words_generated if emotional_words_generated else [
             "worried", "anxious", "urgent", "emergency", "scared",
             "nervous", "panicking", "desperate", "afraid", "concerned about",
         ],
-        "timing_patterns": [
+        "timing_patterns": timing_patterns_generated if timing_patterns_generated else [
             r'\b(?:by|on|before|after|next)\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
             r'\b(?:within|in)\s+\d+\s+(?:hours?|days?|weeks?|months?)\b',
             r'\bright now\b', r'\bimmediately\b', r'\bASAP\b',
             r'\btoday\b', r'\btomorrow\b', r'\byesterday\b',
         ],
         "directional_verbs": {},
-        "qualitative_words": [],
+        "qualitative_words": qualitative_words_generated if qualitative_words_generated else [],
         "entity_names": [],
     }
 

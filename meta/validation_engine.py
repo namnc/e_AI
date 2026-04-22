@@ -62,8 +62,33 @@ def check_sanitizer_completeness(
                 continue
             total += 1
             sanitized = cg.sanitize_query(text)
-            # Check if span survives sanitization
-            if span_text.lower() in sanitized.lower():
+            # Check if span survives sanitization — two checks:
+            # 1. Exact substring match (original behavior)
+            # 2. Numeric-value match: if the span contains digits, check if
+            #    those digits appear in the sanitized output. Catches cases
+            #    where normalization splits tokens (e.g., "10000 DAI" → "10000 da i")
+            span_lower = span_text.lower()
+            sanitized_lower = sanitized.lower()
+            # Also normalize whitespace for comparison
+            sanitized_collapsed = re.sub(r'\s+', '', sanitized_lower)
+            span_collapsed = re.sub(r'\s+', '', span_lower)
+
+            leaked = False
+            if span_lower in sanitized_lower:
+                leaked = True
+            elif span_collapsed in sanitized_collapsed:
+                # Whitespace-insensitive match (catches split-token leaks)
+                leaked = True
+            else:
+                # Extract numeric portion and check if it survives
+                import re as _re
+                digits = _re.findall(r'\d{3,}', span_text)
+                for d in digits:
+                    if d in sanitized:
+                        leaked = True
+                        break
+
+            if leaked:
                 false_negatives.append({
                     "query": text,
                     "span": span_text,
@@ -537,7 +562,18 @@ def check_held_out_sanitizer(
             total_params += 1
             param_clean = param.lower().replace(",", "")
             sanitized_clean = sanitized.lower().replace(",", "")
-            if param_clean in sanitized_clean:
+            # Three-way leak detection:
+            # 1. Direct substring match
+            # 2. Whitespace-collapsed match (catches split-token leaks)
+            # 3. Numeric value match (catches obfuscated amounts)
+            param_collapsed = re.sub(r'\s+', '', param_clean)
+            sanitized_collapsed = re.sub(r'\s+', '', sanitized_clean)
+            is_leaked = (
+                param_clean in sanitized_clean
+                or param_collapsed in sanitized_collapsed
+                or any(d in sanitized for d in re.findall(r'\d{3,}', param))
+            )
+            if is_leaked:
                 leaked.append({"query": text, "param": param, "sanitized": sanitized})
 
     fn_rate = len(leaked) / max(total_params, 1)

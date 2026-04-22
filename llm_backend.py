@@ -20,8 +20,7 @@ def init_backend(backend: str = "anthropic", model: str | None = None):
         import anthropic
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
-            print("ERROR: Set ANTHROPIC_API_KEY environment variable")
-            sys.exit(1)
+            raise RuntimeError("Set ANTHROPIC_API_KEY environment variable")
         _client = anthropic.Anthropic(api_key=api_key)
         _model = model or "claude-haiku-4-5-20251001"
 
@@ -39,13 +38,11 @@ def init_backend(backend: str = "anthropic", model: str | None = None):
                 print(f"WARNING: Model '{_model}' not found in Ollama. Available: {available}")
                 print(f"  Try: ollama pull {_model}")
         except Exception:
-            print("ERROR: Cannot connect to Ollama. Is it running? Try: ollama serve")
-            sys.exit(1)
+            raise RuntimeError("Cannot connect to Ollama. Is it running? Try: ollama serve")
         _client = httpx.Client(timeout=120)
 
     else:
-        print(f"ERROR: Unknown backend '{backend}'. Use 'anthropic' or 'ollama'.")
-        sys.exit(1)
+        raise ValueError(f"Unknown backend '{backend}'. Use 'anthropic' or 'ollama'.")
 
     print(f"Backend: {backend} | Model: {_model}")
 
