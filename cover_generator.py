@@ -290,16 +290,25 @@ def sanitize_query(query: str) -> str:
     result = re.sub(_PERCENT_PATTERN, '', result)
 
     # Remove emotional language
-    for word in _EMOTIONAL_WORDS:
-        result = re.sub(rf'\b{re.escape(word)}\b', '', result, flags=re.IGNORECASE)
+    # Entries may be plain words ("worried") or regex patterns ("\b(?:worried|anxious)\b").
+    # Plain words get word-boundary wrapping; regex patterns are used directly.
+    _REGEX_META = set(r'\[](){}|+*?^$.')
+    for entry in _EMOTIONAL_WORDS:
+        if any(c in entry for c in _REGEX_META):
+            result = re.sub(entry, '', result, flags=re.IGNORECASE)
+        else:
+            result = re.sub(rf'\b{re.escape(entry)}\b', '', result, flags=re.IGNORECASE)
 
     # Remove timing
     for pat in _TIMING_PATTERNS:
         result = re.sub(pat, '', result, flags=re.IGNORECASE)
 
-    # Remove qualitative descriptors
-    for word in _QUALITATIVE:
-        result = re.sub(rf'\b{re.escape(word)}\b', '', result, flags=re.IGNORECASE)
+    # Remove qualitative descriptors (same plain-word vs regex logic)
+    for entry in _QUALITATIVE:
+        if any(c in entry for c in _REGEX_META):
+            result = re.sub(entry, '', result, flags=re.IGNORECASE)
+        else:
+            result = re.sub(rf'\b{re.escape(entry)}\b', '', result, flags=re.IGNORECASE)
 
     # Replace directional verbs (only standalone, not in compound words)
     for verb, replacement in _DIRECTIONAL_VERBS.items():

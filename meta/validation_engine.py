@@ -539,8 +539,16 @@ def check_held_out_sanitizer(
     # to only those the sanitizer is responsible for: numeric values, addresses,
     # percentages, health factors, leverage ratios.
     import re as _re
+    # Only test params that look like amounts the SANITIZER should strip.
+    # Excludes identifiers like "proposal #47" or "vault #8421" which
+    # contain digits but aren't numeric amounts.
     _numeric_like = _re.compile(
-        r'[\d$%.,]+|0x[a-fA-F0-9]+|health factor|leverage|\d+[xX]',
+        r'\$[\d,]+|'              # dollar amounts
+        r'\b\d{3,}\b|'           # 3+ digit numbers (amounts, not IDs)
+        r'\b\d+(?:\.\d+)?%|'     # percentages
+        r'0x[a-fA-F0-9]{6,}|'    # addresses (6+ hex chars)
+        r'health factor|'        # domain-specific metric
+        r'\b\d+[xX]\b',          # leverage (5x, 10X)
         _re.IGNORECASE,
     )
 

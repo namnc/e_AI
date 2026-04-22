@@ -83,8 +83,10 @@ def genericize_profile(profile: dict) -> tuple[dict, dict]:
     # Strip domain_heuristics (reveals threat model specifics)
     safe.pop("domain_heuristics", None)
 
-    # Redact meta
-    safe["meta"]["domain_name"] = safe["meta"].get("domain_name", "redacted")
+    # Redact meta — store original for de-genericization, replace with "redacted"
+    original_domain = safe["meta"].get("domain_name", "unknown")
+    mapping["_domain_name"] = original_domain
+    safe["meta"]["domain_name"] = "redacted"
     safe["meta"]["_note"] = "Entity names genericized for cloud review"
 
     return safe, mapping

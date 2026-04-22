@@ -299,17 +299,22 @@ def validate_labels(
 ) -> list[dict]:
     """Re-label queries using local LLM to ensure label accuracy.
 
-    Only re-labels queries with "unlabeled" or missing labels.
-    Returns the same list with updated labels.
+    Re-labels: (1) unlabeled/missing queries, and (2) all web/synthetic
+    queries regardless of their current label (the generating source may
+    have assigned an incorrect label).
     """
-    unlabeled = [q for q in queries if q.get("label") in (None, "unlabeled", "")]
-    if not unlabeled:
+    needs_label = [
+        q for q in queries
+        if q.get("label") in (None, "unlabeled", "")
+        or q.get("origin") in ("web_enrichment", "synthetic")
+    ]
+    if not needs_label:
         return queries
 
     if progress:
-        print(f"  Labeling {len(unlabeled)} unlabeled queries...")
+        print(f"  Labeling {len(needs_label)} queries (unlabeled + web/synthetic)...")
 
-    for i, q in enumerate(unlabeled):
+    for i, q in enumerate(needs_label):
         resp = call_llm(
             prompt=f"Query: {q['text']}",
             system=_LABEL_QUERY_PROMPT,

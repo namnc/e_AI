@@ -118,6 +118,10 @@ def _check_schema(queries: list[dict]) -> dict:
 # ---------------------------------------------------------------------------
 
 def _check_label_distribution(queries: list[dict]) -> dict:
+    if not queries:
+        return {"verdict": "FAIL", "distribution": {},
+                "detail": "(empty dataset)"}
+
     labels = Counter(q.get("label", "unlabeled") for q in queries)
     total = len(queries)
 
@@ -126,7 +130,11 @@ def _check_label_distribution(queries: list[dict]) -> dict:
     unlabeled_pct = labels.get("unlabeled", 0) / max(total, 1)
 
     # Check for dominant single label
-    most_common_label, most_common_count = labels.most_common(1)[0]
+    most_common = labels.most_common(1)
+    if not most_common:
+        return {"verdict": "FAIL", "distribution": dict(labels),
+                "detail": "(no labels found)"}
+    most_common_label, most_common_count = most_common[0]
     dominance = most_common_count / max(total, 1)
 
     if not has_sensitive:
