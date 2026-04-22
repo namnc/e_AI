@@ -38,6 +38,34 @@ from meta.util import extract_json as _extract_json
 SearchFn = Callable[[str], list[str]]
 
 
+def _sanitize_search_query(query: str) -> str:
+    """Sanitize a search query BEFORE sending to the search engine.
+
+    Strips numeric amounts, addresses, and specific identifiers that could
+    leak private data through the search side channel. Keeps only generic
+    domain terminology.
+    """
+    import re as _re
+    result = query
+    # Strip dollar amounts
+    result = _re.sub(r'\$[\d,]+(?:\.\d+)?[KkMmBb]?', '', result)
+    # Strip bare numbers with 3+ digits (amounts) and decimal numbers
+    result = _re.sub(r'\b\d{3,}(?:\.\d+)?\b', '', result)
+    result = _re.sub(r'\b\d+\.\d+\b', '', result)  # any decimal (1.15, 0.5)
+    # Strip addresses
+    result = _re.sub(r'0[xX][a-fA-F0-9]{3,}', '', result)
+    # Strip percentages with specific values
+    result = _re.sub(r'\b\d+(?:\.\d+)?%', '', result)
+    # Strip leverage
+    result = _re.sub(r'\b\d+[xX]\b', '', result)
+    # Collapse whitespace
+    result = _re.sub(r'\s+', ' ', result).strip()
+    # Reject if query is too short after sanitization (mostly private data)
+    if len(result.split()) < 2:
+        return ""
+    return result
+
+
 def _sanitize_snippet(text: str, max_len: int = 500) -> str:
     """Sanitize a search result snippet before including in LLM prompt.
 
@@ -154,15 +182,18 @@ def enrich_ontology(
                 f"{sd_name} key concepts mechanisms",
             ]
 
-        # Execute searches
+        # Execute searches (sanitize queries to prevent private data leakage)
         all_snippets = []
         for query in queries[:5]:
+            safe_query = _sanitize_search_query(query)
+            if not safe_query:
+                continue
             try:
-                snippets = search_fn(query)
+                snippets = search_fn(safe_query)
                 all_snippets.extend(snippets)
             except Exception as e:
                 if progress:
-                    print(f"    [warn] Search failed for '{query}': {e}")
+                    print(f"    [warn] Search failed for '{safe_query}': {e}")
 
         if not all_snippets:
             if progress:
@@ -244,8 +275,11 @@ def enrich_threat_model(
 
     all_snippets = []
     for query in queries:
+        safe_query = _sanitize_search_query(query)
+        if not safe_query:
+            continue
         try:
-            snippets = search_fn(query)
+            snippets = search_fn(safe_query)
             all_snippets.extend(snippets)
         except Exception as e:
             if progress:
@@ -302,8 +336,11 @@ def enrich_false_positives(
 
     all_snippets = []
     for query in queries:
+        safe_query = _sanitize_search_query(query)
+        if not safe_query:
+            continue
         try:
-            snippets = search_fn(query)
+            snippets = search_fn(safe_query)
             all_snippets.extend(snippets)
         except Exception as e:
             if progress:

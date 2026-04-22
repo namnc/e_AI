@@ -8,12 +8,9 @@ then de-genericize the response.
 Usage:
     from meta.profile_sanitizer import genericize_profile, degenericize_profile
 
-    # Before cloud review
     safe_profile, mapping = genericize_profile(profile)
-    # Send safe_profile to cloud LLM for review
     cloud_suggestions = cloud_review(safe_profile)
-    # After cloud review — restore real names in suggestions
-    real_suggestions = degenericize_profile(cloud_suggestions, mapping)
+    real_suggestions = degenericize_text(cloud_suggestions, mapping)
 """
 
 from __future__ import annotations
@@ -32,7 +29,7 @@ def genericize_profile(profile: dict) -> tuple[dict, dict]:
     """
     safe = copy.deepcopy(profile)
     mapping: dict[str, str] = {}
-    counter = {"entity": 0, "protocol": 0}
+    counter = {"entity": 0}
 
     # Genericize entity_names
     sp = safe.get("sensitive_patterns", {})
@@ -48,20 +45,17 @@ def genericize_profile(profile: dict) -> tuple[dict, dict]:
     for sd_name, sd_data in safe.get("subdomains", {}).items():
         new_protocols = []
         for proto in sd_data.get("protocols", []):
-            # Reuse mapping if entity already mapped
-            existing = next(
-                (k for k, v in mapping.items() if v == proto), None
-            )
+            existing = next((k for k, v in mapping.items() if v == proto), None)
             if existing:
                 new_protocols.append(existing)
             else:
-                counter["protocol"] += 1
-                placeholder = f"PROTOCOL_{counter['protocol']:03d}"
+                counter["entity"] += 1
+                placeholder = f"ENTITY_{counter['entity']:03d}"
                 mapping[placeholder] = proto
                 new_protocols.append(placeholder)
         sd_data["protocols"] = new_protocols
 
-        # Genericize generic_refs (may contain domain-revealing language)
+        # Genericize generic_refs
         new_refs = []
         for i, ref in enumerate(sd_data.get("generic_refs", [])):
             placeholder = f"REF_{sd_name}_{i}"
@@ -69,23 +63,28 @@ def genericize_profile(profile: dict) -> tuple[dict, dict]:
             new_refs.append(placeholder)
         sd_data["generic_refs"] = new_refs
 
-    # Genericize known tokens in regex patterns (component)
+    # Genericize known tokens in components — replace entire value
+    # (tokens like "usdc\.e" contain backslashes that break JSON round-trips
+    #  if replaced via string substitution, so we replace the whole field)
     comp = sp.get("components", {})
     if "KNOWN_TOKENS" in comp:
-        tokens = comp["KNOWN_TOKENS"].split("|")
-        new_tokens = []
-        for i, tok in enumerate(tokens):
-            placeholder = f"token_{i:03d}"
-            mapping[placeholder] = tok
-            new_tokens.append(placeholder)
-        comp["KNOWN_TOKENS"] = "|".join(new_tokens)
+        mapping["_KNOWN_TOKENS_ORIGINAL"] = comp["KNOWN_TOKENS"]
+        comp["KNOWN_TOKENS"] = "token_placeholder"
+
+    # Also genericize patterns that embed known tokens
+    # (these are long regex strings — replace entire fields, not substrings)
+    for key in ("amount_known_token_pattern", "cardinal_known_token",
+                "worded_fraction_token", "worded_decimal_token"):
+        if key in sp and sp[key]:
+            mapping[f"_PATTERN_{key}"] = sp[key]
+            sp[key] = f"PATTERN_PLACEHOLDER_{key}"
 
     # Strip domain_heuristics (reveals threat model specifics)
-    safe.pop("domain_heuristics", None)
+    if "domain_heuristics" in safe:
+        mapping["_domain_heuristics"] = safe.pop("domain_heuristics")
 
-    # Redact meta — store original for de-genericization, replace with "redacted"
-    original_domain = safe["meta"].get("domain_name", "unknown")
-    mapping["_domain_name"] = original_domain
+    # Redact meta
+    mapping["_domain_name"] = safe["meta"].get("domain_name", "unknown")
     safe["meta"]["domain_name"] = "redacted"
     safe["meta"]["_note"] = "Entity names genericized for cloud review"
 
@@ -95,11 +94,13 @@ def genericize_profile(profile: dict) -> tuple[dict, dict]:
 def degenericize_text(text: str, mapping: dict) -> str:
     """Replace placeholders in text with real names using the mapping.
 
-    Used to de-genericize cloud LLM suggestions.
+    Used to de-genericize cloud LLM suggestions (free text, not JSON).
+    Only replaces ENTITY_NNN and REF_ placeholders, not internal keys.
     """
     result = text
-    # Sort by placeholder length descending to avoid partial replacements
     for placeholder in sorted(mapping.keys(), key=len, reverse=True):
+        if placeholder.startswith("_"):
+            continue  # skip internal keys
         result = result.replace(placeholder, mapping[placeholder])
     return result
 
@@ -107,12 +108,57 @@ def degenericize_text(text: str, mapping: dict) -> str:
 def degenericize_profile(profile: dict, mapping: dict) -> dict:
     """Restore real entity names in a profile using the mapping.
 
-    Used after receiving cloud LLM suggestions to map back to real names.
+    Uses structured traversal instead of string replacement to avoid
+    JSON escaping issues with values like "usdc\\.e".
     """
-    # Convert to string, replace all placeholders, convert back
-    as_str = json.dumps(profile, ensure_ascii=False)
-    restored = degenericize_text(as_str, mapping)
-    return json.loads(restored)
+    restored = copy.deepcopy(profile)
+
+    # Build reverse mapping for entity/ref placeholders only
+    reverse = {k: v for k, v in mapping.items() if not k.startswith("_")}
+
+    def _restore_list(items: list) -> list:
+        return [reverse.get(item, item) if isinstance(item, str) else item
+                for item in items]
+
+    def _restore_str(val: str) -> str:
+        return reverse.get(val, val)
+
+    # Restore entity_names
+    sp = restored.get("sensitive_patterns", {})
+    if "entity_names" in sp:
+        sp["entity_names"] = _restore_list(sp["entity_names"])
+
+    # Restore subdomain protocols and generic_refs
+    for sd_data in restored.get("subdomains", {}).values():
+        if "protocols" in sd_data:
+            sd_data["protocols"] = _restore_list(sd_data["protocols"])
+        if "generic_refs" in sd_data:
+            sd_data["generic_refs"] = _restore_list(sd_data["generic_refs"])
+
+    # Restore KNOWN_TOKENS
+    comp = sp.get("components", {})
+    if "_KNOWN_TOKENS_ORIGINAL" in mapping:
+        comp["KNOWN_TOKENS"] = mapping["_KNOWN_TOKENS_ORIGINAL"]
+
+    # Restore token-embedding patterns
+    for key in ("amount_known_token_pattern", "cardinal_known_token",
+                "worded_fraction_token", "worded_decimal_token"):
+        map_key = f"_PATTERN_{key}"
+        if map_key in mapping:
+            sp[key] = mapping[map_key]
+
+    # Restore domain_heuristics
+    if "_domain_heuristics" in mapping:
+        restored["domain_heuristics"] = mapping["_domain_heuristics"]
+
+    # Restore domain name
+    if "_domain_name" in mapping:
+        restored["meta"]["domain_name"] = mapping["_domain_name"]
+
+    # Remove note
+    restored["meta"].pop("_note", None)
+
+    return restored
 
 
 def save_mapping(mapping: dict, path: str):

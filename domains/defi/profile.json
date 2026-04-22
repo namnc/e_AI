@@ -462,8 +462,9 @@
     "pre_normalization_patterns": [
       "\\b\\d+(?:\\.\\d+)?[eE][+-]?\\d+\\s*\\w*\\b",
       "\\b\\d+(?:\\.\\d+)?[KkMmBb]\\b",
+      "[+~≈><]\\s*\\d+(?:\\.\\d+)?\\s*\\w*\\b",
       "\\b\\d+(?:\\.\\d+)?[+~≈><]\\s*\\w*\\b",
-      "\\b\\d+(?:\\.\\d+)?-\\d+(?:\\.\\d+)?[xX×]?\\s*\\w*\\b"
+      "\\b\\d+(?:\\.\\d+)?\\s*-\\s*\\d+(?:\\.\\d+)?[xX×]?\\s*\\w*\\b"
     ],
     "amount_patterns_icase": [
       "\\$[\\d,]+(?:\\.\\d+)?[KkMmBb]?",
@@ -534,7 +535,7 @@
     ],
     "ens_pattern": "\\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.eth\\b",
     "percent_pattern": "\\b\\d+(?:\\.\\d+)?%(?!\\s*attack)",
-    "hf_pattern": "(?:health factor|HF)\\s*(?:is|of|at|=|:)?\\s*(?:approximately|about|around|roughly|nearly|~|≈)?\\s*\\.?\\d+(?:\\.\\d+)?",
+    "hf_pattern": "(?:health factor|HF)\\s*(?:is|of|at|=|:)?\\s*(?:approximately|about|around|roughly|nearly|~|≈|>|<|>=|<=)?\\s*\\.?\\d+(?:\\.\\d+)?",
     "leverage_pattern": "\\b\\d+\\s*[xX×](?=\\s|$|\\b)",
     "number_words": [
       "hundred",

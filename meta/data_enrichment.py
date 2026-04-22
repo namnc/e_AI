@@ -157,8 +157,12 @@ def enrich_from_web(
 
     all_snippets = []
     for sq in search_queries:
+        # Sanitize search queries to prevent private data leaking via search side channel
+        safe_sq = _sanitize_snippet(sq)
+        if len(safe_sq.split()) < 2:
+            continue
         try:
-            snippets = search_fn(sq)
+            snippets = search_fn(safe_sq)
             all_snippets.extend(snippets)
         except Exception:
             continue

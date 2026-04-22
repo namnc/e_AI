@@ -54,11 +54,16 @@ def load_dataset(path: str) -> list[dict]:
 # Step 1: Sensitivity extraction
 # ---------------------------------------------------------------------------
 
-def extract_sensitive_spans(queries: list[dict], progress: bool = True) -> list[dict]:
+def extract_sensitive_spans(
+    queries: list[dict],
+    progress: bool = True,
+    system_prompt: str | None = None,
+) -> list[dict]:
     """For each query, identify sensitive spans via LLM.
 
     Returns list of dicts: {text, label, spans: [{span, category, reason}]}
     """
+    prompt_to_use = system_prompt or SENSITIVITY_EXTRACTION
     results = []
     total = len(queries)
     for i, entry in enumerate(queries):
@@ -67,7 +72,7 @@ def extract_sensitive_spans(queries: list[dict], progress: bool = True) -> list[
         text = entry["text"]
         resp = call_llm(
             prompt=f"Query: {text}",
-            system=SENSITIVITY_EXTRACTION,
+            system=prompt_to_use,
             max_tokens=1024,
         )
         parsed = _extract_json(resp)
@@ -187,6 +192,7 @@ def extract_vocabulary(
     assignments: list[dict],
     distribution: dict[str, int],
     progress: bool = True,
+    system_prompt: str | None = None,
 ) -> dict[str, dict]:
     """Extract vocabulary for each subdomain via LLM.
 
@@ -218,7 +224,7 @@ def extract_vocabulary(
 
         resp = call_llm(
             prompt=f"Subdomain: {subdomain}\n\nExample queries:\n{query_block}",
-            system=VOCABULARY_EXTRACTION,
+            system=system_prompt or VOCABULARY_EXTRACTION,
             max_tokens=2048,
         )
         parsed = _extract_json(resp)
@@ -388,22 +394,19 @@ def analyze_dataset(
         print(f"  [warn] Very small dataset ({len(queries)} queries). "
               f"Results will be thin. Recommend 200+.")
 
-    # Apply feedback from previous runs to prompts
+    # Apply feedback from previous runs to prompts (local copies, not global mutation)
+    sens_prompt = SENSITIVITY_EXTRACTION
+    vocab_prompt = VOCABULARY_EXTRACTION
     if feedback_adjustments:
         from meta.feedback import apply_adjustments_to_prompt
-        global SENSITIVITY_EXTRACTION, VOCABULARY_EXTRACTION
-        SENSITIVITY_EXTRACTION = apply_adjustments_to_prompt(
-            SENSITIVITY_EXTRACTION, feedback_adjustments
-        )
-        VOCABULARY_EXTRACTION = apply_adjustments_to_prompt(
-            VOCABULARY_EXTRACTION, feedback_adjustments
-        )
+        sens_prompt = apply_adjustments_to_prompt(sens_prompt, feedback_adjustments)
+        vocab_prompt = apply_adjustments_to_prompt(vocab_prompt, feedback_adjustments)
         if progress:
             print(f"  Applied feedback adjustments: {list(feedback_adjustments.keys())}")
 
-    # Step 1: sensitivity extraction
+    # Step 1: sensitivity extraction (uses feedback-adjusted prompt if available)
     print("\nStep 1: Extracting sensitive spans...")
-    span_results = extract_sensitive_spans(queries, progress=progress)
+    span_results = extract_sensitive_spans(queries, progress=progress, system_prompt=sens_prompt)
 
     # Step 2: subdomain clustering
     print("\nStep 2: Clustering subdomains...")
@@ -417,6 +420,7 @@ def analyze_dataset(
         cluster_results["assignments"],
         cluster_results["distribution"],
         progress=progress,
+        system_prompt=vocab_prompt,
     )
 
     # Step 4: template extraction
