@@ -367,6 +367,82 @@ def test_no_false_positives_on_benign_numbers():
 
 
 # ─────────────────────────────────────────────
+# Genericizer regression tests
+# ─────────────────────────────────────────────
+
+def test_gnosis_safe_genericizes_to_wallet():
+    """Gnosis Safe should map to wallet management, not governance."""
+    from cover_generator import genericize_subquery, classify_domain
+    d = classify_domain("How does Gnosis Safe work?")
+    assert d == "wallets", f"Gnosis Safe classified as {d}, expected wallets"
+    r = genericize_subquery("Consolidate funds into a new Gnosis Safe")
+    assert "wallet" in r.lower(), f"Gnosis Safe genericized wrong: {r}"
+    assert "governance" not in r.lower(), f"Gnosis Safe leaked to governance: {r}"
+    assert "Gnosis" not in r, f"Gnosis Safe not stripped: {r}"
+
+
+def test_truncated_addresses():
+    """Truncated addresses like 0xdead...beef and 0x5e6F...7g8H must be fully stripped."""
+    for addr in ["0xdead...beef", "0x742d...f2bD", "0x5e6F...7g8H", "0x1a2B...3c4D"]:
+        r = sanitize_query(f"Wallet {addr} has funds")
+        # No hex/alphanumeric suffix should remain
+        assert "beef" not in r.lower(), f"Suffix leaked: {r}"
+        assert "f2bd" not in r.lower(), f"Suffix leaked: {r}"
+        assert "7g8h" not in r.lower(), f"Suffix leaked: {r}"
+        assert "3c4d" not in r.lower(), f"Suffix leaked: {r}"
+
+
+def test_locale_bare_numbers():
+    """Locale-formatted bare numbers must be stripped."""
+    assert "1234" not in sanitize_query("I have 1,234,567 in my wallet")
+    assert "1234" not in sanitize_query("I have 1,234.56 in my wallet")
+    assert "1234" not in sanitize_query("I have 1.234,56 in my wallet")
+
+
+def test_prefix_numbers_and_comparators():
+    """Leading symbols like >500, ~1000, HF >1.15 must be stripped."""
+    assert "500" not in sanitize_query("I have >500 ETH")
+    assert "1000" not in sanitize_query("About ~1000 USDC left")
+    assert "1.15" not in sanitize_query("My HF >1.15")
+    assert "1.05" not in sanitize_query("Position HF <1.05")
+
+
+def test_spaced_ranges():
+    """Ranges with spaces like '500 - 1000 ETH' must be stripped."""
+    r = sanitize_query("I need 500 - 1000 ETH")
+    assert "500" not in r, f"Range lower bound leaked: {r}"
+    assert "1000" not in r, f"Range upper bound leaked: {r}"
+
+
+# ─────────────────────────────────────────────
+# WildChat extractor regression tests
+# ─────────────────────────────────────────────
+
+def test_wildchat_metamask_swap():
+    """MetaMask Swap is a DeFi product — should be detected."""
+    import sys; sys.path.insert(0, "data")
+    from extract_wildchat_defi import is_defi_query
+    assert is_defi_query("How do I use the MetaMask Swap feature?")
+    assert is_defi_query("Why is MetaMask Swap charging so much spread?")
+
+
+def test_wildchat_no_content_generation_fp():
+    """Content-generation prompts mentioning DeFi products should be excluded."""
+    import sys; sys.path.insert(0, "data")
+    from extract_wildchat_defi import is_defi_query
+    assert not is_defi_query("Write a landing page for MetaMask Swap.")
+    assert not is_defi_query("Create an ad for the MetaMask swap feature.")
+    assert not is_defi_query("Can you write marketing copy for MetaMask swap?")
+
+
+def test_wildchat_no_office_fp():
+    """Non-DeFi text with DeFi product names should be excluded."""
+    import sys; sys.path.insert(0, "data")
+    from extract_wildchat_defi import is_defi_query
+    assert not is_defi_query("How do I swap desks in the MetaMask office?")
+
+
+# ─────────────────────────────────────────────
 # Full query integration tests
 # ─────────────────────────────────────────────
 

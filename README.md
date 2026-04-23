@@ -14,8 +14,9 @@ We propose a **tiered architecture**: a regex sanitizer (browser extension, $0) 
 | **1: Full pipeline** | + LLM decompose + genericize + covers | Mac Mini 14B+ | **$200-500** | + topic hiding (40% detection, n=20) | + per-set Tor unlinkability; small-sample result |
 
 This repository contains:
-- **`ethresearch_post.md`** — the main ethresear.ch post (Part 1)
+- **`ethresearch_post.md`** — the main ethresear.ch post (Part 1: the private query problem)
 - **`companion_post_active_adversary.md`** — Part 2: active adversaries, verifiable inference, cryptoeconomic accountability
+- **`ethresearch_meta_framework_draft.md`** — Part 3 (draft): domain-agnostic meta-framework for auto-generating privacy protection
 - Benchmark suite (A-F), DistilBERT classifier, cover generator, sanitizer tests
 - **Meta-framework** for auto-generating privacy pipelines from any dataset
 
@@ -312,23 +313,63 @@ Read all benchmark results as **"under a constrained synthetic threat model"**, 
 
 ## Contributing
 
-**Help validate the sanitizer — without sharing any private data.** The benchmark dataset (216 queries) is synthetic. We need real-world validation, but real DeFi queries are private by definition. Three ways to contribute that protect your privacy:
+**All contributions protect your privacy by design.** The benchmark dataset is synthetic. Real queries are private by definition. Every contribution path below ensures no private data leaves your machine.
 
-**1. Local-only validation (nothing leaves your machine)**
-Run the sanitizer on your actual queries locally and report only the binary result:
+### Sanitizer & Privacy
+
+**1. Sanitizer bypass bounty (highest value)**
+Find queries where exploitable information survives sanitization. Report the *pattern*, not your query:
 ```bash
 python -c "
 from cover_generator import sanitize_query
-q = input('Paste your query (stays local): ')
+q = input('Paste query (stays local): ')
 print(f'Sanitized: {sanitize_query(q)}')
-# Report ONLY: 'leaked' or 'clean' — never the query itself
+# Report ONLY the pattern: 'worded fractions like half a million bypass'
 "
 ```
+Open a GitHub issue with the pattern class. Past bounty finds: Unicode bypasses, locale-formatted numbers, truncated addresses, split-token amounts.
 
-**2. Sanitizer bypass bounty**
-Try to write a query that contains exploitable private information but passes the regex sanitizer. Report the *pattern* (e.g., "natural language numbers like 'half a million'"), not your actual query. Open a GitHub issue with the pattern.
+**2. Local-only validation**
+Run the sanitizer on your actual queries locally. Report only the binary result (leaked/clean), never the query:
+```bash
+python test_sanitizer_fuzz.py --rounds 5000  # adversarial mutations
+python test_sanitizer_audit.py               # 2,600 synthetic params
+```
 
-**3. Independent labeling**
-Label 100 queries from `data/benchmark_dataset.jsonl` as sensitive/non-sensitive/borderline. We'll compute inter-annotator agreement (target: Cohen's kappa > 0.7).
-- **Damage reduction is simulated**: 100% reduction holds for parameter-dependent attacks; topic-only attacks (narrowing search by domain) are not modeled
-- **Regex has a natural language gap**: Common worded quantities ("half a million USDC", "twenty ETH") are now caught, but compound forms ("twenty five ETH" → partially leaks), semantic quantities ("three quarters of my portfolio"), and novel phrasings still bypass the sanitizer
+**3. Fuzz corpus expansion**
+Add adversarial test cases to `test_sanitizer_fuzz.py` — Unicode tricks, format mutations, locale variants, novel encoding bypasses. The fuzz test is now blocking in CI at a 5% threshold.
+
+### Profile & Ontology
+
+**4. Profile improvement (safe — profiles contain no private data)**
+Review `domains/defi/profile.json` for:
+- Missing protocol names the genericizer should strip
+- Missing mechanisms, metrics, or vocabulary per subdomain
+- False-positive words that shouldn't be stripped
+Submit as PR. Profiles are domain knowledge, not user data.
+
+**5. Community profiles for new domains**
+Generate a profile for medical, legal, TradFi, or other domains using public datasets:
+```bash
+python generate_profile.py --dataset public_medical_queries.jsonl --domain medical --backend ollama
+```
+Submit the profile (not the dataset). Others validate locally against their private data.
+
+### Benchmarks & Validation
+
+**6. Independent labeling**
+Label 100 queries from `data/benchmark_dataset.jsonl` as sensitive/non_sensitive/borderline. Target: Cohen's kappa > 0.7 inter-annotator agreement.
+
+**7. Benchmark validation on different hardware/models**
+Run benchmarks A-F on your hardware and report results. Helps establish the quality-hardware curve documented in [deployment_guide.md](docs/deployment_guide.md):
+```bash
+python run_benchmarks.py --benchmark all --backend ollama --model qwen2.5:32b
+```
+
+**8. Meta-framework audit**
+Review `meta/` modules for validation gaps, pattern generation bugs, feedback contamination, or privacy side channels. Past audit finds: self-certification attacks, search query privacy leaks, profile sanitizer JSON crashes, feedback global mutation.
+
+### What NOT to share
+- Never share your actual queries, wallet addresses, or position details
+- Never share your private dataset (use it locally only)
+- Profiles and patterns are safe to share — they contain domain knowledge, not user data
