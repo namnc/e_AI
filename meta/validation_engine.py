@@ -455,12 +455,27 @@ def check_entity_completeness(
 def _auto_generate_held_out(queries: list[dict] | None) -> list[dict]:
     """Auto-generate held-out test data from any dataset.
 
-    Extracts numeric/address-like substrings from sensitive queries
-    as synthetic private_params. Domain-agnostic.
+    Strategy:
+    1. If queries have labeled private_params, use those directly (best)
+    2. Otherwise, extract numeric/address-like substrings as synthetic params
     """
     import re as _re
     if not queries:
         return []
+
+    # Strategy 1: use dataset-provided private_params if available
+    with_params = [
+        q for q in queries
+        if q.get("private_params") and q.get("label") == "sensitive"
+    ]
+    if with_params:
+        # Use last 20% as held-out, but always keep at least 1
+        split_idx = min(len(with_params) - 1, max(1, int(len(with_params) * 0.8)))
+        return [
+            {"text": q.get("text", q.get("query", "")),
+             "private_params": q["private_params"]}
+            for q in with_params[split_idx:]
+        ]
 
     sensitive = [q for q in queries if q.get("label") == "sensitive"]
     if not sensitive:
@@ -540,13 +555,16 @@ def check_held_out_sanitizer(
     # percentages, health factors, leverage ratios.
     import re as _re
     # Only test params that look like amounts the SANITIZER should strip.
-    # Excludes identifiers like "proposal #47" or "vault #8421" which
-    # contain digits but aren't numeric amounts.
+    # Uses the profile's known token list for comprehensive matching.
+    _known = profile.get("sensitive_patterns", {}).get("components", {}).get("KNOWN_TOKENS", "")
+    _token_pattern = _known if _known else "ETH|BTC|USDC|USDT|DAI"
     _numeric_like = _re.compile(
         r'\$[\d,]+|'              # dollar amounts
         r'\b\d{3,}\b|'           # 3+ digit numbers (amounts, not IDs)
+        r'\b\d+\s*(?:' + _token_pattern + r')\b|'  # token amounts (50 ETH, 80 SOL, 99 ARB...)
+        r'\b\d+\.\d+\b|'        # decimal values (1.12, 0.5)
         r'\b\d+(?:\.\d+)?%|'     # percentages
-        r'0x[a-fA-F0-9]{6,}|'    # addresses (6+ hex chars)
+        r'0[xX][a-zA-Z0-9]+(?:\.{2,}[a-zA-Z0-9]+)?|'  # addresses (full or truncated with alphanumeric suffix)
         r'health factor|'        # domain-specific metric
         r'\b\d+[xX]\b',          # leverage (5x, 10X)
         _re.IGNORECASE,
@@ -576,10 +594,14 @@ def check_held_out_sanitizer(
             # 3. Numeric value match (catches obfuscated amounts)
             param_collapsed = re.sub(r'\s+', '', param_clean)
             sanitized_collapsed = re.sub(r'\s+', '', sanitized_clean)
+            # For truncated addresses like 0x5e6F...7g8H, also check if the
+            # suffix fragment (e.g., "7g8h") survives in the sanitized text
+            addr_suffix = re.findall(r'\.{2,}([a-zA-Z0-9]{2,})', param)
             is_leaked = (
                 param_clean in sanitized_clean
                 or param_collapsed in sanitized_collapsed
                 or any(d in sanitized for d in re.findall(r'\d{3,}', param))
+                or any(s.lower() in sanitized_clean for s in addr_suffix)
             )
             if is_leaked:
                 leaked.append({"query": text, "param": param, "sanitized": sanitized})

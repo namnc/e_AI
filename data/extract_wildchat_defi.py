@@ -46,7 +46,9 @@ DEFI_KEYWORDS = [
 # Exclude non-DeFi crypto (pure trading, price speculation, general crypto)
 EXCLUDE_PATTERNS = [
     r"\b(price prediction|will .+ go up|should i buy .+ coin|to the moon)\b",
-    r"\b(write me a|create a|generate a|help me write)\b",  # code generation requests
+    # Content generation / marketing / creative writing requests (not DeFi usage queries)
+    r"\b(write|create|generate|draft|compose|design|build)\b.{0,20}\b(copy|page|ad|campaign|article|blog|post|content|email|script|slide|deck|logo|banner|brief)\b",
+    r"\b(write me a|create a|generate a|help me write|can you write)\b",
 ]
 
 
@@ -63,7 +65,8 @@ STRONG_KEYWORDS = [
     "swap eth", "swap btc", "swap usdc", "stake eth",
     "restaking", "liquid staking", "provide liquidity",
     "add collateral", "repay loan", "repay debt",
-    "gnosis safe", "metamask.*swap", "bridge.*token",
+    "gnosis safe", "metamask swap", "metamask.*(?:token|eth|defi|staking|gas)",
+    "bridge.*token|token.*bridge",
 ]
 
 
@@ -73,8 +76,10 @@ def is_defi_query(text: str) -> bool:
 
     # Must contain at least one strong DeFi keyword (with word boundaries where needed)
     found = False
+    _REGEX_META = set(r'\[](){}|+*?^$.')
     for kw in STRONG_KEYWORDS:
-        if kw.startswith(r"\b"):
+        if any(c in kw for c in _REGEX_META):
+            # Contains regex metacharacters — use re.search
             if re.search(kw, text_lower):
                 found = True
                 break

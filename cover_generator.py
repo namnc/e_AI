@@ -210,6 +210,10 @@ def sanitize_query(query: str) -> str:
     # without breaking base58/bech32 addresses with inserted spaces.
     result = _ud.normalize('NFKC', query)
     result = ''.join(ch for ch in result if ch in '\n\t\r' or _ud.category(ch) not in ('Cf', 'Cc'))
+    # Strip truncated/ellipsis addresses FIRST (before contiguous patterns
+    # eat the prefix and leave the suffix orphaned).
+    # Suffix is alphanumeric — real truncated addresses use mixed case (0x5e6F...7g8H)
+    result = re.sub(r'0[xX][a-zA-Z0-9]+\.{2,}[a-zA-Z0-9]+', '', result)
     for pat in _ADDRESS_PATTERNS:
         result = re.sub(pat, '', result)
     # Also strip ENS names before normalization
@@ -679,13 +683,24 @@ def genericize_subquery(sub_query: str) -> str:
     result = ''.join(ch for ch in result if ch in '\n\t\r' or _ud.category(ch) not in ('Cf', 'Cc'))
     domain = classify_domain(result)
     onto = DOMAIN_ONTOLOGY.get(domain, {})
-    generic_ref = onto.get("generic_refs", ["DeFi protocols"])[0]
+    default_ref = onto.get("generic_refs", ["DeFi protocols"])[0]
+
+    # Build per-entity generic_ref: if an entity appears in a subdomain's
+    # protocols list, use that subdomain's generic_ref[0] for replacement
+    entity_ref_cache = {}
+    for sd_name, sd_data in DOMAIN_ONTOLOGY.items():
+        sd_ref = sd_data.get("generic_refs", ["DeFi protocols"])[0]
+        for proto in sd_data.get("protocols", []):
+            entity_ref_cache[proto.lower()] = sd_ref
 
     for proto in _PROTOCOL_NAMES:
-        result = re.sub(rf'\b{re.escape(proto)}\b', generic_ref, result, flags=re.IGNORECASE)
+        ref = entity_ref_cache.get(proto.lower(), default_ref)
+        result = re.sub(rf'\b{re.escape(proto)}\b', ref, result, flags=re.IGNORECASE)
 
-    # Clean up doubled generic refs
-    result = re.sub(rf'({re.escape(generic_ref)})\s+\1', generic_ref, result)
+    # Clean up doubled generic refs (any ref that appears twice in a row)
+    for sd_data in DOMAIN_ONTOLOGY.values():
+        for ref in sd_data.get("generic_refs", []):
+            result = re.sub(rf'({re.escape(ref)})\s+\1', ref, result)
     result = re.sub(r'\s+', ' ', result).strip()
     return result
 

@@ -7,12 +7,13 @@
   },
   "domain_distribution": {
     "lending": 0.25,
-    "dex": 0.3,
+    "dex": 0.27,
     "staking": 0.15,
     "derivatives": 0.1,
     "bridges": 0.08,
     "governance": 0.05,
-    "aggregators": 0.07
+    "aggregators": 0.07,
+    "wallets": 0.03
   },
   "top_domains": [
     "lending",
@@ -446,6 +447,52 @@
         "aggregation platforms",
         "yield optimization systems",
         "DeFi aggregators"
+      ]
+    },
+    "wallets": {
+      "protocols": [
+        "Gnosis Safe",
+        "Instadapp",
+        "DeFi Saver"
+      ],
+      "mechanisms": [
+        "multisig management",
+        "threshold signing",
+        "transaction batching",
+        "wallet coordination",
+        "account abstraction"
+      ],
+      "operations": [
+        "consolidating funds",
+        "managing multisig",
+        "signing transactions",
+        "batching transfers",
+        "setting up wallet"
+      ],
+      "triggers": [
+        "signer changes",
+        "threshold updates",
+        "large transfers pending"
+      ],
+      "metrics": [
+        "signer count",
+        "confirmation threshold",
+        "pending transactions"
+      ],
+      "actors": [
+        "wallet owners",
+        "multisig signers",
+        "fund managers"
+      ],
+      "risk_concepts": [
+        "key compromise",
+        "signer collusion",
+        "transaction replay"
+      ],
+      "generic_refs": [
+        "wallet management platforms",
+        "multisig solutions",
+        "smart wallet platforms"
       ]
     }
   },
