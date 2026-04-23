@@ -220,22 +220,101 @@ Despite 5 guardrails, the generating LLM still has influence:
 
 Mitigation: 11/13 checks are fully programmatic. Security validation is LLM-independent.
 
-## 7. Future Work
+## 7. Beyond Sanitization: Toward a Privacy Protection Compiler
 
-1. **Validate on medical/legal/TradFi domains** — prove the generalization claim
+### 7.1 Limitations of the Current Approach
+
+This meta-framework generates one specific protection strategy: regex sanitization + LLM decomposition + cover queries + genericization. This is Layer 1 — query transformation. It is effective against passive observers but has inherent limits:
+
+- **Format-bounded**: regex cannot catch semantic leaks ("about double what I started with")
+- **Statistical, not cryptographic**: cover queries provide k-plausible deniability, not formal privacy guarantees
+- **Local LLM required**: Tier 1 quality depends on a capable local model
+- **Cloud still sees content**: even genericized sub-queries reveal the topic domain
+
+### 7.2 A More General Architecture
+
+The natural generalization is a **privacy protection compiler** — a system that takes a threat model and hardware constraints as input, and outputs a composed pipeline of privacy tools.
+
+```
+Threat Model + Domain Profile + Hardware Constraints
+  → [Privacy Protection Compiler]
+    → Composed Pipeline Configuration
+      → Formal Property Guarantees + Residual Risk Assessment
+```
+
+The compiler would select from a **tool library** across three layers:
+
+**Layer 1: Query Transformation (this work)**
+- Regex sanitization, LLM decomposition, cover queries, genericization
+- Strength: fast, no special hardware, works today
+- Limitation: format-bounded, statistical hiding only
+
+**Layer 2: Cryptographic Infrastructure (emerging)**
+- **TEE inference**: cloud LLM runs in hardware enclave (SGX, TDX, SEV-SNP). Cloud operator cannot inspect queries. Requires attestation and trusting the TEE vendor.
+- **Split inference**: run embedding layers locally, send intermediate activations to cloud. Activations are less interpretable than raw text but not provably private.
+- **Secure Multi-Party Computation**: query split across N non-colluding servers. Information-theoretic security. Impractical latency for full LLM inference today, but feasible for embedding-level operations.
+- **Private Information Retrieval**: retrieve relevant context from a cloud knowledge base without revealing which records were accessed. Useful for RAG architectures.
+
+**Layer 3: AI-Native Privacy (research frontier)**
+- **Semantic sanitization**: NER + paraphrase models that remove meaning, not just format. Catches "whale-sized position" and "near liquidation" that regex misses.
+- **Prompt obfuscation**: rewrite queries to preserve the answer while hiding intent. "What happens to a lending position when collateral drops 20%?" is equivalent to Alice's specific question but reveals no private parameters.
+- **Local distillation**: distill the cloud model's capabilities for the user's specific domain into a local model. Zero cloud exposure after distillation.
+- **Adversarial embeddings**: add perturbations to token embeddings that preserve semantic content for the model but confuse reconstruction attacks by eavesdroppers.
+
+### 7.3 Compiler-Selected Pipelines
+
+Different threat models produce different composed pipelines:
+
+| Threat Model | Hardware | Compiler Output | Residual Risk |
+|---|---|---|---|
+| Casual privacy (passive observer) | Browser only | Regex sanitizer (Layer 1) | Semantic leaks, topic visible |
+| Serious privacy (passive + analytics) | Local 14B | Sanitize → decompose → cover → Tor (Layer 1) | Session composition, timing |
+| Regulatory compliance (HIPAA/GDPR) | Local GPU + TEE cloud | Semantic sanitize → TEE inference → audit (Layer 1+2) | TEE side channels |
+| Adversarial (nation-state) | Air-gapped 70B | Local distilled model (Layer 3) | Model quality bounded |
+| Maximum (defense-in-depth) | Local 70B + TEE + MPC | Sanitize → obfuscate → split across TEE servers (Layer 1+2+3) | Implementation complexity |
+
+### 7.4 Relationship to This Work
+
+The current meta-framework becomes the **first backend** of the compiler:
+- **Profile generation** (this work) provides the domain knowledge for any tool to use
+- **Validation engine** (this work) provides the property-checking framework
+- **Tool library** becomes pluggable — new tools register with their formal properties
+- **Compiler** is new — selects and composes tools, verifies combined guarantees
+
+The 13 validation properties generalize naturally: parameter hiding is checked the same way whether the tool is regex or NER or encryption. Cover quality is measured the same way whether covers are template-filled or adversarially generated.
+
+### 7.5 Open Research Questions
+
+1. **Composability**: do privacy guarantees compose? If Layer 1 provides ε₁-privacy and Layer 2 provides ε₂-privacy, what does the composition provide?
+2. **Verification**: how do you verify a TEE is running the correct model without trusting the hardware vendor?
+3. **Latency budget**: cryptographic tools add latency. How much is acceptable for interactive LLM use?
+4. **Adversarial robustness**: can a cloud provider with access to the model architecture undo prompt obfuscation?
+5. **Distillation fidelity**: how much domain-specific capability survives distillation to a local model?
+
+## 8. Short-Term Future Work
+
+1. **Validate on medical/legal/TradFi domains** — prove the generalization claim with non-DeFi data
 2. **Implement covered D2 benchmark** — measure utility when sub-queries are mixed with covers
 3. **Run C2 on actual decomposition output** — validate detectability end-to-end
 4. **Browser extension** — port Tier 0 sanitizer to JavaScript
-5. **Formal privacy proofs** — extend the k-indistinguishability theorem to generated profiles
-6. **Fine-tuned local models** — train a 14B model specifically for privacy tool generation
+5. **Semantic sanitization prototype** — NER-based sanitizer as Layer 3 proof-of-concept
+6. **TEE integration** — deploy Tier 1 pipeline with TEE-hosted cloud inference
 
-## 8. Conclusion
+## 9. Conclusion
 
-The Private Query Problem is universal, but until now, the solution was domain-specific. This meta-framework demonstrates that privacy protection pipelines can be auto-generated from datasets, validated against formal properties, and iteratively improved through feedback loops — without requiring domain expertise or hand-crafting.
+This work makes three contributions:
 
-The critical insight: **security validation doesn't need an LLM** (11/13 checks are programmatic), but **quality generation benefits enormously from model capability** (97% vocabulary recall with Claude vs 22% with 14B). The recommended architecture — cloud generation for public data, local validation for all data, local runtime for private queries — gives users the best of both worlds.
+**1. Domain-agnostic meta-framework.** Privacy protection pipelines can be auto-generated from datasets, validated against 13 formal properties (11 programmatic, 5 anti-malicious-LLM), and iteratively improved through feedback loops — without domain expertise or hand-crafting.
 
-For private datasets, local 14B + web search + 3 iteration rounds + 15 minutes of human profile review achieves 70-80% of hand-crafted quality with zero privacy exposure. The remaining gap closes with larger local models or community-contributed profiles.
+**2. Experimental validation.** Six generation strategies tested on a 216-query DeFi benchmark. Local 14B + web search achieves ACCEPTED (matching hand-crafted). Cloud Claude achieves 97% vocabulary recall and 3.8/5 Tier 1 quality (outperforming hand-crafted). The quality gap is in the generating model, not the framework.
+
+**3. Path to a privacy protection compiler.** The current framework (query transformation) is Layer 1 of a three-layer architecture. Layers 2 (cryptographic: TEE, MPC, split inference) and 3 (AI-native: semantic sanitization, prompt obfuscation, local distillation) compose with Layer 1 through a compiler that selects tools based on threat models.
+
+The critical insight for practitioners: **security validation doesn't need an LLM** (11/13 checks are programmatic), but **quality generation benefits enormously from model capability**. The recommended architecture — cloud generation for public data, local validation for all data, local runtime for private queries — gives the best of both worlds.
+
+For private datasets, local 14B + web search + iteration + human profile review achieves 70-80% of hand-crafted quality with zero privacy exposure. The remaining gap closes with larger local models, community profiles, or the Layer 2/3 tools outlined in Section 7.
+
+The Private Query Problem is universal. This framework is the first step toward making the solution universal too.
 
 ## References
 
