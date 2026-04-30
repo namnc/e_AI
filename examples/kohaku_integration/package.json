@@ -1,0 +1,30 @@
+{
+  "name": "@pse/stealth-address-ops-advisor",
+  "version": "0.1.0",
+  "description": "Profile-based transaction risk analysis for stealth address operations (arxiv 2308.01703)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "stealth_address_ops.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "tsx": "^4.21.0"
+  }
+}
