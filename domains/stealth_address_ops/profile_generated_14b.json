@@ -1,0 +1,715 @@
+{
+  "meta": {
+    "domain_name": "stealth_address_ops",
+    "version": "0.1.0-14b",
+    "generated_by": "qwen2.5:14b via meta-framework",
+    "validation_status": "draft",
+    "source_paper": "arxiv 2308.01703"
+  },
+  "risk_domain": {
+    "name": "Stealth Address Operational Privacy",
+    "crops_property": "P",
+    "description": "Auto-generated (14B) from labeled incidents",
+    "protocols": [
+      "Umbra",
+      "ERC-5564"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation",
+        "timing analysis",
+        "address clustering"
+      ],
+      "limitations": [
+        "no private key access"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_same_entity_deposit_withdrawal": {
+      "name": "same_entity_deposit_withdrawal",
+      "description": "Deposit and withdrawal transactions linked to the same entity or wallet.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "same_entity_deposit_withdrawal_same_cex",
+            "description": "Deposit and withdrawal transactions are linked through the same exchange account.",
+            "data_needed": [
+              "deposit_address_exchange_account",
+              "withdrawal_address_exchange_account"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "name": "same_entity_deposit_withdrawal_ens_name",
+            "description": "The withdrawal address is an ENS name controlled by the depositor.",
+            "data_needed": [
+              "deposit_address_controlled_by",
+              "withdrawal_address"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "same_entity_deposit_withdrawal_previous_transaction_source",
+            "description": "The withdrawal address has received tokens from the same source as the deposit address.",
+            "data_needed": [
+              "deposit_address_funding_sources",
+              "withdrawal_address_funding_history"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "same_entity_deposit_withdrawal_fresh_address",
+            "description": "The withdrawal is made to a completely new address with no prior transaction history.",
+            "data_needed": [
+              "withdrawal_address_transaction_history",
+              "deposit_time"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_separate_accounts_for_transactions",
+          "description": "Use different exchange accounts for deposits and withdrawals to avoid linking them.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "avoid_ens_name_control",
+          "description": "Do not use ENS names controlled by the depositor for withdrawal addresses to avoid clear linking.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_funding_sources",
+          "description": "Regularly monitor and verify funding sources of addresses involved in transactions to prevent misuse.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": "transaction_monitoring_tool"
+        },
+        {
+          "action": "use_relay_services",
+          "description": "Utilize relay services or anonymizing mixers to obscure the direct link between deposit and withdrawal addresses.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": "anonymization_service"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test same_entity_deposit_withdrawal",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H2_clean_address_behavior": {
+      "name": "clean_address_behavior",
+      "description": "Withdrawals to fresh, unlinked addresses with no prior history, indicating privacy measures.",
+      "severity": "medium",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "clean_address_withdrawals",
+            "description": "Withdrawals made from stealth addresses directly to new, unlinked addresses that have no prior transaction history.",
+            "data_needed": [
+              "stealth_address",
+              "withdrawal_address",
+              "transaction_history"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "ens_redirection",
+            "description": "Withdrawals from stealth address to ENS names where the name's owner matches or is linked to the depositor.",
+            "data_needed": [
+              "stealth_address",
+              "withdrawal_ens_name"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "same_source_token_flow",
+            "description": "Identifying withdrawal addresses that have previously received tokens from the same source as the deposit address, suggesting reuse of an old address.",
+            "data_needed": [
+              "stealth_address",
+              "deposit_address",
+              "withdrawal_address"
+            ],
+            "confidence": 0.65
+          },
+          {
+            "name": "cross_cex_deposit",
+            "description": "Withdrawals sent to a different CEX deposit address than the original source, indicating an attempt to obscure transaction history.",
+            "data_needed": [
+              "stealth_address",
+              "withdrawal_address"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_unique_addresses",
+          "description": "Generate new addresses for each transaction to avoid linking behavior.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "disable_ens_integration",
+          "description": "Avoid using ENS names when possible, as they may reveal user identity.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "cross_exchange_deposit",
+          "description": "Deposit and withdraw funds through multiple exchanges to break the chain of custody.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": "exchange_integration_tool"
+        },
+        {
+          "action": "implement_advanced_mixing_services",
+          "description": "Use mixing services that add additional obfuscation layers to transactions.",
+          "effectiveness": 0.95,
+          "user_cost": "medium",
+          "skill_required": "mixer_service_api"
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test clean_address_behavior",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H3_gas_pattern_consistency": {
+      "name": "gas_pattern_consistency",
+      "description": "Repeated use of identical or consistent gas pricing strategies across multiple transactions.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "consistent_gas_pricing",
+            "description": "Transactions use the exact same gas price in multiple operations, suggesting a consistent strategy.",
+            "data_needed": [
+              "gas_price",
+              "transaction_timestamps"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "abrupt_gas_increase",
+            "description": "Sudden increase in gas price after initial transactions with low gas costs, indicating potential detection of stealth address.",
+            "data_needed": [
+              "gas_price_history",
+              "transaction_timestamps"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "cross_platform_gas_consistency",
+            "description": "Transactions across different platforms or wallets use the same consistent gas pricing strategy, indicating a coordinated effort to maintain anonymity.",
+            "data_needed": [
+              "gas_price",
+              "transaction_platforms"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "withdrawal_to_known_source",
+            "description": "Withdrawals are sent back to addresses that have previously interacted with the same source as the deposit address, suggesting an attempt to reuse or trace funds.",
+            "data_needed": [
+              "source_address",
+              "withdrawal_addresses",
+              "transaction_history"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "randomize_gas_pricing",
+          "description": "Use a randomized gas pricing strategy to avoid detection through consistent patterns.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_price_oracles",
+          "description": "Integrate with decentralized price oracles for dynamic gas pricing, reducing the predictability of transactions.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "price_oracle_integration_tool"
+        },
+        {
+          "action": "monitor_for_abrupt_changes",
+          "description": "Automatically monitor for any sudden changes in gas pricing strategy to detect potential stealth address deanonymization attempts.",
+          "effectiveness": 0.7,
+          "user_cost": "high",
+          "skill_required": "anomaly_detection_tool"
+        },
+        {
+          "action": "avoid_cross_platform_consistency",
+          "description": "Avoid using the same gas pricing strategy across different platforms or wallets to break up any consistent patterns that could be used for deanonymization.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_mixing_services",
+          "description": "Utilize mixing services or tumbler tools to make withdrawal patterns less traceable back to the source address.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "mixing_service_tool"
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test gas_pattern_consistency",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H4_immediate_spend_behavior": {
+      "name": "immediate_spend_behavior",
+      "description": "Deposits followed immediately by withdrawals, reducing the anonymity set.",
+      "severity": "critical",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "immediate_deposit_withdrawal",
+            "description": "A stealth address receives a deposit and immediately sends funds out, likely to the same or closely associated entity.",
+            "data_needed": [
+              "deposit_tx_hash",
+              "withdrawal_tx_hash",
+              "timestamp"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "withdraw_to_known_entity",
+            "description": "Funds are withdrawn from a stealth address and sent to an address known to belong to the same entity as the deposit source, indicating a low anonymity set.",
+            "data_needed": [
+              "withdrawal_tx_hash",
+              "recipient_address"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "fresh_address_behavior",
+            "description": "Funds are withdrawn from a stealth address to an entirely new and previously unspent address, suggesting an attempt at obfuscation but potentially revealing the real identity if correlated.",
+            "data_needed": [
+              "withdrawal_tx_hash",
+              "recipient_address"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "cross_exchange_behavior",
+            "description": "A withdrawal from a stealth address goes to an exchange deposit address, possibly indicating funds are being moved between exchanges or back to the original source.",
+            "data_needed": [
+              "withdrawal_tx_hash",
+              "recipient_address"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_mixing_services",
+          "description": "Utilize mixing services to increase the anonymity set by breaking the direct link between deposit and withdrawal.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "mixing_service_tool"
+        },
+        {
+          "action": "delay_transactions",
+          "description": "Delay withdrawals after receiving deposits to avoid immediate spend behavior that reduces anonymity set.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_multiple_exchanges",
+          "description": "Distribute funds across multiple exchanges to complicate cross-exchange transaction patterns.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "create_unique_intermediate_addresses",
+          "description": "Create unique intermediate addresses for each deposit and withdrawal to obfuscate the direct relationship.",
+          "effectiveness": 0.65,
+          "user_cost": "high",
+          "skill_required": "wallet_tool"
+        },
+        {
+          "action": "analyze_known_entities",
+          "description": "Identify known entity interactions early and adjust transaction strategy to avoid predictable patterns.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test immediate_spend_behavior",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H5_direct_funding": {
+      "name": "direct_funding",
+      "description": "Gas costs funded directly from the depositor's main wallet or known entities.",
+      "severity": "high",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "direct_gas_funding",
+            "description": "A transaction sending small amounts (usually under 0.5 ETH) to stealth addresses is detected from known depositor wallets.",
+            "data_needed": [
+              "transaction.sender",
+              "transaction.recipient",
+              "transaction.amount"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "consistent_gas_sender",
+            "description": "Multiple transactions of small amounts sent from the same wallet address to various stealth addresses.",
+            "data_needed": [
+              "transaction.sender",
+              "transaction.recipient",
+              "transaction.timestamp",
+              "wallet.transaction_history"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "known_entity_funding",
+            "description": "Transactions for small amounts from known entities (previously linked to depositor) directly funding stealth addresses.",
+            "data_needed": [
+              "transaction.sender.entity_relationship",
+              "transaction.amount",
+              "transaction.recipient"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "recent_gas_transactions",
+            "description": "Recent history of a wallet showing frequent small transactions (under 1 ETH) to stealth addresses.",
+            "data_needed": [
+              "wallet.transaction_history.timestamp",
+              "transaction.amount",
+              "transaction.recipient"
+            ],
+            "confidence": 0.85
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_multi_signatures",
+          "description": "Implement multi-signature wallets for transactions to increase security.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "multi_signature_wallet_service"
+        },
+        {
+          "action": "increase_gas_costs",
+          "description": "Increase the amount of gas used in transactions to avoid detection by heuristic rules focusing on small amounts.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_mixer_services",
+          "description": "Utilize mixer services that shuffle transaction inputs and outputs to obscure funding origins.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "mixer_service_tool"
+        },
+        {
+          "action": "rotate_wallet_addresses",
+          "description": "Regularly rotate the use of wallet addresses for transactions to reduce the chance of pattern recognition.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "implement_entity_masking",
+          "description": "Mask the entity relationship data when transferring small amounts to stealth addresses.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": "entity_masking_tool"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test direct_funding",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H6_self_send_activity": {
+      "name": "self_send_activity",
+      "description": "Transfer of funds between addresses controlled by the same entity, reducing anonymity set.",
+      "severity": "high",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "self_send_deposit_withdrawal",
+            "description": "A user deposits funds into a stealth address and then withdraws those funds to another address controlled by the same entity.",
+            "data_needed": [
+              "transaction_hashes",
+              "addresses_involved",
+              "timestamp"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "self_send_ens_name",
+            "description": "A user deposits funds into a stealth address and then withdraws to an ENS name known to be owned by the depositor.",
+            "data_needed": [
+              "transaction_hashes",
+              "addresses_involved",
+              "timestamp",
+              "ens_names"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "self_send_token_flow",
+            "description": "A user deposits tokens into a stealth address and withdraws them to an address that has previously received funds from the same source.",
+            "data_needed": [
+              "transaction_hashes",
+              "addresses_involved",
+              "timestamp",
+              "token_transfers"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "self_send_fresh_address",
+            "description": "A user withdraws funds to an address with no prior transaction history, indicating it may be controlled by the same entity as the stealth address.",
+            "data_needed": [
+              "transaction_hashes",
+              "addresses_involved",
+              "timestamp",
+              "address_history"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "self_send_cex_deposit",
+            "description": "A user withdraws funds to a different CEX deposit address, suggesting the same entity controls both addresses.",
+            "data_needed": [
+              "transaction_hashes",
+              "addresses_involved",
+              "timestamp",
+              "cex_accounts"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_unique_addresses",
+          "description": "Use unique addresses for each transaction to avoid patterns that could link stealth addresses.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "enable_wallet_anonymity_features",
+          "description": "Enable built-in anonymity features in the wallet software, such as enhanced privacy modes that randomize transaction sequences.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_tor_for_wallets",
+          "description": "Use Tor or similar anonymizing networks when accessing wallet services to mask IP addresses and reduce deanonymization risks.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "deploy_monitoring_tool",
+          "description": "Deploy a monitoring tool that alerts when funds are moved between likely related addresses, allowing immediate response to mitigate exposure.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": "privacy_analysis_tool"
+        },
+        {
+          "action": "implement_advanced_mixing_services",
+          "description": "Implement advanced mixing services that anonymize transactions through a complex web of transfers, reducing the ability to trace funds.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": "mixer_service"
+        },
+        {
+          "action": "avoid_cex_deposit_withdrawal_patterns",
+          "description": "Avoid depositing and withdrawing between stealth addresses and centralized exchange accounts, reducing detectable patterns.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H6",
+      "benchmark_scenario": {
+        "setup": "Test self_send_activity",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H7_unique_transaction_value": {
+      "name": "unique_transaction_value",
+      "description": "Deposits or transactions with unique or rare amounts that are easily identifiable.",
+      "severity": "medium",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "unique_deposit_amount",
+            "description": "Identifies transactions where the amount is unique or rare within the network, making it traceable back to the original depositor.",
+            "data_needed": [
+              "transaction_value",
+              "network_activity"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "correlated_withens",
+            "description": "Detects a withdrawal to an ENS name that is owned by the same entity as the stealth address depositor.",
+            "data_needed": [
+              "transaction_value",
+              "recipient_ens_name"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "history_less_address",
+            "description": "Identifies a withdrawal to an address with no prior history, suggesting it was created specifically for this transaction.",
+            "data_needed": [
+              "withdrawal_address_history",
+              "transaction_value"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "cross_exchange_deposit",
+            "description": "Recognizes withdrawals sent back to a different CEX deposit address, indicating the funds were likely reintegrated into another exchange account.",
+            "data_needed": [
+              "withdrawal_address",
+              "recipient_cex_deposit"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_rounded_amounts",
+          "description": "Use standardized transaction amounts that are common within the network to blend in.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "automate_randomization",
+          "description": "Implement an automated tool to randomly generate transaction amounts close to intended values, but varied enough to avoid uniqueness.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "transaction_amount_randomizer"
+        },
+        {
+          "action": "avoid_correlated_ens_names",
+          "description": "Do not use ENS names owned by the same entity for deposits or withdrawals to prevent correlation.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_temporary_addresses",
+          "description": "Create temporary wallet addresses specifically for each transaction to reduce the risk of history-based detection.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "cross_exchange_integration",
+          "description": "Avoid sending funds back to different CEX deposit addresses from where they were withdrawn; use direct withdrawal methods instead.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "employ_advanced_mixing_services",
+          "description": "Utilize advanced mixing services that obscure transaction amounts and patterns more effectively.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "privacy_preserving_mixer_service"
+        }
+      ],
+      "id": "H7",
+      "benchmark_scenario": {
+        "setup": "Test unique_transaction_value",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "Benchmark",
+    "methodology": {},
+    "target": "TBD",
+    "metrics": [
+      "detection_rate"
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Transaction triggers {heuristic_id}: {signal_description}.",
+    "summary": "Analyzed {n_txs} transactions. {n_risky} flagged.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}."
+  }
+}
