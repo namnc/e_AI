@@ -1,0 +1,529 @@
+{
+  "meta": {
+    "domain_name": "offchain_signature",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Off-chain Signature Phishing",
+    "crops_property": "S",
+    "description": "Phishing attacks that exploit off-chain signature mechanisms (EIP-712 typed data, EIP-2612 permits, Permit2, Seaport orders) to steal tokens without requiring on-chain approval transactions",
+    "protocols": [
+      "EIP-712",
+      "EIP-2612",
+      "Permit2",
+      "Seaport",
+      "ERC-721",
+      "ERC-1155"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "deploy convincing phishing dApp frontends mimicking legitimate protocols",
+        "craft arbitrary EIP-712 typed data payloads for user signing",
+        "register lookalike ENS domains and deploy clone contracts",
+        "monitor mempool for signed permits and front-run revocations",
+        "chain multiple signed permits into a single drain transaction"
+      ],
+      "limitations": [
+        "cannot forge signatures without private key",
+        "cannot modify signed message after signature",
+        "cannot bypass EIP-712 domain separator verification in compliant wallets"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_permit2_long_expiry": {
+      "name": "Permit2 long expiry",
+      "description": "Identifies Permit2 transactions with excessively long expiration times, potentially allowing unauthorized access.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "long_expiration",
+            "description": "Expiration timestamp set more than 30 days from signing time.",
+            "data_needed": [
+              "expiration_timestamp",
+              "signing_time"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "unlimited_amount",
+            "description": "Permit2 transaction with amount greater than or equal to 2^159 (effectively unlimited).",
+            "data_needed": [
+              "amount"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "name": "unknown_spender",
+            "description": "Spender address is not in any known protocol registry or verified contract list.",
+            "data_needed": [
+              "spender_address"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "block_long_expiration",
+          "description": "Block Permit2 transactions with expiration more than 30 days.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "limit_amount",
+          "description": "Set a maximum allowed amount for Permit2 transactions to 2^159.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "verify_spender",
+          "description": "Only allow Permit2 transactions from known and verified spender addresses.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": "Smart_contract_analysis_tool"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test Permit2 long expiry",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_eip_712_data_encoding_anomalie": {
+      "name": "EIP-712 data encoding anomalies",
+      "description": "Detects unexpected or misleading fields in EIP-712 typed data, indicating possible misrepresentation by the dApp.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "unexpected_expiration_field",
+            "description": "Detection of an unexpected expiration field value that is abnormally high or outside the expected range.",
+            "data_needed": [
+              "expiration"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "unverified_spender_address",
+            "description": "Identification of a spender address not found in any known protocol registry or verified contract list, suggesting potential misrepresentation.",
+            "data_needed": [
+              "spender_address"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "excessive_amount_value",
+            "description": "Detection of an unusually high amount value that could indicate a security risk or misuse of the EIP-712 data.",
+            "data_needed": [
+              "amount"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "investigate",
+          "description": "Review before proceeding",
+          "effectiveness": 0.5,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test EIP-712 data encoding anomalies",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_unverified_operator_approval": {
+      "name": "Unverified operator approval",
+      "description": "Flags transactions approving unknown operators that are not from verified marketplaces or protocols.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "unknown_operator",
+            "description": "Operator address is not found in any known protocol registry or verified contract list.",
+            "data_needed": [
+              "operator_address"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "unverified_marketplace",
+            "description": "Transaction involves an operator from a non-verified marketplace or platform.",
+            "data_needed": [
+              "marketplace"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "long_expiration_timestamp",
+            "description": "Expiration timestamp of the permit is set significantly longer than typical usage periods (e.g., more than 30 days).",
+            "data_needed": [
+              "expiration_time",
+              "signing_time"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "inconsistent_approvals",
+            "description": "Multiple approvals with high amounts and long expirations from unknown operators.",
+            "data_needed": [
+              "amount",
+              "expiration_time",
+              "operator_address"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "block_unverified_operators",
+          "description": "Block transactions from unknown operators.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "verify_marketplace",
+          "description": "Ensure all marketplaces are on a trusted list before use.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "set_short_expiration",
+          "description": "Automatically set expiration timestamps to short periods (e.g., 24 hours).",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": "smart_contract"
+        },
+        {
+          "action": "monitor_approvals",
+          "description": "Regularly monitor and review all operator approvals.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test Unverified operator approval",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_unverified_dapp_signature": {
+      "name": "Unverified dApp signature",
+      "description": "Detects signatures coming from unverified domains, increasing the risk of phishing or fraudulent activities.",
+      "severity": "medium",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "unverified_domain_signature",
+            "description": "Signature domain is not verified or recognized by known security lists.",
+            "data_needed": [
+              "signature_domain"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "uncommon_signature_extension",
+            "description": "Signature uses uncommon or less secure extensions that are not widely adopted.",
+            "data_needed": [
+              "signature_extensions"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "outdated_signature_timestamp",
+            "description": "Signature timestamp is far in the future, possibly indicating delayed execution risks.",
+            "data_needed": [
+              "signature_expiration",
+              "current_time"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "block_unverified_signatures",
+          "description": "Block transactions or interactions from unverified domains.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "verify_domain_manually",
+          "description": "Manually verify the domain before proceeding with any actions.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "update_security_lists",
+          "description": "Automatically update your security lists to include verified domains.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": "automation_tool"
+        },
+        {
+          "action": "disable_uncommon_extensions",
+          "description": "Disable or block transactions using uncommon signature extensions.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "extension_management_tool"
+        },
+        {
+          "action": "ignore_outdated_timestamps",
+          "description": "Assess and ignore signatures with outdated timestamps.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test Unverified dApp signature",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_batch_permit_with_multiple_tok": {
+      "name": "Batch permit with multiple tokens",
+      "description": "Identifies Permit2 batch transactions that involve multiple token approvals, which may increase risk due to higher complexity.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "multiple_token_approvals",
+            "description": "Identifies transactions involving multiple token approvals within a Permit2 batch.",
+            "data_needed": [
+              "transaction_input"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "high_approval_amounts",
+            "description": "Detects large approval amounts in Permit2 batch transactions, indicating higher risk.",
+            "data_needed": [
+              "approval_amount",
+              "transaction_input"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "long_expiration_times",
+            "description": "Identifies permits with expiration timestamps set far into the future, suggesting increased risk.",
+            "data_needed": [
+              "expiration_timestamp",
+              "transaction_time"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "limit_token_approvals",
+          "description": "Limit the number of tokens approved in batch transactions.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_high_approval",
+          "description": "Set up alerts for high approval amounts.",
+          "effectiveness": 0.65,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "short_expiration_time",
+          "description": "Shorten the expiration time for permits.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "automate_monitoring",
+          "description": "Automate monitoring and alerting using a security tool.",
+          "effectiveness": 0.95,
+          "user_cost": "medium",
+          "skill_required": "security_tool"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test Batch permit with multiple tokens",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H6_seaport_order_undervaluation": {
+      "name": "Seaport order undervaluation",
+      "description": "Flags Seaport orders with significantly lower listing prices than the market value of the assets, potentially indicating fraudulent behavior.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "seaport_order_price_mismatch",
+            "description": "Price of the seaport order is significantly lower than the estimated market value of the assets being sold.",
+            "data_needed": [
+              "order_price",
+              "asset_value_estimate"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "seaport_order_volume_mismatch",
+            "description": "Volume of the seaport order is disproportionately low relative to typical market trades involving similar assets.",
+            "data_needed": [
+              "order_volume",
+              "asset_type",
+              "market_trade_volume"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "name": "seaport_order_frequency",
+            "description": "Frequency of seaport orders by a single user is unusually high within a short time frame, possibly indicating manipulative behavior.",
+            "data_needed": [
+              "user_address",
+              "order_timestamps"
+            ],
+            "confidence": 0.6
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_low_price_orders",
+          "description": "Automate monitoring for seaport orders below market value.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "verify_market_value",
+          "description": "Manually verify the asset's estimated market value before listing.",
+          "effectiveness": 0.5,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "limit_order_volume",
+          "description": "Automatically limit the volume of low-priced orders to prevent manipulation.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "track_order_frequency",
+          "description": "Automate tracking and alerting for frequent, suspiciously low-price listings.",
+          "effectiveness": 0.65,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H6",
+      "benchmark_scenario": {
+        "setup": "Test Seaport order undervaluation",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring off-chain signature phishing detection across all vectors",
+    "methodology": {
+      "step_1": "Collect dataset of known phishing signatures from Scam Sniffer, Forta alerts, and wallet drainer kit analysis",
+      "step_2": "Collect dataset of legitimate off-chain signatures from DeFi protocols (Uniswap, OpenSea, 1inch, Cowswap)",
+      "step_3": "Run analyzer against both sets with all 6 heuristics",
+      "step_4": "Measure: true positive rate (phishing caught), false positive rate (legitimate flagged)",
+      "step_5": "Apply recommendations and re-measure user exposure"
+    },
+    "target": "Catch >90% of known phishing signatures with <5% false positive rate on legitimate DeFi",
+    "metrics": [
+      "true_positive_rate",
+      "false_positive_rate",
+      "value_at_risk_reduction",
+      "user_friction_score",
+      "time_to_detection_ms"
+    ],
+    "adversary_levels": [
+      {
+        "name": "basic",
+        "heuristics": [
+          "H1",
+          "H3"
+        ],
+        "description": "Unlimited permits + NFT approval to unknown operator"
+      },
+      {
+        "name": "intermediate",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4"
+        ],
+        "description": "Add disguised EIP-712 transfers + unverified origin"
+      },
+      {
+        "name": "advanced",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5",
+          "H6"
+        ],
+        "description": "All heuristics including batch drain and Seaport manipulation"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Signature request triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "summary": "Analyzed {n_sigs} off-chain signature requests. {n_risky} flagged ({pct_risky}%). Value at risk: ${value_at_risk}. Top risks: {top_risks}.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}. Reduces phishing risk by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}

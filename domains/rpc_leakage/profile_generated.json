@@ -1,0 +1,493 @@
+{
+  "meta": {
+    "domain_name": "rpc_leakage",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "RPC Query Pattern Leakage",
+    "crops_property": "P",
+    "description": "Privacy leakage through RPC query patterns that reveal user intent, address ownership, portfolio composition, and trading behavior to RPC providers and network observers",
+    "protocols": [
+      "JSON-RPC",
+      "eth_call",
+      "eth_getBalance",
+      "eth_getLogs",
+      "Helios",
+      "ERC-5564"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full observation of all RPC queries from user to provider (RPC provider or network eavesdropper)",
+        "timing correlation across queries within a session",
+        "cross-session user identification via IP, API key, or query fingerprint",
+        "correlation of query patterns with on-chain state changes",
+        "aggregation of query metadata across multiple users for pattern analysis"
+      ],
+      "limitations": [
+        "cannot observe queries routed through Tor or encrypted tunnels without endpoint compromise",
+        "cannot distinguish cover queries from real queries if properly constructed",
+        "cannot access local execution results (Helios light client)",
+        "no private key access"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_frequent_balance_checks": {
+      "name": "frequent balance checks",
+      "description": "Multiple queries to eth_getBalance for distinct addresses within a short time window, indicating potential portfolio monitoring.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "frequent_balance_checks",
+            "description": "Multiple eth_getBalance calls to distinct addresses within a short time window from the same session.",
+            "data_needed": [
+              "method",
+              "address",
+              "timestamp",
+              "session_id"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "name": "repeated_balance_queries",
+            "description": "Eth_getBalance queries for the same set of addresses at regular intervals.",
+            "data_needed": [
+              "method",
+              "address",
+              "timestamp",
+              "set_of_addresses"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "post_transfer_check",
+            "description": "Eth_getBalance query immediately after an address receives a transfer, indicating possible portfolio verification.",
+            "data_needed": [
+              "method",
+              "address",
+              "timestamp",
+              "transfer_details"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "enable_throttling",
+          "description": "Implement rate limiting to reduce query frequency.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "log_and_alert",
+          "description": "Log suspicious activity and send alerts for review.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "automated_throttling",
+          "description": "Use an automated tool to apply rate limiting based on heuristics.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "automation_tool"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test frequent balance checks",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_repeated_contract_calls": {
+      "name": "repeated contract calls",
+      "description": "Repetitive eth_call requests to the same or multiple DeFi contracts, often indicating position monitoring or liquidation risk assessment.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "repetitive_eth_call",
+            "description": "Detection of multiple eth_call requests to the same contract method within a short time frame.",
+            "data_needed": [
+              "contract_address",
+              "method_name",
+              "timestamp"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "frequent_balance_checks",
+            "description": "Repetitive calls to eth_getBalance for multiple distinct addresses from the same origin within a short period.",
+            "data_needed": [
+              "origin_address",
+              "target_addresses",
+              "timestamp"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "scheduled_calls_pattern",
+            "description": "Eth_call requests to the same method at regular intervals, indicating periodic monitoring of positions or assets.",
+            "data_needed": [
+              "contract_address",
+              "method_name",
+              "interval_duration",
+              "timestamp"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "immediate_balance_query",
+            "description": "Eth_getBalance calls immediately after a transfer to an address, suggesting the query is related to monitoring a specific transaction.",
+            "data_needed": [
+              "origin_address",
+              "target_address",
+              "transfer_timestamp",
+              "balance_query_timestamp"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "disable_eth_call",
+          "description": "Disable eth_call requests to suspicious contracts.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_scheduled_calls",
+          "description": "Set up alerts for scheduled calls to specific contract methods.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "automated_monitoring_tool"
+        },
+        {
+          "action": "rate_limit_eth_calls",
+          "description": "Implement rate limits on eth_call requests from known malicious origins.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": "security_gateway"
+        },
+        {
+          "action": "enable_blockchain_monitoring",
+          "description": "Monitor blockchain transactions for immediate balance queries.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": "blockchain_analytics_tool"
+        },
+        {
+          "action": "implement_access_controls",
+          "description": "Restrict access to sensitive smart contract methods.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test repeated contract calls",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_pre_trade_simulation": {
+      "name": "pre-trade simulation",
+      "description": "Eth_call to DEX router for swap simulations followed by immediate transaction execution, suggesting pre-trade intent detection.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "pre_trade_sim_balance",
+            "description": "Eth_call to DEX router for simulated swaps, followed by immediate eth_sendTransaction.",
+            "data_needed": [
+              "from_address",
+              "to_address",
+              "call_data",
+              "transaction_hash"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "pre_trade_sim_schedule",
+            "description": "Frequent calls to DEX router for simulated swaps within a short time frame, suggesting pre-trade analysis.",
+            "data_needed": [
+              "from_address",
+              "call_data_timestamps"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "block_heuristic",
+          "description": "Block transactions matching the heuristic to prevent unauthorized trades.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "use_monitoring_tool",
+          "description": "Deploy a smart contract monitoring tool to detect and alert on potential heuristics.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "smart_contract_analyzer"
+        },
+        {
+          "action": "set_up_thresholds",
+          "description": "Set up thresholds for frequent calls to DEX router to trigger manual review.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "implement_rate_limiting",
+          "description": "Implement rate limiting on API calls to reduce the frequency of suspicious activities.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test pre-trade simulation",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_stealth_address_scanning": {
+      "name": "stealth address scanning",
+      "description": "Automated and frequent eth_getLogs queries targeting specific topics of stealth addresses, indicating potential deanonymization attempts.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "eth_getLogs_frequency",
+            "description": "Frequent eth_getLogs calls targeting specific topics related to stealth address announcements.",
+            "data_needed": [
+              "method",
+              "topics",
+              "block_range"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "repeated_eth_getLogs_interval",
+            "description": "Repeated eth_getLogs calls to the same contract and topic filters at regular intervals, suggesting automated scanning.",
+            "data_needed": [
+              "method",
+              "topics",
+              "interval"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "narrow_block_range_query",
+            "description": "Queries with narrow block ranges indicating stealth address scanning for new announcements.",
+            "data_needed": [
+              "block_start",
+              "block_end"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "implement_rate_limiting",
+          "description": "Limit the frequency of eth_getLogs requests to prevent detection.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "deploy_contract_monitoring",
+          "description": "Use an automated tool to monitor and block suspicious eth_getLogs queries.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "automated_security_tool"
+        },
+        {
+          "action": "block_specific_topics",
+          "description": "Restrict access to specific topics to reduce the scan range.",
+          "effectiveness": 0.7,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "enhance_network_security",
+          "description": "Implement network security measures such as firewalls and DDoS protection.",
+          "effectiveness": 0.65,
+          "user_cost": "high",
+          "skill_required": null
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test stealth address scanning",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_correlated_price_checks_with_h": {
+      "name": "correlated price checks with holdings",
+      "description": "Eth_call for token pair prices that match the user's on-chain balance, potentially revealing which tokens they hold or are interested in.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "correlated_token_price_checks",
+            "description": "Eth_call requests for token pair prices that match or closely correlate with the user's on-chain holdings.",
+            "data_needed": [
+              "from_address",
+              "token_pair_prices",
+              "user_holdings"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "repeated_token_price_checks",
+            "description": "Frequent repeated eth_call requests to token pair prices, indicating ongoing monitoring of specific tokens.",
+            "data_needed": [
+              "from_address",
+              "token_pair_prices",
+              "timestamp_window"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "name": "price_query_after_transfer",
+            "description": "Eth_call for a token pair price immediately after an address receives a transfer, suggesting interest in specific tokens.",
+            "data_needed": [
+              "from_address",
+              "token_pair_prices",
+              "transfer_events"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "disable_eth_call",
+          "description": "Disable unnecessary eth_call functionality to reduce exposure.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "randomize_request_intervals",
+          "description": "Randomize intervals between price checks to avoid correlation patterns.",
+          "effectiveness": 0.6,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_proxy_addresses",
+          "description": "Operate through proxy addresses or Tor to anonymize request origins.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": "automated_tool"
+        },
+        {
+          "action": "implement_rate_limiting",
+          "description": "Implement rate limiting on API calls to avoid frequent repeated requests.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": "automated_tool"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test correlated price checks with holdings",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring RPC provider's ability to infer user identity, portfolio, and trading intent from query patterns",
+    "methodology": {
+      "step_1": "Simulate N users with known portfolios and trading patterns generating RPC queries through a monitored endpoint",
+      "step_2": "Run adversary simulator applying all 5 heuristics to the query log",
+      "step_3": "Measure baseline inference accuracy (address linkage, portfolio reconstruction, intent detection)",
+      "step_4": "Apply profile recommendations (cover queries, local execution, Tor routing) to all users",
+      "step_5": "Re-run adversary simulator on modified query patterns",
+      "step_6": "Compare: inference accuracy before vs after mitigation"
+    },
+    "target": "Reduce adversary inference accuracy from >90% to <20% for address linkage, <30% for portfolio reconstruction",
+    "metrics": [
+      "address_linkage_accuracy",
+      "portfolio_reconstruction_accuracy",
+      "trade_intent_detection_rate",
+      "cover_query_overhead_ratio",
+      "query_latency_increase_ms"
+    ],
+    "adversary_levels": [
+      {
+        "name": "basic",
+        "heuristics": [
+          "H1",
+          "H5"
+        ],
+        "description": "Balance checks and price correlation only"
+      },
+      {
+        "name": "intermediate",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H5"
+        ],
+        "description": "Add position monitoring and pre-trade intent"
+      },
+      {
+        "name": "advanced",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "All heuristics including stealth address scanning"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "RPC query pattern triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "summary": "Analyzed {n_queries} RPC queries in session. {n_risky} patterns flagged ({pct_risky}%). Leaked information: {leaked_info}. Top risks: {top_risks}.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}. Reduces leakage by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}
