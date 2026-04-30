@@ -1,216 +1,152 @@
 # Domain Status & Task List
 
-*Auto-updatable. Run artifact check to refresh.*
+*Last updated: 2026-04-30*
 
-## Built Domains
+---
 
-### stealth_address_ops (REFERENCE)
-- [x] profile.json (11/11 validated)
-- [x] README.md
-- [x] test_profile.py (23 tests pass)
-- [x] data/labeled_incidents.jsonl (27 incidents)
-- [x] data/umbra_real_sample.jsonl (20 real txs)
-- [x] benchmarks/real_data.py
-- [x] profile_generated.json (7b variant)
-- [x] profile_generated_14b.json (14b variant)
-- [x] analysis/failure_analysis.md
-- [x] analysis/variant_comparison.md
-- [x] cover_generator.py (with adversary simulation)
-- [x] compiler.py (analyzer + cover gen + LLM pipeline)
-- [x] analyzer.py (rule-based + synthetic benchmark)
+## Built Domains (9)
 
-### approval_phishing
-- [x] profile.json (11/11)
-- [x] README.md
-- [x] test_profile.py (10 tests)
-- [x] data/labeled_incidents.jsonl (17)
-- [x] benchmarks/benchmark.py
-- [x] profile_generated.json (7b)
-- [x] analysis/failure_analysis.md
-- [ ] **profile_generated_14b.json** (14b variant)
-- [ ] **analysis/variant_comparison.md**
-- [ ] domain-specific analyzer.py (currently uses generic checks)
-- [ ] real data benchmark (Forta/ScamSniffer phishing tx dataset)
-- N/A cover generator (security domain, not privacy)
+| Domain | Access | CROPS | Integration | Tests | Variants | Failure | Cover | Analyzer | Real data |
+|---|---|---|---|---|---|---|---|---|---|
+| **stealth_address_ops** | Wallet | P | Wallet guard | 23 | 3 (hand+7b+14b) | Y | Y | Y | Y (20 Umbra txs) |
+| **approval_phishing** | Wallet | S | Wallet guard | 10 | 1 (7b) | Y | N/A | - | - |
+| **offchain_signature** | Wallet | S | Wallet guard | 11 | 1 (7b) | Y | N/A | - | - |
+| **governance_proposal** | App | S | Wallet guard | 10 | - | - | N/A | - | - |
+| **l2_bridge_linkage** | L2 | P | Wallet guard | 10 | - | - | - | - | - |
+| **cross_protocol_risk** | App | S | RPC guard | 10 | - | - | N/A | - | - |
+| **l2_anonymity_set** | L2 | P | RPC guard | 10 | - | - | - | - | - |
+| **rpc_leakage** | AI | P | RPC guard | 10 | 1 (7b) | Y | - | partial (in proxy) | - |
+| **defi_query (v1)** | AI | P | LLM proxy | v1 suite | 5 | Y | Y (v5) | Y | Y |
 
-### offchain_signature
-- [x] profile.json (11/11)
-- [x] README.md
-- [x] test_profile.py (11 tests)
-- [x] data/labeled_incidents.jsonl (24)
-- [x] benchmarks/benchmark.py
-- [x] profile_generated.json (7b)
-- [x] analysis/failure_analysis.md
-- [ ] **profile_generated_14b.json**
-- [ ] **analysis/variant_comparison.md**
-- [ ] domain-specific analyzer.py (signature decoder)
-- [ ] real data benchmark (EIP-712 phishing signatures dataset)
-- N/A cover generator (security domain)
+All 9 profiles pass 11/11 validation. 94 total tests passing.
 
-### rpc_leakage
-- [x] profile.json (11/11)
-- [x] README.md
-- [x] test_profile.py (10 tests)
-- [x] data/labeled_incidents.jsonl (20)
-- [x] benchmarks/benchmark.py
-- [x] profile_generated.json (7b)
-- [x] analysis/failure_analysis.md
-- [ ] **profile_generated_14b.json**
-- [ ] **analysis/variant_comparison.md**
-- [ ] **cover_generator.py** (cover queries -- extends v1 concept to RPC layer)
-- [ ] domain-specific analyzer.py (pattern tracker)
-- [ ] real data benchmark (capture real RPC patterns)
+Legend: Y = done, - = missing, N/A = not applicable (security domains don't need cover generators)
 
-### governance_proposal
-- [x] profile.json (11/11)
-- [x] README.md
-- [x] test_profile.py (10 tests)
-- [x] data/labeled_incidents.jsonl (21)
-- [x] benchmarks/benchmark.py
-- [ ] **profile_generated.json** (7b variant)
-- [ ] **profile_generated_14b.json**
-- [ ] **analysis/failure_analysis.md**
-- [ ] **analysis/variant_comparison.md**
-- [ ] domain-specific analyzer.py (proposal decoder)
-- [ ] real data benchmark (historical malicious proposals)
-- N/A cover generator (security domain)
+---
 
-### l2_bridge_linkage
-- [x] profile.json (11/11)
-- [x] README.md
-- [x] test_profile.py (10 tests)
-- [x] data/labeled_incidents.jsonl (20)
-- [x] benchmarks/benchmark.py
-- [ ] **profile_generated.json**
-- [ ] **profile_generated_14b.json**
-- [ ] **analysis/failure_analysis.md**
-- [ ] **analysis/variant_comparison.md**
-- [ ] **cover_generator.py** (optimize bridge params to blend)
-- [ ] domain-specific analyzer.py
-- [ ] real data benchmark (bridge tx dataset)
+## Planned Domains (9)
 
-### cross_protocol_risk
-- [x] profile.json (11/11)
-- [x] README.md
-- [x] test_profile.py (10 tests)
-- [x] data/labeled_incidents.jsonl (21)
-- [x] benchmarks/benchmark.py
-- [ ] **profile_generated.json**
-- [ ] **profile_generated_14b.json**
-- [ ] **analysis/failure_analysis.md**
-- [ ] **analysis/variant_comparison.md**
-- [ ] domain-specific analyzer.py (portfolio scanner)
-- [ ] real data benchmark (historical cascading liquidations)
-- N/A cover generator (security domain)
+| Domain | Access | CROPS | Integration | Source | Effort |
+|---|---|---|---|---|---|
+| **pq_readiness** | Wallet | S | Wallet guard | PQ SA + on-chain ciphertext findings | Quick |
+| **mev_vulnerability** | Wallet | S | Wallet guard | Slippage × pool depth + private mempool check | Quick |
+| **wrong_chain_address** | Wallet | S | Wallet guard | Chain/address validation rules | Quick |
+| **backup_security** | Wallet | S | Wallet guard | encrypted_backup_recovery 10 problems | Quick |
+| **mixing_behavioral** | L2 | P | Wallet guard | Extends stealth_ops H3+H6 to mixers | Quick |
+| **sequencer_privacy** | L2 | P | RPC guard | Extends l2_anonymity_set H2 | Quick |
+| **behavioral_drift** | Wallet | S | Wallet+RPC | Default thresholds, user customizable | Medium |
+| **general_crypto_query** | AI | P | LLM proxy | Extend v1 to NFT/governance/staking | Medium |
+| **agent_privacy** | AI | P | RPC guard | Agent interaction graph formalization | **Research needed** |
 
-### l2_anonymity_set
-- [x] profile.json (11/11)
-- [x] README.md
-- [x] test_profile.py (10 tests)
-- [x] data/labeled_incidents.jsonl (20)
-- [x] benchmarks/benchmark.py
-- [ ] **profile_generated.json**
-- [ ] **profile_generated_14b.json**
-- [ ] **analysis/failure_analysis.md**
-- [ ] **analysis/variant_comparison.md**
-- [ ] **cover_generator.py** (timing/amount optimization like stealth ops)
-- [ ] domain-specific analyzer.py
-- [ ] real data benchmark (L2 pool size data)
+8 buildable now, 1 needs research.
 
-### defi_query (v1)
-- [x] profile.json (audited, 829 lines)
-- [x] README.md
-- [x] v1 tests (test_sanitizer.py, test_sanitizer_audit.py, test_sanitizer_fuzz.py, test_benchmarks.py)
-- [x] v1 benchmarks (run_benchmarks.py)
-- [x] cover_generator.py (v5)
-- [x] 5 profile variants (defi_14b, defi_bootstrap, defi_claude, defi_generated, defi_websearch)
-- [x] analysis/ (cover_strategies.md, failure_analysis.md)
-- Note: v1 uses different schema (DomainProfile) and test system. Not migrating to v2 format.
-- [ ] **READMEs for variant directories** (defi_14b, defi_bootstrap, defi_claude, defi_generated, defi_websearch)
+---
 
-## Automatable Tasks (by priority)
+## Task List
 
-### Batch 1: LLM bootstrap (fills most gaps)
-Run `python -m meta.bootstrap_domain domains/<name>` for:
-- [ ] governance_proposal (missing: variant, failure)
-- [ ] l2_bridge_linkage (missing: variant, failure)
-- [ ] cross_protocol_risk (missing: variant, failure)
-- [ ] l2_anonymity_set (missing: variant, failure)
+### Batch 0: Build 8 new domain profiles
+Source from existing research, validate 11/11, bootstrap all artifacts.
 
-Then generate 14b variants for:
-- [ ] approval_phishing
-- [ ] offchain_signature
-- [ ] rpc_leakage
-- [ ] governance_proposal
-- [ ] l2_bridge_linkage
-- [ ] cross_protocol_risk
-- [ ] l2_anonymity_set
+| # | Domain | Heuristic source |
+|---|---|---|
+| 0.1 | pq_readiness | projects/pq_stealth_address/ + projects/onchain_pq_ciphertext/ |
+| 0.2 | mev_vulnerability | Slippage model + public/private mempool check + DEX MEV protection list |
+| 0.3 | wrong_chain_address | Chain ID validation, contract vs EOA, address poisoning detection |
+| 0.4 | backup_security | projects/encrypted_backup_recovery/problem_list.md (P1-P10) |
+| 0.5 | mixing_behavioral | stealth_address_ops H3+H6 generalized to Tornado Cash/Railgun/Privacy Pools |
+| 0.6 | sequencer_privacy | l2_anonymity_set H2 expanded with per-L2 sequencer data |
+| 0.7 | behavioral_drift | Portfolio concentration, leverage tracking, approval accumulation |
+| 0.8 | general_crypto_query | Extend v1 defi profile subdomains to NFT, governance, staking, bridges |
 
-### Batch 2: Variant comparisons (after batch 1)
-Run comparison analysis for domains with 2+ variants:
-- [ ] approval_phishing
-- [ ] offchain_signature
-- [ ] rpc_leakage
-- [ ] governance_proposal
-- [ ] l2_bridge_linkage
-- [ ] cross_protocol_risk
-- [ ] l2_anonymity_set
+### Batch 1: LLM bootstrap existing domains (variants + failure analysis)
+Run `python -m meta.bootstrap_domain domains/<name>` for domains missing artifacts.
+
+| # | Domain | Missing |
+|---|---|---|
+| 1.1 | governance_proposal | variant, failure analysis |
+| 1.2 | l2_bridge_linkage | variant, failure analysis |
+| 1.3 | cross_protocol_risk | variant, failure analysis |
+| 1.4 | l2_anonymity_set | variant, failure analysis |
+
+Generate 14b variants for all 7 domains missing them:
+
+| # | Domain |
+|---|---|
+| 1.5 | approval_phishing |
+| 1.6 | offchain_signature |
+| 1.7 | rpc_leakage |
+| 1.8 | governance_proposal |
+| 1.9 | l2_bridge_linkage |
+| 1.10 | cross_protocol_risk |
+| 1.11 | l2_anonymity_set |
+
+### Batch 2: Variant comparisons
+After batch 1, run comparison for all domains with 2+ variants.
+
+| # | Domain |
+|---|---|
+| 2.1-2.7 | approval_phishing, offchain_signature, rpc_leakage, governance_proposal, l2_bridge_linkage, cross_protocol_risk, l2_anonymity_set |
 
 ### Batch 3: Cover generators (privacy domains only)
-Build cover generators for:
-- [ ] rpc_leakage (cover queries -- v1 concept extended to RPC)
-- [ ] l2_bridge_linkage (optimize bridge amount/timing)
-- [ ] l2_anonymity_set (timing/amount vs pool state)
+| # | Domain | What the cover does |
+|---|---|---|
+| 3.1 | rpc_leakage | Cover queries (extends v1 concept to RPC) |
+| 3.2 | l2_bridge_linkage | Optimize bridge amount/timing to blend |
+| 3.3 | l2_anonymity_set | Timing/amount optimization vs pool state |
+| 3.4 | mixing_behavioral | Cover params for mixer deposit/withdrawal |
 
 ### Batch 4: Domain-specific analyzers
-Build analyzers (rule-based checks like stealth_address_ops/analyzer.py) for:
-- [ ] approval_phishing (decode approve calldata, check amounts)
-- [ ] offchain_signature (decode EIP-712 typed data)
-- [ ] governance_proposal (decode proposal calldata, simulate effects)
-- [ ] cross_protocol_risk (portfolio scanner from accumulated state)
-- [ ] l2_bridge_linkage (bridge tx analysis)
-- [ ] rpc_leakage (query pattern tracker -- partially in RPC proxy already)
-- [ ] l2_anonymity_set (pool size monitor)
+Rule-based checks (like stealth_address_ops/analyzer.py).
+
+| # | Domain | What it decodes/checks |
+|---|---|---|
+| 4.1 | approval_phishing | Decode approve calldata, check amounts vs MAX_UINT |
+| 4.2 | offchain_signature | Decode EIP-712 typed data, identify Permit2/Seaport |
+| 4.3 | governance_proposal | Decode proposal calldata, simulate parameter changes |
+| 4.4 | cross_protocol_risk | Portfolio scanner from accumulated RPC state |
+| 4.5 | l2_bridge_linkage | Bridge tx analysis (address/amount/timing) |
+| 4.6 | rpc_leakage | Query pattern tracker (partially in proxy already) |
+| 4.7 | l2_anonymity_set | Pool size monitor from getLogs |
+| 4.8 | mev_vulnerability | Slippage calculator + pool depth check |
+| 4.9 | pq_readiness | Key type detector (ECDSA vs PQ) |
 
 ### Batch 5: v1 domain READMEs
-- [ ] domains/defi_14b/README.md
-- [ ] domains/defi_bootstrap/README.md
-- [ ] domains/defi_claude/README.md
-- [ ] domains/defi_generated/README.md
-- [ ] domains/defi_websearch/README.md
+| # | File |
+|---|---|
+| 5.1-5.5 | defi_14b, defi_bootstrap, defi_claude, defi_generated, defi_websearch |
 
-### Batch 6: Real data benchmarks (needs external data)
-- [ ] approval_phishing: Forta alert dataset
-- [ ] offchain_signature: EIP-712 phishing signatures
-- [ ] governance_proposal: historical malicious proposals (Beanstalk, etc.)
-- [ ] cross_protocol_risk: cascading liquidation events
-- [ ] l2_bridge_linkage: bridge transaction patterns
-- [ ] l2_anonymity_set: L2 privacy pool deposit counts
+### Batch 6: Real data benchmarks
+| # | Domain | Data source |
+|---|---|---|
+| 6.1 | approval_phishing | Forta alerts API |
+| 6.2 | offchain_signature | EIP-712 phishing signature reports |
+| 6.3 | governance_proposal | Historical attacks (Beanstalk, Tornado governance) |
+| 6.4 | cross_protocol_risk | Cascading liquidation events (LUNA, etc.) |
+| 6.5 | l2_bridge_linkage | Bridge transaction patterns (Hop, Across, Stargate) |
+| 6.6 | l2_anonymity_set | L2 privacy pool deposit counts |
+| 6.7 | mev_vulnerability | MEV-Boost relay data, sandwich tx history |
 
-## Planned Domains (not yet built)
+### Batch 7: Integration hardening
+| # | Task |
+|---|---|
+| 7.1 | RPC proxy: add all domain checks (currently only rpc_leakage partially) |
+| 7.2 | Wallet guard: add calldata decoder routing for all wallet profiles |
+| 7.3 | Test all integration demos end-to-end |
+| 7.4 | Write MetaMask Snap skeleton (highest-reach wallet integration) |
 
-| Domain | Access | CROPS | Integration | Automatable? |
-|---|---|---|---|---|
-| pq_readiness | Wallet | S | Wallet guard | Yes -- heuristics from our PQ SA research |
-| mev_vulnerability | Wallet | S | Wallet guard | Partially -- needs mempool data |
-| wrong_chain_address | Wallet | S | Wallet guard | Yes -- chain/address analysis |
-| behavioral_drift | Wallet | S | Wallet guard + RPC | Partially -- needs threshold definitions |
-| backup_security | Wallet | S | Wallet guard | Yes -- heuristics from encrypted_backup research |
-| mixing_behavioral | L2 | P | Wallet guard | Yes -- extends stealth_address_ops to mixers |
-| agent_privacy | AI | P | RPC guard | Partially -- needs agent framework integration |
-| sequencer_privacy | L2 | P | RPC guard | Yes -- extends l2_anonymity_set |
-| general_crypto_query | AI | P | LLM proxy | Yes -- extend v1 defi profile to broader topics |
+---
 
-### Auto-buildable now (from existing research)
-These can be generated immediately from our AI_PS research:
-- **pq_readiness**: from `projects/pq_stealth_address/` + `projects/onchain_pq_ciphertext/` findings
-- **backup_security**: from `projects/encrypted_backup_recovery/` problem list
-- **mixing_behavioral**: from stealth_address_ops H3+H6 generalized
-- **wrong_chain_address**: straightforward chain/address validation rules
-- **sequencer_privacy**: extends l2_anonymity_set H2
+## Summary
 
-### Needs new research
-- **mev_vulnerability**: needs mempool modeling, MEV-Boost data
-- **behavioral_drift**: needs portfolio tracking threshold research
-- **agent_privacy**: needs agent framework interaction graph analysis
-- **general_crypto_query**: needs v1 profile extension to new subdomains
+| Batch | Items | Automatable | Needs human |
+|---|---|---|---|
+| 0: New profiles | 8 domains | Yes (from research) | Review heuristics |
+| 1: LLM bootstrap | 11 tasks | Yes | - |
+| 2: Comparisons | 7 tasks | Yes (after batch 1) | - |
+| 3: Cover generators | 4 domains | Yes (code) | - |
+| 4: Analyzers | 9 domains | Yes (code) | - |
+| 5: v1 READMEs | 5 files | Yes | - |
+| 6: Real data | 7 domains | Partially (needs data sources) | Data collection |
+| 7: Integration | 4 tasks | Mostly (Snap needs wallet SDK) | Snap review |
+
+**Total: 55 tasks. ~48 fully automatable.**
