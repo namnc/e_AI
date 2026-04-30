@@ -1,0 +1,586 @@
+{
+  "meta": {
+    "domain_name": "wrong_chain_address",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Wrong Chain / Address Prevention",
+    "crops_property": "S",
+    "description": "Pre-submission validation to prevent irreversible loss from sending to wrong chain, wrong address, poisoned address, or non-functional contract. Wallet guard that catches common transfer mistakes.",
+    "protocols": [
+      "ERC-20",
+      "ERC-721",
+      "ERC-1155",
+      "ENS",
+      "EIP-155"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "address poisoning via dust transactions with similar-looking addresses",
+        "monitoring user transaction history to craft targeted poisoning attacks",
+        "deploying decoy contracts that mimic legitimate addresses on wrong chains"
+      ],
+      "limitations": [
+        "no private key access",
+        "cannot modify user's address book or wallet UI",
+        "cannot intercept transactions after private relay submission"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_silent_address": {
+      "name": "Silent Address",
+      "description": "Address has no transaction history on the target chain.",
+      "severity": "medium",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "no_transactions",
+            "description": "The address has not participated in any transactions (sent or received) on the target chain.",
+            "data_needed": [
+              "address",
+              "chain_id",
+              "transactions"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "cross_chain_activity",
+            "description": "The address has transaction history on at least one other EVM-based blockchain.",
+            "data_needed": [
+              "address",
+              "chain_ids_with_transactions"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "external_address_interaction",
+            "description": "User has sent funds to this address from another chain, indicating potential legitimacy but possible risk if the address is new on the target chain.",
+            "data_needed": [
+              "address",
+              "user_address",
+              "sender_chain_id",
+              "receiver_chain_id"
+            ],
+            "confidence": 0.6
+          },
+          {
+            "name": "chain_specific_contract_behavior",
+            "description": "The contract does not contain standard functions (e.g., receive() or fallback()) that would allow it to accept ETH transfers on the target chain.",
+            "data_needed": [
+              "address",
+              "contract_bytecode"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_address",
+          "description": "Regularly monitor the newly identified address for any transaction activity.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "integrate_heuristic_check",
+          "description": "Automatically check new addresses against this heuristic during network analysis.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "automated_security_tool"
+        },
+        {
+          "action": "validate_external_interactions",
+          "description": "Verify the legitimacy of funds sent to a new address by checking transaction history on other chains.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "deploy_contract_analyzer",
+          "description": "Use an automated contract analysis tool to check for standard interaction functions in new contracts.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "contract_analysis_tool"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test Silent Address",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_cross_chain_activity": {
+      "name": "Cross-Chain Activity",
+      "description": "Address is active on other EVM chains but not on the target chain.",
+      "severity": "low",
+      "incidents_matched": 1,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "cross_chain_tx_history",
+            "description": "Identifies addresses that have transactions on other EVM chains but not on the target chain.",
+            "data_needed": [
+              "address",
+              "transactions"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "inter_chain_follower",
+            "description": "Addresses which follow accounts active across multiple EVM chains, indicating potential cross-chain manipulation or control.",
+            "data_needed": [
+              "address",
+              "following_addresses"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "block_suspicious_address",
+          "description": "Block the identified address to prevent potential malicious activity.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_cross_chain_activity",
+          "description": "Continuously monitor for new addresses with cross-chain activity.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "filter_cross_chain_transactions",
+          "description": "Automatically filter out or analyze transactions from suspicious cross-chain addresses.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "automated_security_tool"
+        },
+        {
+          "action": "implement_multi_factor_auth",
+          "description": "Implement multi-factor authentication for user accounts to prevent unauthorized access.",
+          "effectiveness": 0.7,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test Cross-Chain Activity",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_previous_interaction": {
+      "name": "Previous Interaction",
+      "description": "User has a history of sending to this address on another network.",
+      "severity": "low",
+      "incidents_matched": 1,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "previous_send",
+            "description": "Identifies if the user has sent tokens to this address on another network.",
+            "data_needed": [
+              "user_address",
+              "sent_to_address"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "different_network_activity",
+            "description": "Checks for transactions involving the same address on at least one other EVM chain.",
+            "data_needed": [
+              "address"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "block_address",
+          "description": "Block the address to prevent further transactions.",
+          "effectiveness": 1.0,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "verify_identity",
+          "description": "Verify the identity of the user before allowing any transactions.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "implement_2fa",
+          "description": "Enable two-factor authentication for additional security.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_security_tool",
+          "description": "Use a blockchain analysis tool to monitor and filter suspicious transactions.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "blockchain_analysis_tool"
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test Previous Interaction",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_receive_function_absence": {
+      "name": "Receive Function Absence",
+      "description": "Contract lacks necessary functions for receiving ETH or NFTs.",
+      "severity": "high",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "no_eth_re\u63a5\u6536",
+            "description": "\u5408\u7ea6\u5b57\u8282\u7801\u4e2d\u6ca1\u6709\u5b9a\u4e49\u63a5\u6536ETH\u7684`receive()`\u6216`fallback()`\u51fd\u6570\u3002",
+            "data_needed": [
+              "contract_bytecode"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "name": "no_nft_handler",
+            "description": "\u5408\u7ea6\u5b57\u8282\u7801\u4e2d\u6ca1\u6709\u5b9a\u4e49\u5904\u7406NFT\u7684\u7279\u5b9a\u51fd\u6570\uff0c\u5982`onERC721Received()`\u6216`onERC1155Received()`\u3002",
+            "data_needed": [
+              "contract_bytecode"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "missing_reception_logics",
+            "description": "\u5408\u7ea6\u6ca1\u6709\u63a5\u6536\u4ea4\u6613\u7684\u903b\u8f91\uff0c\u5982\u7f3a\u4e4f\u4e8b\u4ef6\u65e5\u5fd7\u8bb0\u5f55\u6216\u72b6\u6001\u66f4\u65b0\u673a\u5236\u3002",
+            "data_needed": [
+              "contract_abi",
+              "blockchain_state"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "implement_receive_function",
+          "description": "Implement the `receive()` or `fallback()` function to handle ETH.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "add_nft_handler_functions",
+          "description": "Add specific NFT handling functions such as `onERC721Received()` or `onERC1155Received()`. ",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "record_reception_logs",
+          "description": "Record logs or use blockchain state to track reception events.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "Truffle"
+        },
+        {
+          "action": "automate_contract_audit",
+          "description": "Automatically audit contracts for missing functions using a security tool.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": "Slither"
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test Receive Function Absence",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_address_poisoning": {
+      "name": "Address Poisoning",
+      "description": "Recipient address visually resembles a previously used address, potentially leading to confusion.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "address_similarity",
+            "description": "Addresses share significant portions (e.g., first 4 and last 4 characters) but are not identical.",
+            "data_needed": [
+              "previous_addresses",
+              "recent_address"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "low_value_transaction",
+            "description": "Received a transaction of very low value (e.g., < $0.01).",
+            "data_needed": [
+              "transaction_amount"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "recent_low_value_transactions",
+            "description": "Recent address has only received low-value transactions.",
+            "data_needed": [
+              "address",
+              "transactions_history",
+              "timestamp"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "verify_address",
+          "description": "Manually verify the recipient address before sending funds.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_two_factor_auth",
+          "description": "Enable two-factor authentication for added security.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "address_book_sync",
+          "description": "Automatically sync recent addresses with a digital address book.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": "digital_address_book"
+        },
+        {
+          "action": "monitor_transactions",
+          "description": "Set up alerts for transactions below $0.01 to your recent addresses.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test Address Poisoning",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H6_chain_id_mismatch": {
+      "name": "Chain ID Mismatch",
+      "description": "Transaction chain ID does not align with the expected network\u2019s reported ID.",
+      "severity": "medium",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "rpc_chain_id_mismatch",
+            "description": "Transaction chain ID does not match the RPC endpoint's reported chain ID.",
+            "data_needed": [
+              "transaction.chain_id",
+              "rpc_response.chain_id"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "name": "network_name_mismatch",
+            "description": "User-selected network name resolves to a different chain ID than expected.",
+            "data_needed": [
+              "user_selected_network_name",
+              "expected_chain_id"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "recommended_correction_unapplied",
+            "description": "Transaction is not being broadcast despite recommendation to correct the chain ID issue.",
+            "data_needed": [
+              "transaction_status",
+              "recommendation_to_correct_chain_id"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "update_network_settings",
+          "description": "Manually update the network settings to match the expected chain ID.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_auto_correction_tool",
+          "description": "Automatically correct the chain ID mismatch if available in a tool.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": "auto_correction_tool"
+        }
+      ],
+      "id": "H6",
+      "benchmark_scenario": {
+        "setup": "Test Chain ID Mismatch",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H7_deprecated_contract": {
+      "name": "Deprecated Contract",
+      "description": "Contract shows signs of being outdated or abandoned, such as lack of activity and governance updates.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "lack_of_transactions",
+            "description": "The contract has not received any transactions in the last 90 days.",
+            "data_needed": [
+              "last_transaction_timestamp"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "no_governance_activity",
+            "description": "No governance or update events have been recorded for over 365 days.",
+            "data_needed": [
+              "latest_governance_event_timestamp"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "inactive_state_variable",
+            "description": "The contract contains a state variable indicating an inactive or paused status (e.g., `paused` set to true).",
+            "data_needed": [
+              "state_variables"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "check_contract_code",
+          "description": "Manually review the contract code for any active functionalities.",
+          "effectiveness": 0.7,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "deploy_monitoring_contract",
+          "description": "Automatically monitor transaction activity and governance events using a smart contract audit tool.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "smart_contract_audit_tool"
+        },
+        {
+          "action": "notify_holders",
+          "description": "Send notifications to token holders about the potential risks associated with an outdated contract.",
+          "effectiveness": 0.6,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H7",
+      "benchmark_scenario": {
+        "setup": "Test Deprecated Contract",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring detection of wrong-chain and wrong-address transfers before submission",
+    "methodology": {
+      "step_1": "Generate N test transfers: correct, wrong-chain, poisoned-address, non-receivable contract, chain-ID mismatch",
+      "step_2": "Run all 5 heuristics on each transfer",
+      "step_3": "Measure detection rate per category",
+      "step_4": "Measure false positive rate on legitimate transfers",
+      "step_5": "Estimate funds saved by blocked transactions"
+    },
+    "target": "detect >95% of wrong-chain/wrong-address transfers with <5% false positive rate",
+    "metrics": [
+      "per_heuristic_detection_rate",
+      "combined_detection_rate",
+      "false_positive_rate",
+      "estimated_funds_saved"
+    ],
+    "adversary_levels": [
+      {
+        "name": "accidental",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H4"
+        ],
+        "description": "User mistakes -- wrong chain, non-receivable contract"
+      },
+      {
+        "name": "social_engineering",
+        "heuristics": [
+          "H3",
+          "H5"
+        ],
+        "description": "Attacker-induced -- poisoned addresses, deprecated contracts"
+      },
+      {
+        "name": "full_detection",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "All transfer validation heuristics"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Transfer to {recipient} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "summary": "Validated {n_txs} pending transfers. {n_risky} flagged ({pct_risky}%). Issues: {issue_list}.",
+    "skill_suggestion": "To prevent {heuristic_name}, I can {skill_action}. This catches ~{effectiveness_pct}% of cases. {user_cost_note}"
+  }
+}

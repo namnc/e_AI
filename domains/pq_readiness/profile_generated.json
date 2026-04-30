@@ -1,0 +1,319 @@
+{
+  "meta": {
+    "domain_name": "pq_readiness",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Post-Quantum Readiness",
+    "crops_property": "S",
+    "description": "Detect quantum-vulnerable keys and cryptographic operations in wallet transactions. Flags ECDH-only key exchanges, classical-only smart account keys, and on-chain data encrypted with quantum-breakable schemes -- all harvestable under HNDL.",
+    "protocols": [
+      "ERC-5564",
+      "ERC-6538",
+      "Umbra",
+      "Fluidkey",
+      "ERC-4337",
+      "EIP-7702"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation and permanent archival of all transaction data",
+        "future CRQC access capable of running Shor's algorithm against ECDH and BLS",
+        "harvest-now-decrypt-later strategy on all ECDH ephemeral keys and BLS signatures",
+        "retroactive deanonymization of stealth address recipients via archived ciphertexts",
+        "identification of key reuse patterns to prioritize high-value harvest targets"
+      ],
+      "limitations": [
+        "no private key access (pre-quantum)",
+        "no off-chain metadata (IP, browser fingerprints)",
+        "CRQC timeline uncertain (estimated 2030-2035)"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_ecdh_only_encryption": {
+      "name": "ECDH-only encryption",
+      "description": "Use of ECDH key exchange without ML-KEM for on-chain encrypted data, indicating classical-only key exchange.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "ecdh_only",
+            "description": "Transaction interacts with contracts that exclusively use ECDH for key exchange.",
+            "data_needed": [
+              "contract_addresses",
+              "tx_input_data"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "ecdh_key_derivation",
+            "description": "Transaction input data contains patterns indicative of ECDH key derivation (e.g., elliptic curve operations).",
+            "data_needed": [
+              "tx_input_data",
+              "input_opcodes"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "tornado_cash_note",
+            "description": "Transaction involves Tornado Cash notes, which are known to use ECDH-only encryption for privacy.",
+            "data_needed": [
+              "transaction_inputs",
+              "contract_calls"
+            ],
+            "confidence": 0.95
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "disable_ecdh_only",
+          "description": "Manually disable or audit contracts using ECDH-only key exchange.",
+          "effectiveness": 0.7,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "use_ml_kem",
+          "description": "Automatically replace ECDH with ML-KEM in contract code.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "smart_contract_tool"
+        },
+        {
+          "action": "monitor_tornado_cash",
+          "description": "Continuously monitor for Tornado Cash transactions.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "analyze_input_data",
+          "description": "Automatically analyze transaction input data for ECDH key derivation patterns.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": "malware_analysis_tool"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test ECDH-only encryption",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_classical_only_keys_in_smart_a": {
+      "name": "Classical-only keys in smart accounts",
+      "description": "Presence of only classical ECDSA keys in a smart account without PQ verification or signature paths.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "no_pq_key_registered",
+            "description": "The smart account lacks any registration of Post-Quantum (PQ) signature verification keys.",
+            "data_needed": [
+              "registered_keys"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "name": "pq_extension_absent",
+            "description": "The protocol version in the smart account configuration indicates a pre-PQ specification without PQ extension support.",
+            "data_needed": [
+              "protocol_version"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "ephemeral_key_only",
+            "description": "Ephemeral keys used for stealth address registration or transactions are 33-byte secp256k1 public keys without any PQ KEM key.",
+            "data_needed": [
+              "ephemeral_keys"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "implement_pq_keys",
+          "description": "Register at least one Post-Quantum signature verification key in the smart account.",
+          "effectiveness": 0.95,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "update_protocol_version",
+          "description": "Upgrade the protocol version to include PQ extension support.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_pq_keys_for_ephemeral",
+          "description": "Ensure all ephemeral keys used for stealth addresses or transactions are PQ KEM keys.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "automate_key_management",
+          "description": "Integrate an automated tool to manage and register PQ keys in smart accounts.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "security Automation Tool"
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test Classical-only keys in smart accounts",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_long_term_key_reuse": {
+      "name": "Long-term key reuse",
+      "description": "Reusing signing keys for extended periods without rotation, increasing the risk of compromise.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "key_age",
+            "description": "Time period during which the same key has been in active use.",
+            "data_needed": [
+              "key_usage_start_time",
+              "current_time"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "transaction_count",
+            "description": "Number of transactions signed by a specific key within a certain period.",
+            "data_needed": [
+              "key_id",
+              "transaction_count"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "asset_value",
+            "description": "Value of assets controlled by the key over a given time frame.",
+            "data_needed": [
+              "key_id",
+              "time_frame",
+              "total_asset_value"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "key_rotation",
+          "description": "Rotate signing keys regularly to minimize exposure.",
+          "effectiveness": 0.95,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "automated_key_rotation",
+          "description": "Automate key rotation to ensure it is done consistently and on schedule.",
+          "effectiveness": 0.98,
+          "user_cost": "high",
+          "skill_required": "key_management_tool"
+        },
+        {
+          "action": "audit_keys",
+          "description": "Periodically review the age of keys in use for any suspicious patterns.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "key_usage_monitoring",
+          "description": "Monitor key usage to detect unusual activity or long-term reuse.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": "security_information_and_event_management_system"
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test Long-term key reuse",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring PQ readiness across a wallet's key portfolio",
+    "methodology": {
+      "step_1": "Enumerate all keys controlled by the wallet (EOAs, smart account signers, stealth meta-addresses, BLS keys)",
+      "step_2": "For each key, assess quantum vulnerability (ECDSA, ECDH, BLS) and harvest value (age, tx count, controlled assets)",
+      "step_3": "Score overall PQ readiness as percentage of key operations with PQ protection",
+      "step_4": "Generate migration priority list ordered by harvest value and vulnerability severity",
+      "step_5": "Re-score after user applies recommended migrations"
+    },
+    "target": "0% PQ-ready (current baseline) -> 80%+ with hybrid registrations and smart account PQ modules",
+    "metrics": [
+      "pq_readiness_score",
+      "harvest_value_at_risk_usd",
+      "migration_cost_estimate_gas",
+      "per_key_vulnerability_rating"
+    ],
+    "adversary_levels": [
+      {
+        "name": "passive_harvester",
+        "heuristics": [
+          "H1",
+          "H3"
+        ],
+        "description": "Archives ECDH ciphertexts for future CRQC decryption"
+      },
+      {
+        "name": "key_targeter",
+        "heuristics": [
+          "H2",
+          "H5"
+        ],
+        "description": "Identifies high-value classical keys to prioritize quantum attack"
+      },
+      {
+        "name": "full_crqc",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "All quantum-vulnerable operations across all key types"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "summary": "PQ readiness scan: {n_txs} operations analyzed. {n_risky} quantum-vulnerable ({pct_risky}%). Harvest value at risk: {harvest_value}. Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} operations use PQ-safe cryptography. No quantum vulnerability detected.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This reduces quantum harvest exposure by ~{effectiveness_pct}%. {user_cost_note}",
+    "pq_migration_plan": "Migration plan for {account}: {n_steps} steps, estimated gas {total_gas}. Priority 1: {priority_1}. Timeline: {timeline}.",
+    "harvest_warning": "WARNING: This operation adds {data_size} bytes of ECDH-encrypted data to the permanent on-chain archive. A future CRQC can decrypt this retroactively."
+  }
+}

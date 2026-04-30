@@ -1,0 +1,544 @@
+{
+  "meta": {
+    "domain_name": "mixing_behavioral",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Post-Mixer Linkability",
+    "crops_property": "P",
+    "description": "Behavioral heuristics that link deposits to withdrawals across mixing protocols (Tornado Cash, Railgun, Privacy Pools) despite correct cryptographic privacy. Generalizes stealth_address_ops H3 (timing) and H6 (amounts) to the broader mixing context, adding multi-denomination, cross-protocol, and mixer-specific metadata leaks.",
+    "protocols": [
+      "Tornado Cash",
+      "Railgun",
+      "Privacy Pools",
+      "Aztec Connect"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation of all deposits and withdrawals across all mixing protocols",
+        "timing analysis across mempool and block timestamps with second-level precision",
+        "amount distribution modeling across fixed and variable denomination pools",
+        "cross-protocol behavioral correlation (mixer withdrawal -> DeFi interaction)",
+        "relay and gas pattern analysis for mixer-specific transaction fingerprinting",
+        "address clustering across withdrawal addresses (Chainalysis-level)"
+      ],
+      "limitations": [
+        "no private key access",
+        "no ZK proof internals (cannot break cryptographic privacy directly)",
+        "no off-chain metadata (IP, browser) unless combined with RPC provider profile"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_timing_correlation": {
+      "name": "timing correlation",
+      "description": "Spending from a private address shortly after receiving narrows the anonymity set",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "short_deposit_withdrawal",
+            "description": "The time interval between receiving funds and initiating a withdrawal is unusually short.",
+            "data_needed": [
+              "received_time",
+              "withdrawn_time"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "frequent_small_withdrawals",
+            "description": "Multiple withdrawals occur within a short period, indicating potential mixing activity with reduced anonymity set due to frequent transactions.",
+            "data_needed": [
+              "withdrawal_times",
+              "transaction_amounts"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "name": "consistent_timing_window",
+            "description": "The user consistently withdraws within a narrow time window across multiple mixing operations, possibly indicating the same wallet being used.",
+            "data_needed": [
+              "withdrawal_times",
+              "transaction_amounts"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "insufficient_dwell_time",
+            "description": "The dwell time between deposit and withdrawal is significantly shorter than expected for a normal transaction, suggesting an attempt to reduce anonymity.",
+            "data_needed": [
+              "received_time",
+              "withdrawn_time"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "delay_transactions",
+          "description": "Delay deposits and withdrawals to randomize timing.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "randomize_withdrawal_times",
+          "description": "Randomize withdrawal times by a few minutes or hours within a day.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_mixing_service",
+          "description": "Utilize a mixing service to obfuscate transaction patterns.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "mixer"
+        },
+        {
+          "action": "delayed_deposit_withdrawal_script",
+          "description": "Automatically delay transactions using scripting tools.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "python"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test timing correlation",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_amount_fingerprinting": {
+      "name": "amount fingerprinting",
+      "description": "Depositing or withdrawing specific amounts that can be uniquely identified among transactions",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "low_match_count",
+            "description": "Identifies deposits with fewer than 3 matches within a 24-hour window in variable-amount pools.",
+            "data_needed": [
+              "user_address",
+              "transaction_amount",
+              "timestamp"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "high_decimal_count",
+            "description": "Detects deposits with more than 4 decimal places, indicating a unique amount in active pools.",
+            "data_needed": [
+              "user_address",
+              "transaction_amount"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "unique_combination",
+            "description": "Looks for total value deposited from multiple fixed-denomination deposits that form a unique combination.",
+            "data_needed": [
+              "user_address",
+              "transaction_amounts"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "prefer_fixed_denominations",
+            "description": "Identifies users who prefer using fixed-denomination pools over variable-amount shielded pools for high-privacy transactions.",
+            "data_needed": [
+              "user_address",
+              "pool_type"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_variable_amounts",
+          "description": "Always use variable-amount pools for transactions.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "disable_fixed_denomination_pool_use",
+          "description": "Avoid using fixed-denomination pools.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "round_transaction_amounts",
+          "description": "Round transaction amounts to a standard decimal place before sending.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_custom_script",
+          "description": "Implement custom scripts to automatically round transactions and use variable pools.",
+          "effectiveness": 1.0,
+          "user_cost": "medium",
+          "skill_required": "automated_tool"
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test amount fingerprinting",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_multi_denomination_linkage": {
+      "name": "multi-denomination linkage",
+      "description": "Correlation in timing and value between deposits and withdrawals from multiple pools, reducing anonymity",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "multi_denom_deposit_cluster",
+            "description": "Identify clusters of addresses making deposits in multiple denomination pools within a short time window.",
+            "data_needed": [
+              "address",
+              "pool_id",
+              "timestamp",
+              "denomination"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "multi_denom_withdraw_cluster",
+            "description": "Detect withdrawals from multiple pools to the same or similar address clusters, correlating with deposit timings.",
+            "data_needed": [
+              "address",
+              "pool_id",
+              "timestamp",
+              "denomination"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "value_fingerprint_match",
+            "description": "Check if the sum of deposited denominations matches the withdrawn amounts within a reasonable time frame.",
+            "data_needed": [
+              "address",
+              "pool_id",
+              "timestamp",
+              "denomination"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "temporal_correlation_break",
+            "description": "Look for attempts to spread deposits across time and different addresses to avoid temporal correlation.",
+            "data_needed": [
+              "address",
+              "timestamp",
+              "pool_id",
+              "denomination"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "address_mixing",
+          "description": "Mix funds across multiple addresses to obscure their origin.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "time_stretching",
+          "description": "Delays transactions over extended periods.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "address_rotation",
+          "description": "Regularly change the addresses used for transactions.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "multi_denom_mixing_service",
+          "description": "Use a mixing service that supports multiple denominations.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "mixer"
+        },
+        {
+          "action": "token_swapping",
+          "description": "Swap tokens for equivalent amounts in different pools.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test multi-denomination linkage",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_cross_protocol_linkage": {
+      "name": "cross-protocol linkage",
+      "description": "Interactions with DeFi protocols or other chains that link the mixed funds to a user's identity",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "withdrawal_to_defi",
+            "description": "Withdrawal address interacts with a DeFi protocol within 2 blocks of receiving mixer funds.",
+            "data_needed": [
+              "withdrawal_address",
+              "interaction_block_number",
+              "defi_protocol_used"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "defi_behavior_cluster",
+            "description": "Post-withdrawal DeFi interaction pattern matches a known address cluster's historical behavior (same protocols, similar amounts, same time-of-day).",
+            "data_needed": [
+              "address_cluster",
+              "defi_protocols_involved",
+              "transaction_amounts",
+              "transaction_times"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "cross_chain_bridging",
+            "description": "Funds bridged to another chain within 1 hour of mixer withdrawal, creating cross-chain correlation opportunity.",
+            "data_needed": [
+              "bridging_time",
+              "target_chain",
+              "funds_transferred"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "delayed_defi_engagement",
+            "description": "User followed recommendation -- Wait at least 24 hours and multiple intervening transactions before using mixed funds in identifiable DeFi protocols.",
+            "data_needed": [
+              "time_since_withdrawal",
+              "intervening_transactions",
+              "defi_protocol_used"
+            ],
+            "confidence": 0.65
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "delay_defi_use",
+          "description": "Wait at least 24 hours before using funds in identifiable DeFi protocols.",
+          "effectiveness": 0.65,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_private_keys_only",
+          "description": "Always use your own private keys and avoid hot wallets for sensitive operations.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "disable_automatic_bridges",
+          "description": "Manually approve any cross-chain transfers to prevent automated bridging.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "track_withdrawal_address",
+          "description": "Monitor the withdrawal address for unexpected activity using a blockchain explorer tool.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": "blockchain_explorer"
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test cross-protocol linkage",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_mixer_specific_metadata_leaks": {
+      "name": "mixer-specific metadata leaks",
+      "description": "Using specific services or patterns that can be traced back to a single user or address",
+      "severity": "critical",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "specific_relayer_usage",
+            "description": "Withdrawal uses a specific relayer that handles <5% of pool withdrawals, narrowing anonymity set.",
+            "data_needed": [
+              "withdrawal_address",
+              "relayer_used",
+              "total_withdrawals"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "repeated_withdrawal_addresses",
+            "description": "Same address used as withdrawal destination for multiple separate mixing operations, indicating a single user.",
+            "data_needed": [
+              "withdrawal_address",
+              "mixing_operations_count"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "distinctive_gas_price",
+            "description": "Withdrawal transaction gas price or priority fee is distinctive (>2 std devs from block median or matches a known wallet configuration.",
+            "data_needed": [
+              "withdrawal_address",
+              "gas_price",
+              "block_median_gas_price"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "name": "address_reuse_prevention",
+            "description": "User followed recommendation -- Generate a new address for every mixer withdrawal. Never reuse withdrawal addresses across mixing operations.",
+            "data_needed": [
+              "withdrawal_addresses",
+              "mixing_operations_count"
+            ],
+            "confidence": 0.6
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_random_relayer",
+          "description": "Use different relayers for each mixing operation to increase anonymity.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "randomize_gas_price",
+          "description": "Set gas price randomly to avoid distinctive patterns.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "new_withdrawal_address_per_mixer",
+          "description": "Create a unique withdrawal address for each mixing session.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "address_generator_tool"
+        },
+        {
+          "action": "relayer_randomization_script",
+          "description": "Automate the selection of random relayers using a script.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": "scripting_language"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test mixer-specific metadata leaks",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring post-mixer linkability with all behavioral heuristics applied",
+    "methodology": {
+      "step_1": "Generate synthetic deposit/withdrawal dataset with realistic timing, amount, and behavioral distributions across multiple mixer protocols",
+      "step_2": "Run adversary simulator applying all 5 heuristics (timing, amount, multi-denomination, cross-protocol, metadata)",
+      "step_3": "Measure baseline linking rate per heuristic and combined",
+      "step_4": "Apply profile recommendations to all operations",
+      "step_5": "Re-run adversary simulator on modified operations",
+      "step_6": "Compare: linking rate before vs after, broken down by pool activity level"
+    },
+    "target": "Reduce combined linking rate from ~30-50% (estimated baseline) to <5% with all recommendations applied",
+    "metrics": [
+      "per_heuristic_linking_rate",
+      "combined_linking_rate",
+      "anonymity_set_size_distribution",
+      "false_positive_rate",
+      "user_cost_score"
+    ],
+    "adversary_levels": [
+      {
+        "name": "basic",
+        "heuristics": [
+          "H1",
+          "H2"
+        ],
+        "description": "Timing + amount analysis only"
+      },
+      {
+        "name": "intermediate",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H5"
+        ],
+        "description": "Add multi-denomination and metadata analysis"
+      },
+      {
+        "name": "advanced",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "All heuristics including cross-protocol behavioral correlation"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Mixer operation triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Anonymity set: ~{anon_set}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "summary": "Analyzed {n_txs} mixer operations. {n_risky} linkability risks detected ({pct_risky}%). Average anonymity set: ~{avg_anon_set}. Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} mixer operations pass linkability checks. Anonymity sets adequate.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This improves anonymity set by ~{effectiveness_pct}%. {user_cost_note}",
+    "pool_recommendation": "Pool {pool_name}: {n_deposits} deposits in last {window}h. Optimal withdrawal time: {peak_hour}:00 UTC ({peak_count} withdrawals/hr). Anonymity set: ~{anon_set}.",
+    "cross_protocol_warning": "WARNING: Immediate DeFi interaction after mixer withdrawal. {defi_protocol} interaction within {minutes} minutes links this withdrawal to behavioral profile. Recommendation: wait {recommended_delay}h."
+  }
+}

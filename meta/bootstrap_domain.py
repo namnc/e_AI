@@ -3,15 +3,17 @@ Domain bootstrapper — auto-generates all v1-quality artifacts for a domain.
 
 Given a validated profile.json, generates:
   1. Labeled incident data (synthetic, from heuristics)
-  2. Auto-generated profile variant (via LLM)
-  3. Test file (per-heuristic + combined)
+  2. Test file (per-heuristic + combined)
+  3. Auto-generated profile variant (via LLM)
   4. Failure analysis (via LLM)
   5. Benchmark script
+  6. Cover generator skeleton (with optional LLM strategy-hint fill-in)
 
 Usage:
     python -m meta.bootstrap_domain domains/approval_phishing
     python -m meta.bootstrap_domain domains/offchain_signature --model qwen2.5:14b
     python -m meta.bootstrap_domain domains/* --skip-llm  # data + tests only, no LLM calls
+    python -m meta.bootstrap_domain domains/rpc_leakage --cover-only  # only run cover-gen step
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ def bootstrap_domain(
     domain_path: str,
     llm_call=None,
     skip_llm: bool = False,
+    cover_only: bool = False,
 ):
     """Generate all supporting artifacts for a domain."""
     domain = Path(domain_path)
@@ -48,31 +51,41 @@ def bootstrap_domain(
     (domain / "benchmarks").mkdir(exist_ok=True)
     (domain / "analysis").mkdir(exist_ok=True)
 
+    if cover_only:
+        print("\n[cover-only] Generating cover generator skeleton...")
+        _generate_cover_generator(profile, domain, domain_name, llm_call, skip_llm)
+        print(f"\nDone. Cover generator in {domain}/cover_generator.py")
+        return True
+
     # 1. Generate labeled data
-    print("\n[1/5] Generating labeled incident data...")
+    print("\n[1/6] Generating labeled incident data...")
     _generate_labeled_data(profile, domain)
 
     # 2. Generate tests
-    print("\n[2/5] Generating test file...")
+    print("\n[2/6] Generating test file...")
     _generate_tests(profile, domain, domain_name)
 
     # 3. Auto-generate variant (needs LLM)
     if not skip_llm and llm_call:
-        print("\n[3/5] Auto-generating profile variant via LLM...")
+        print("\n[3/6] Auto-generating profile variant via LLM...")
         _generate_variant(profile, domain, domain_name, llm_call)
     else:
-        print("\n[3/5] Skipping LLM variant (--skip-llm or no LLM)")
+        print("\n[3/6] Skipping LLM variant (--skip-llm or no LLM)")
 
     # 4. Failure analysis (needs LLM)
     if not skip_llm and llm_call:
-        print("\n[4/5] Generating failure analysis via LLM...")
+        print("\n[4/6] Generating failure analysis via LLM...")
         _generate_failure_analysis(profile, domain, domain_name, llm_call)
     else:
-        print("\n[4/5] Skipping failure analysis (--skip-llm or no LLM)")
+        print("\n[4/6] Skipping failure analysis (--skip-llm or no LLM)")
 
     # 5. Benchmark script
-    print("\n[5/5] Generating benchmark script...")
+    print("\n[5/6] Generating benchmark script...")
     _generate_benchmark(profile, domain, domain_name)
+
+    # 6. Cover generator skeleton (always runs; LLM hints are optional)
+    print("\n[6/6] Generating cover generator skeleton...")
+    _generate_cover_generator(profile, domain, domain_name, llm_call, skip_llm)
 
     print(f"\nDone. Artifacts in {domain}/")
     return True
@@ -472,6 +485,72 @@ if __name__ == "__main__":
 
 
 # ---------------------------------------------------------------------------
+# 6. Cover generator skeleton
+# ---------------------------------------------------------------------------
+
+def _generate_cover_generator(
+    profile: dict,
+    domain: Path,
+    domain_name: str,
+    llm_call=None,
+    skip_llm: bool = False,
+):
+    """Generate a skeleton cover_generator.py for the domain.
+
+    Skeleton structure is template-driven (always works). If LLM is available,
+    fills in per-heuristic strategy hints in the docstrings.
+    """
+    from meta.cover_generator_template import render, strategy_hint_prompt
+
+    strategy_hints: dict[str, str] = {}
+
+    if not skip_llm and llm_call:
+        for hkey, h in profile.get("heuristics", {}).items():
+            hid = h.get("id", hkey)
+            try:
+                response = llm_call(strategy_hint_prompt(
+                    hid=hid,
+                    hname=h.get("name", ""),
+                    hdescription=h.get("description", ""),
+                    recommendations=h.get("recommendations", []),
+                ))
+                # Strip code blocks / quotes the LLM might add
+                hint = response.strip()
+                if hint.startswith("```"):
+                    hint = hint.split("\n", 1)[1] if "\n" in hint else hint
+                if hint.endswith("```"):
+                    hint = hint.rsplit("```", 1)[0]
+                hint = hint.strip()
+                # Single-paragraph guard
+                hint = hint.replace("\n\n", " ").replace("\n", " ")
+                if hint:
+                    strategy_hints[hid] = hint
+            except Exception as e:
+                print(f"  WARN: failed to generate strategy hint for {hid}: {e}")
+
+    code = render(profile, domain_name, strategy_hints)
+
+    out = domain / "cover_generator.py"
+    if out.exists():
+        # Don't overwrite hand-crafted cover_generator (e.g., stealth_address_ops)
+        # Check for the auto-generated marker
+        existing = out.read_text()
+        if "Auto-generated by meta/bootstrap_domain.py (cover_generator_template.py)" not in existing:
+            backup = domain / "cover_generator.py.bak"
+            print(f"  Existing cover_generator.py is hand-crafted; saving auto-version to {backup}")
+            with open(backup, "w") as f:
+                f.write(code)
+            return
+
+    with open(out, "w") as f:
+        f.write(code)
+
+    n_hints = len(strategy_hints)
+    n_h = len(profile.get("heuristics", {}))
+    print(f"  Cover generator skeleton written to {out} ({n_hints}/{n_h} strategy hints from LLM)")
+
+
+# ---------------------------------------------------------------------------
 # Utilities
 # ---------------------------------------------------------------------------
 
@@ -498,6 +577,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bootstrap a domain to v1 quality")
     parser.add_argument("domains", nargs="+", help="Domain directories to bootstrap")
     parser.add_argument("--skip-llm", action="store_true", help="Skip LLM-dependent steps")
+    parser.add_argument("--cover-only", action="store_true", help="Only run cover generator step")
     parser.add_argument("--backend", default="ollama", choices=["ollama", "anthropic"])
     parser.add_argument("--model", default=None)
     args = parser.parse_args()
@@ -520,4 +600,4 @@ if __name__ == "__main__":
             args.skip_llm = True
 
     for domain_path in args.domains:
-        bootstrap_domain(domain_path, llm_call, args.skip_llm)
+        bootstrap_domain(domain_path, llm_call, args.skip_llm, cover_only=args.cover_only)
