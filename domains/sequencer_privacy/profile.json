@@ -1,0 +1,339 @@
+{
+  "meta": {
+    "domain_name": "sequencer_privacy",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "L2Beat sequencer analysis, Espresso/Astria shared sequencer research"
+  },
+
+  "risk_domain": {
+    "name": "Sequencer-Specific Privacy Risks",
+    "crops_property": "P",
+    "description": "Privacy risks arising from centralized and shared L2 sequencers. RPC guard that detects sequencer-level threats: transaction content leakage, censorship, MEV extraction, and cross-rollup correlation. Extends l2_anonymity_set H2.",
+    "protocols": ["Arbitrum", "Optimism", "Base", "zkSync", "StarkNet", "Espresso", "Astria"],
+    "adversary_model": {
+      "capabilities": [
+        "full visibility of all transactions before batch inclusion (sequencer operator)",
+        "ability to reorder transactions within a batch for MEV extraction",
+        "cross-rollup correlation when operating as shared sequencer",
+        "selective censorship of specific addresses or transaction types",
+        "timing analysis of transaction submission patterns"
+      ],
+      "limitations": [
+        "no private key access",
+        "cannot forge transactions or modify calldata",
+        "L1 forced inclusion provides eventual censorship resistance"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_centralized_sequencer": {
+      "id": "H1",
+      "name": "Centralized sequencer",
+      "severity": "high",
+      "description": "Target L2 operates a single centralized sequencer run by one entity. This operator sees all transactions before they are batched, gaining full visibility into transaction content, ordering, and sender identity pre-publication.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "single_operator",
+            "description": "L2 sequencer is operated by a single entity with no rotation or decentralization mechanism",
+            "data_needed": ["l2_chain_id", "sequencer_operator", "decentralization_status"],
+            "confidence": 0.95
+          },
+          {
+            "name": "no_encrypted_mempool",
+            "description": "L2 does not implement encrypted mempool or commit-reveal for transaction content",
+            "data_needed": ["l2_chain_id", "mempool_encryption_status"],
+            "confidence": 0.80
+          },
+          {
+            "name": "sequencer_ip_visible",
+            "description": "Transactions submitted directly to sequencer endpoint expose sender IP without Tor/VPN",
+            "data_needed": ["submission_endpoint", "transport_privacy"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "single_operator AND no_encrypted_mempool triggers WARNING for privacy-sensitive txs"
+      },
+      "recommendations": [
+        {
+          "action": "use_privacy_layer",
+          "description": "Submit through a privacy-preserving relay or encrypted mempool if available on the L2",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_decentralization",
+          "description": "Check sequencer decentralization roadmap and prefer L2s with active decentralization progress",
+          "effectiveness": 0.60,
+          "user_cost": "medium (may require switching L2s)",
+          "skill_required": "decentralization_checker"
+        }
+      ],
+      "fundamental_limitation": "Until sequencer decentralization is achieved, the sequencer operator inherently has god-mode visibility. No client-side mitigation fully eliminates this trust assumption.",
+      "benchmark_scenario": {
+        "setup": "Survey of N L2 networks with known sequencer architectures",
+        "metric": "accuracy of sequencer centralization classification across all surveyed L2s",
+        "baseline": "as of 2024, most major L2s run centralized sequencers (L2Beat data)"
+      }
+    },
+
+    "H2_sequencer_censorship": {
+      "id": "H2",
+      "name": "Sequencer censorship",
+      "severity": "critical",
+      "description": "Transaction is not included by the sequencer despite valid gas and formatting. May indicate selective censorship based on sender address, destination, or transaction content. Privacy risk because censorship reveals the sequencer is profiling transactions.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "inclusion_delay",
+            "description": "Transaction not included within expected time window despite sufficient gas and valid nonce",
+            "data_needed": ["tx_submission_time", "expected_inclusion_time", "gas_price", "nonce"],
+            "confidence": 0.70
+          },
+          {
+            "name": "selective_pattern",
+            "description": "Other transactions from same block with lower gas were included while this one was skipped",
+            "data_needed": ["tx_gas_price", "block_transactions", "inclusion_order"],
+            "confidence": 0.85
+          },
+          {
+            "name": "repeated_exclusion",
+            "description": "Same sender address has been excluded from multiple consecutive batches",
+            "data_needed": ["sender_address", "batch_history", "exclusion_count"],
+            "confidence": 0.90
+          }
+        ],
+        "threshold": "repeated_exclusion triggers ALERT, selective_pattern triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "use_forced_inclusion",
+          "description": "Submit transaction directly to L1 forced inclusion queue to bypass sequencer entirely",
+          "effectiveness": 0.95,
+          "user_cost": "high (L1 gas cost + delay)",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_inclusion",
+          "description": "Track inclusion time and flag anomalous delays that may indicate censorship",
+          "effectiveness": 0.70,
+          "user_cost": "none",
+          "skill_required": "inclusion_timer"
+        }
+      ],
+      "fundamental_limitation": "Distinguishing censorship from congestion or priority fee sorting is inherently ambiguous. Short-term non-inclusion may be legitimate; only persistent patterns are indicative.",
+      "benchmark_scenario": {
+        "setup": "Submit N transactions across L2s with varying gas prices, measure inclusion times",
+        "metric": "ability to distinguish censorship from congestion based on inclusion patterns",
+        "baseline": "documented censorship incidents rare but increasing as L2 usage grows"
+      }
+    },
+
+    "H3_sequencer_mev": {
+      "id": "H3",
+      "name": "Sequencer MEV extraction",
+      "severity": "high",
+      "description": "Sequencer reorders transactions within a batch to extract MEV. Unlike L1 where block builders compete, a centralized sequencer has monopoly power over ordering and can sandwich or front-run with zero competition.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "suspicious_reordering",
+            "description": "Transaction ordering in batch does not match submission order or gas priority",
+            "data_needed": ["batch_tx_order", "submission_timestamps", "gas_prices"],
+            "confidence": 0.75
+          },
+          {
+            "name": "sequencer_adjacent_profit",
+            "description": "Sequencer-controlled address profits from transactions adjacent to user's in batch",
+            "data_needed": ["batch_tx_order", "sequencer_addresses", "profit_analysis"],
+            "confidence": 0.85
+          }
+        ],
+        "threshold": "sequencer_adjacent_profit triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "use_fair_ordering",
+          "description": "Prefer L2s that implement FCFS or other fair ordering mechanisms",
+          "effectiveness": 0.80,
+          "user_cost": "medium (may need to switch L2)",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_ordering",
+          "description": "Compare submission order to inclusion order to detect suspicious reordering patterns",
+          "effectiveness": 0.65,
+          "user_cost": "none",
+          "skill_required": "sequencer_monitor"
+        }
+      ],
+      "fundamental_limitation": "Sequencer MEV is inherent to centralized ordering. Only decentralized sequencing, encrypted mempools, or verifiable ordering constraints can structurally prevent it.",
+      "benchmark_scenario": {
+        "setup": "Monitor N batches across L2s, compare submission order to inclusion order",
+        "metric": "frequency of profitable reordering by sequencer vs fair FCFS ordering",
+        "baseline": "sequencer MEV on L2s is largely unquantified due to opacity"
+      }
+    },
+
+    "H4_shared_sequencer_linkage": {
+      "id": "H4",
+      "name": "Shared sequencer linkage",
+      "severity": "high",
+      "description": "A shared sequencer operating across multiple rollups can correlate user activity cross-rollup. If the same entity sequences transactions on Rollup A and Rollup B, they can link addresses that transact on both based on timing, amounts, and behavioral patterns.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "shared_sequencer_detected",
+            "description": "Target L2 uses a shared sequencer that also sequences for other rollups the user interacts with",
+            "data_needed": ["l2_chain_id", "sequencer_provider", "user_active_chains"],
+            "confidence": 0.80
+          },
+          {
+            "name": "cross_rollup_timing",
+            "description": "User transactions on multiple rollups sharing a sequencer show correlated timing patterns",
+            "data_needed": ["user_tx_timestamps", "sequencer_provider", "cross_chain_txs"],
+            "confidence": 0.70
+          },
+          {
+            "name": "amount_correlation",
+            "description": "Transfer amounts across rollups suggest same-entity bridging through shared sequencer view",
+            "data_needed": ["cross_chain_amounts", "bridge_events", "sequencer_batch_data"],
+            "confidence": 0.65
+          }
+        ],
+        "threshold": "shared_sequencer_detected AND cross_rollup_timing triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "diversify_sequencers",
+          "description": "Use L2s with different sequencer operators for activities you want to keep unlinkable",
+          "effectiveness": 0.85,
+          "user_cost": "medium (manage multiple L2s)",
+          "skill_required": "decentralization_checker"
+        },
+        {
+          "action": "break_timing_correlation",
+          "description": "Introduce random delays between cross-rollup transactions to break timing linkage",
+          "effectiveness": 0.60,
+          "user_cost": "low (slight delays)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Shared sequencers are designed for atomic cross-rollup operations, which inherently requires visibility across rollups. The privacy cost is architectural, not a bug.",
+      "benchmark_scenario": {
+        "setup": "User operates on N rollups with shared vs independent sequencers, adversary attempts correlation",
+        "metric": "adversary accuracy in linking cross-rollup addresses via shared sequencer data",
+        "baseline": "shared sequencer correlation is theoretical -- no large-scale empirical data yet"
+      }
+    },
+
+    "H5_preconfirmation_privacy": {
+      "id": "H5",
+      "name": "Pre-confirmation privacy leak",
+      "severity": "high",
+      "description": "Sequencer publishes soft confirmations (pre-confirmations) that reveal transaction content before the batch is posted to L1. This gives observers a time window to act on private information before it becomes part of the canonical chain.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "preconf_enabled",
+            "description": "L2 publishes pre-confirmations that include full transaction details before L1 posting",
+            "data_needed": ["l2_chain_id", "preconfirmation_status", "preconf_content_level"],
+            "confidence": 0.85
+          },
+          {
+            "name": "preconf_to_l1_gap",
+            "description": "Time gap between pre-confirmation and L1 batch posting exceeds 10 minutes",
+            "data_needed": ["preconf_timestamp", "l1_batch_timestamp"],
+            "confidence": 0.75
+          },
+          {
+            "name": "preconf_public_api",
+            "description": "Pre-confirmation data is accessible via public API without authentication",
+            "data_needed": ["preconf_api_endpoint", "access_controls"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "preconf_enabled AND preconf_public_api triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "delay_sensitive_actions",
+          "description": "Avoid time-sensitive transactions on L2s with long pre-confirmation windows",
+          "effectiveness": 0.60,
+          "user_cost": "medium (limits when/where to transact)",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_preconf_gap",
+          "description": "Track pre-confirmation to L1 posting delay to assess information leakage window",
+          "effectiveness": 0.70,
+          "user_cost": "none",
+          "skill_required": "inclusion_timer"
+        }
+      ],
+      "fundamental_limitation": "Pre-confirmations are a UX feature that trades privacy for speed. The information leakage is by design -- faster confirmation requires earlier content revelation.",
+      "benchmark_scenario": {
+        "setup": "Monitor pre-confirmation feeds across N L2s, measure content exposure vs L1 finality gap",
+        "metric": "information leakage window (time between content-revealing preconf and L1 inclusion)",
+        "baseline": "pre-confirmation windows range from seconds to minutes depending on L2"
+      }
+    }
+  },
+
+  "skills": {
+    "sequencer_monitor": {
+      "tool": "sequencer behavior analyzer",
+      "description": "Monitor sequencer ordering patterns, detect reordering and MEV extraction",
+      "parameters": {"monitoring_window_batches": 100, "reordering_threshold": 0.1, "supported_l2s": ["arbitrum", "optimism", "base"]}
+    },
+    "decentralization_checker": {
+      "tool": "L2 sequencer decentralization tracker",
+      "description": "Check sequencer operator count, decentralization roadmap status, and shared sequencer usage",
+      "parameters": {"data_source": "l2beat", "check_shared_sequencer": true, "min_operators_for_decentralized": 5}
+    },
+    "inclusion_timer": {
+      "tool": "transaction inclusion monitor",
+      "description": "Track transaction submission to inclusion timing, detect anomalous delays suggesting censorship",
+      "parameters": {"expected_inclusion_seconds": 2, "alert_threshold_multiplier": 5, "track_preconf_gap": true}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring sequencer privacy risk detection across L2 networks",
+    "methodology": {
+      "step_1": "Survey sequencer architecture of top N L2 networks by TVL",
+      "step_2": "Submit test transactions and measure inclusion timing, ordering fidelity, pre-confirmation exposure",
+      "step_3": "Detect censorship patterns via controlled exclusion experiments",
+      "step_4": "Measure cross-rollup correlation capability for shared sequencer setups",
+      "step_5": "Score each L2 on sequencer privacy risk (centralization, MEV, censorship, linkage, preconf)"
+    },
+    "target": "accurate risk classification of L2 sequencer privacy for top 20 L2 networks",
+    "metrics": [
+      "sequencer_centralization_score",
+      "censorship_detection_rate",
+      "mev_extraction_frequency",
+      "cross_rollup_linkability",
+      "preconf_exposure_window"
+    ],
+    "adversary_levels": [
+      {"name": "passive_observer", "heuristics": ["H1", "H5"], "description": "Reads public pre-confirmations and sequencer data"},
+      {"name": "active_sequencer", "heuristics": ["H1", "H2", "H3"], "description": "Sequencer operator extracting MEV and censoring"},
+      {"name": "cross_rollup_correlator", "heuristics": ["H1", "H3", "H4", "H5"], "description": "Shared sequencer linking cross-rollup activity"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "L2 transaction on {chain_name} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Sequencer risk: {risk_level}. Recommendation: {recommendation}.",
+    "summary": "Analyzed {n_txs} L2 transactions across {n_chains} chains. {n_risky} flagged for sequencer privacy risks ({pct_risky}%). Top risks: {top_risks}.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This reduces sequencer privacy exposure by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}

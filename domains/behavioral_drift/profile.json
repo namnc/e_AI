@@ -1,0 +1,343 @@
+{
+  "meta": {
+    "domain_name": "behavioral_drift",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "DeFi risk monitoring research, approval exploit post-mortems (Revoke.cash)"
+  },
+
+  "risk_domain": {
+    "name": "Behavioral Drift Monitoring",
+    "crops_property": "S",
+    "description": "Long-term behavioral monitoring detecting gradual security and privacy degradation. Wallet + RPC guard that tracks portfolio concentration, leverage creep, approval accumulation, gas inefficiency, and behavioral fingerprinting over time.",
+    "protocols": ["Aave", "Compound", "Uniswap", "Maker", "Lido", "ERC-20 approvals"],
+    "adversary_model": {
+      "capabilities": [
+        "longitudinal on-chain behavioral analysis across all user addresses",
+        "approval monitoring to detect exploitable unlimited allowances",
+        "pattern recognition of recurring transaction sequences for fingerprinting",
+        "portfolio composition inference from token transfer patterns"
+      ],
+      "limitations": [
+        "no private key access",
+        "cannot observe off-chain portfolio (CEX holdings, fiat)",
+        "behavioral drift detection requires extended observation period (weeks/months)"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_portfolio_concentration": {
+      "id": "H1",
+      "name": "Portfolio concentration",
+      "severity": "high",
+      "description": "More than 50% of on-chain portfolio value is concentrated in a single protocol, and this concentration is increasing over time. Creates correlated risk exposure and makes the user predictable to adversaries monitoring protocol-specific activity.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "single_protocol_dominance",
+            "description": "One protocol holds >50% of user's total on-chain value across all tracked addresses",
+            "data_needed": ["user_addresses", "protocol_balances", "token_prices"],
+            "confidence": 0.85
+          },
+          {
+            "name": "concentration_increasing",
+            "description": "Concentration in dominant protocol has increased by >10% over the past 30 days",
+            "data_needed": ["historical_protocol_balances", "time_window"],
+            "confidence": 0.70
+          },
+          {
+            "name": "single_chain_concentration",
+            "description": "User's entire portfolio is on a single chain with no cross-chain diversification",
+            "data_needed": ["user_addresses", "chain_balances"],
+            "confidence": 0.60
+          }
+        ],
+        "threshold": "single_protocol_dominance AND concentration_increasing triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "diversification_alert",
+          "description": "Alert user to concentration risk and suggest rebalancing across protocols",
+          "effectiveness": 0.70,
+          "user_cost": "medium (gas for rebalancing)",
+          "skill_required": "portfolio_tracker"
+        },
+        {
+          "action": "set_concentration_limit",
+          "description": "Configure maximum protocol concentration threshold that triggers warnings before new deposits",
+          "effectiveness": 0.80,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Concentration may be intentional (yield farming, conviction bets). The system cannot distinguish deliberate strategy from inattentive drift without user context.",
+      "benchmark_scenario": {
+        "setup": "Track N wallets over 90 days, measure portfolio concentration changes",
+        "metric": "accuracy in detecting wallets that experienced protocol-specific losses due to concentration",
+        "baseline": "concentrated portfolios face 2-5x higher drawdowns in protocol-specific events"
+      }
+    },
+
+    "H2_leverage_creep": {
+      "id": "H2",
+      "name": "Leverage creep",
+      "severity": "critical",
+      "description": "User's total leverage across lending protocols is increasing week-over-week without corresponding collateral increases. Gradual leverage accumulation often goes unnoticed until a market downturn triggers cascading liquidations.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "leverage_increasing",
+            "description": "Total borrow/collateral ratio has increased for 3+ consecutive weeks",
+            "data_needed": ["user_borrow_positions", "user_collateral", "weekly_snapshots"],
+            "confidence": 0.85
+          },
+          {
+            "name": "multi_protocol_leverage",
+            "description": "User has open borrow positions across 2+ lending protocols simultaneously",
+            "data_needed": ["user_addresses", "lending_protocol_positions"],
+            "confidence": 0.70
+          },
+          {
+            "name": "approaching_liquidation",
+            "description": "Aggregate health factor across all positions is below 1.3",
+            "data_needed": ["all_position_health_factors", "aggregate_collateral_ratio"],
+            "confidence": 0.90
+          }
+        ],
+        "threshold": "leverage_increasing AND approaching_liquidation triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "leverage_dashboard",
+          "description": "Show aggregate leverage across all protocols with historical trend and liquidation distances",
+          "effectiveness": 0.75,
+          "user_cost": "none",
+          "skill_required": "leverage_monitor"
+        },
+        {
+          "action": "set_leverage_ceiling",
+          "description": "Configure maximum aggregate leverage ratio that blocks new borrows when exceeded",
+          "effectiveness": 0.90,
+          "user_cost": "low (may limit borrowing)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Leverage monitoring only covers on-chain positions. Users with CEX margin positions have hidden leverage that this system cannot detect, understating true risk.",
+      "benchmark_scenario": {
+        "setup": "Monitor N wallets with lending positions over 90 days through a market downturn",
+        "metric": "fraction of liquidated wallets that showed leverage creep signals beforehand",
+        "baseline": "most liquidated positions show 2-4 weeks of gradual leverage increase before event"
+      }
+    },
+
+    "H3_approval_accumulation": {
+      "id": "H3",
+      "name": "Approval accumulation",
+      "severity": "critical",
+      "description": "Growing number of unlimited ERC-20 token approvals without periodic revocation. Each outstanding approval is an attack surface -- if an approved contract is exploited, all approved tokens can be drained.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "unlimited_approvals_count",
+            "description": "User has >10 outstanding unlimited (max uint256) token approvals",
+            "data_needed": ["user_addresses", "approval_events", "revocation_events"],
+            "confidence": 0.85
+          },
+          {
+            "name": "stale_approvals",
+            "description": "Approvals granted to contracts the user hasn't interacted with in 90+ days",
+            "data_needed": ["approval_events", "user_interaction_history", "contract_addresses"],
+            "confidence": 0.80
+          },
+          {
+            "name": "approval_to_vulnerable_contract",
+            "description": "Outstanding approval to a contract with known vulnerability or audit finding",
+            "data_needed": ["approval_events", "vulnerability_database", "audit_reports"],
+            "confidence": 0.90
+          }
+        ],
+        "threshold": "approval_to_vulnerable_contract triggers ALERT, unlimited_approvals_count triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "revoke_stale",
+          "description": "Revoke approvals to contracts not interacted with in 90+ days",
+          "effectiveness": 0.85,
+          "user_cost": "low (gas per revocation)",
+          "skill_required": "approval_auditor"
+        },
+        {
+          "action": "use_limited_approvals",
+          "description": "Set approval amounts to exact transaction needs instead of unlimited",
+          "effectiveness": 0.90,
+          "user_cost": "low (extra approval tx per interaction)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "ERC-20 approve() is permissive by design. Until permit2 or session-key patterns are universal, users must actively manage approvals. Gas costs of revocation deter hygiene.",
+      "benchmark_scenario": {
+        "setup": "Audit N wallets for outstanding approvals, cross-reference with exploit history",
+        "metric": "fraction of wallets with approvals to historically exploited contracts",
+        "baseline": "average active DeFi wallet has 20-50 outstanding unlimited approvals (Revoke.cash data)"
+      }
+    },
+
+    "H4_gas_spending_trend": {
+      "id": "H4",
+      "name": "Gas spending trend",
+      "severity": "medium",
+      "description": "User's gas costs are increasing over time, potentially indicating increasingly inefficient strategies, unnecessary complex transactions, or MEV extraction eroding effective returns.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "gas_cost_increasing",
+            "description": "Weekly gas spend has increased for 4+ consecutive weeks while transaction count is stable",
+            "data_needed": ["user_tx_history", "gas_costs_weekly", "tx_count_weekly"],
+            "confidence": 0.65
+          },
+          {
+            "name": "high_gas_ratio",
+            "description": "Gas costs exceed 5% of transaction value on average across recent transactions",
+            "data_needed": ["tx_gas_cost", "tx_value", "recent_tx_window"],
+            "confidence": 0.75
+          },
+          {
+            "name": "inefficient_routing",
+            "description": "Transactions use suboptimal gas patterns (high gas limit with low usage, manual gas price)",
+            "data_needed": ["tx_gas_limit", "tx_gas_used", "gas_price_vs_base"],
+            "confidence": 0.60
+          }
+        ],
+        "threshold": "gas_cost_increasing AND high_gas_ratio triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "gas_efficiency_report",
+          "description": "Generate report of gas-inefficient transactions with suggestions for optimization",
+          "effectiveness": 0.65,
+          "user_cost": "none",
+          "skill_required": null
+        },
+        {
+          "action": "batch_transactions",
+          "description": "Suggest batching multiple operations into single transactions where possible",
+          "effectiveness": 0.50,
+          "user_cost": "low (different workflow)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Gas costs are partly a function of network conditions, not just user behavior. Rising base fees during congestion inflate gas costs without any change in user strategy.",
+      "benchmark_scenario": {
+        "setup": "Analyze gas spending patterns of N wallets over 90 days across varying network conditions",
+        "metric": "ability to distinguish user-caused gas inefficiency from network-caused increases",
+        "baseline": "power DeFi users spend 2-10% of portfolio value on gas annually"
+      }
+    },
+
+    "H5_interaction_pattern_rigidity": {
+      "id": "H5",
+      "name": "Interaction pattern rigidity",
+      "severity": "high",
+      "description": "User follows the same sequence of on-chain actions at predictable times, creating a behavioral fingerprint. This pattern is both a privacy risk (linking addresses to the same entity) and a security risk (adversary can predict and front-run actions).",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "temporal_regularity",
+            "description": "Transactions cluster at the same time of day across weeks with <1 hour variance",
+            "data_needed": ["user_tx_timestamps", "time_clustering_analysis"],
+            "confidence": 0.80
+          },
+          {
+            "name": "sequence_repetition",
+            "description": "Same ordered sequence of contract interactions repeats 3+ times (e.g., swap -> deposit -> borrow)",
+            "data_needed": ["user_tx_history", "contract_interaction_sequences"],
+            "confidence": 0.85
+          },
+          {
+            "name": "day_of_week_pattern",
+            "description": "User consistently transacts on specific days of the week (e.g., always Monday + Thursday)",
+            "data_needed": ["user_tx_timestamps", "weekly_pattern_analysis"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "temporal_regularity AND sequence_repetition triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "randomize_timing",
+          "description": "Add random delays (1-6 hours) to recurring transactions to break temporal patterns",
+          "effectiveness": 0.75,
+          "user_cost": "low (slight timing variance)",
+          "skill_required": null
+        },
+        {
+          "action": "vary_sequences",
+          "description": "Occasionally reorder non-dependent operations to break sequence fingerprints",
+          "effectiveness": 0.65,
+          "user_cost": "low (different order, same result)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Some patterns are operationally necessary (e.g., weekly yield harvesting). Users cannot fully randomize behavior that is constrained by protocol mechanics or personal schedules.",
+      "benchmark_scenario": {
+        "setup": "Analyze N wallets over 90 days, identify recurring patterns, test linkability",
+        "metric": "adversary accuracy in linking multiple addresses to same entity via behavioral patterns",
+        "baseline": "behavioral fingerprinting can narrow anonymity set by 80-90% for habitual users"
+      }
+    }
+  },
+
+  "skills": {
+    "portfolio_tracker": {
+      "tool": "multi-protocol portfolio analyzer",
+      "description": "Track portfolio composition across protocols and chains, detect concentration trends",
+      "parameters": {"supported_protocols": ["aave", "compound", "uniswap", "maker", "lido", "curve"], "snapshot_interval_days": 7, "lookback_days": 90}
+    },
+    "leverage_monitor": {
+      "tool": "aggregate leverage calculator",
+      "description": "Calculate total leverage across all lending positions with liquidation distance estimates",
+      "parameters": {"lending_protocols": ["aave_v3", "compound_v3", "maker", "spark"], "alert_health_factor": 1.3, "critical_health_factor": 1.1}
+    },
+    "approval_auditor": {
+      "tool": "ERC-20 approval scanner",
+      "description": "Scan all outstanding token approvals, identify stale and unlimited approvals, suggest revocations",
+      "parameters": {"stale_threshold_days": 90, "check_vulnerability_db": true, "batch_revoke_supported": true}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring behavioral drift detection accuracy over extended monitoring periods",
+    "methodology": {
+      "step_1": "Select N wallets with 90+ days of DeFi activity history",
+      "step_2": "Run all 5 heuristics on historical data with sliding window analysis",
+      "step_3": "Correlate detected drift signals with actual adverse outcomes (liquidations, exploits, gas waste)",
+      "step_4": "Measure detection lead time: how far in advance drift signals predicted the adverse event",
+      "step_5": "Calculate false positive rate on wallets that experienced no adverse outcomes"
+    },
+    "target": "detect 70% of adverse outcomes with 2+ week lead time and <20% false positive rate",
+    "metrics": [
+      "per_heuristic_detection_rate",
+      "detection_lead_time_days",
+      "false_positive_rate",
+      "adverse_outcome_correlation"
+    ],
+    "adversary_levels": [
+      {"name": "passive_monitor", "heuristics": ["H1", "H4"], "description": "Portfolio and gas trend analysis only"},
+      {"name": "security_focused", "heuristics": ["H2", "H3"], "description": "Leverage and approval risk detection"},
+      {"name": "full_behavioral", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All behavioral drift heuristics including fingerprinting"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Behavioral drift detected: {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Trend: {trend_direction} over {time_window}. Recommendation: {recommendation}.",
+    "summary": "Behavioral analysis over {time_window}: {n_signals} drift signals detected. {n_critical} critical. Portfolio concentration: {concentration_pct}%. Leverage trend: {leverage_trend}. Outstanding approvals: {approval_count}.",
+    "skill_suggestion": "To address {heuristic_name}, I can {skill_action}. This reduces drift risk by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}

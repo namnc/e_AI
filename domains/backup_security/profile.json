@@ -1,0 +1,349 @@
+{
+  "meta": {
+    "domain_name": "backup_security",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "PSE encrypted_backup_recovery research (2026), SLIP-39, Juels-Ristenpart 2014 (Honey Encryption)"
+  },
+
+  "risk_domain": {
+    "name": "Backup Encryption and Recovery Security",
+    "crops_property": "S",
+    "description": "Detect weak backup encryption, stale guardians, quantum-vulnerable backup key exchange, lack of coercion resistance, and non-deterministic secrets that cannot be recovered from seed. Protects the recoverability and confidentiality of wallet secrets.",
+    "protocols": ["SLIP-39", "ERC-4337 social recovery", "Safe recovery modules", "Tornado Cash encrypted notes", "Argent guardians"],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation of all encrypted backup data (permanent, public)",
+        "offline brute-force against password-encrypted backups (GPU/ASIC acceleration)",
+        "social engineering against individual guardians",
+        "future CRQC access for ECDH-encrypted backup key exchange",
+        "coercion of user to reveal backup passwords under duress"
+      ],
+      "limitations": [
+        "no private key access (pre-compromise)",
+        "no physical access to hardware wallets or secure enclaves",
+        "cannot compromise a threshold of independent guardians simultaneously (assumed)"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_password_only_backup": {
+      "id": "H1",
+      "name": "Password-only backup encryption",
+      "severity": "critical",
+      "description": "Backup encrypted solely with a user-chosen password and no additional authentication factor. Vulnerable to offline brute-force: even with Argon2id KDF, a weak password (6-8 chars) is crackable with GPU clusters. On-chain backups are permanently available for offline attack with no rate-limiting.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "single_factor_encryption",
+            "description": "Backup ciphertext uses password-derived key (Argon2/scrypt/PBKDF2) with no threshold shares or hardware key",
+            "data_needed": ["backup_metadata", "encryption_scheme_identifier"],
+            "confidence": 0.85
+          },
+          {
+            "name": "weak_kdf_parameters",
+            "description": "KDF parameters below recommended minimums (Argon2id: <64MB memory, <3 iterations; scrypt: <N=2^20)",
+            "data_needed": ["kdf_parameters", "kdf_algorithm"],
+            "confidence": 0.90
+          },
+          {
+            "name": "no_hardware_binding",
+            "description": "Backup encryption has no hardware key component (e.g., YubiKey HMAC challenge-response)",
+            "data_needed": ["backup_metadata", "encryption_factors"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "single_factor_encryption AND weak_kdf_parameters triggers BLOCK for new backups, WARNING for existing"
+      },
+      "recommendations": [
+        {
+          "action": "add_threshold_factor",
+          "description": "Split backup key into 2-of-3 Shamir shares: password-derived share + guardian share + hardware key share",
+          "effectiveness": 0.90,
+          "user_cost": "medium (guardian setup + hardware key purchase)",
+          "skill_required": "backup_auditor"
+        },
+        {
+          "action": "strengthen_kdf",
+          "description": "Use Argon2id with >=256MB memory, >=4 iterations, 32-byte salt. This raises brute-force cost but does not eliminate single-factor risk.",
+          "effectiveness": 0.50,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Password entropy is bounded by human memory. No KDF can make a 6-character password secure against a determined attacker with GPU clusters and permanent access to the ciphertext.",
+      "benchmark_scenario": {
+        "setup": "Generate N backup ciphertexts with varying password strengths and KDF parameters",
+        "metric": "estimated brute-force time per backup given attacker budget (e.g., $10K GPU rental)",
+        "baseline": "8-char random password with Argon2id (64MB, 3 iter): ~months on GPU cluster; 6-char: ~hours"
+      }
+    },
+
+    "H2_stale_guardians": {
+      "id": "H2",
+      "name": "Stale guardians",
+      "severity": "high",
+      "description": "Social recovery guardian has not confirmed liveness in more than 6 months. Stale guardians may have lost their keys, changed addresses, or become unreachable. If enough guardians go stale, recovery threshold becomes unrecoverable. Adversary can also compromise stale guardians without detection.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "guardian_inactive",
+            "description": "Guardian address has no on-chain activity (transactions sent) in the last 6 months",
+            "data_needed": ["guardian_address", "guardian_last_tx_timestamp"],
+            "confidence": 0.75
+          },
+          {
+            "name": "guardian_liveness_expired",
+            "description": "Guardian has not responded to a liveness check (on-chain heartbeat or signed attestation) within the configured period",
+            "data_needed": ["guardian_liveness_registry", "liveness_check_interval"],
+            "confidence": 0.90
+          },
+          {
+            "name": "threshold_at_risk",
+            "description": "Number of active guardians minus stale guardians is below or equal to the recovery threshold",
+            "data_needed": ["guardian_set", "recovery_threshold", "guardian_activity_status"],
+            "confidence": 0.95
+          }
+        ],
+        "threshold": "threshold_at_risk triggers BLOCK, guardian_inactive triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "request_liveness_check",
+          "description": "Send liveness check request to all guardians. Replace any who do not respond within 30 days.",
+          "effectiveness": 0.85,
+          "user_cost": "low (message + potential replacement transaction)",
+          "skill_required": "guardian_monitor"
+        },
+        {
+          "action": "add_redundant_guardians",
+          "description": "Increase guardian set size above threshold to tolerate stale members (e.g., 3-of-5 instead of 2-of-3)",
+          "effectiveness": 0.70,
+          "user_cost": "medium (onboarding new guardians)",
+          "skill_required": "guardian_monitor"
+        }
+      ],
+      "fundamental_limitation": "Guardian liveness is fundamentally probabilistic. On-chain activity is a proxy, not proof of guardian readiness. A guardian can be active on-chain but have lost their recovery key.",
+      "benchmark_scenario": {
+        "setup": "Sample N social recovery wallets, check guardian activity timestamps",
+        "metric": "fraction of recovery setups where stale guardians bring effective threshold below recoverability",
+        "baseline": "Argent reported ~15% of guardians become unreachable within 1 year"
+      }
+    },
+
+    "H3_quantum_vulnerable_backup_encryption": {
+      "id": "H3",
+      "name": "Quantum-vulnerable backup encryption",
+      "severity": "critical",
+      "description": "Backup encrypted using ECDH-derived key exchange (e.g., recipient public key + ephemeral ECDH) and stored on-chain permanently. A future CRQC breaks ECDH, recovers the encryption key, and decrypts the backup, exposing all wallet secrets including seed phrases, viewing keys, and nullifier keys.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "ecdh_key_in_backup_header",
+            "description": "Backup ciphertext header contains an ephemeral secp256k1 public key indicating ECDH key exchange",
+            "data_needed": ["backup_ciphertext_header", "ephemeral_key_detection"],
+            "confidence": 0.90
+          },
+          {
+            "name": "backup_to_known_ecdh_contract",
+            "description": "Backup stored via contract known to use ECDH-only encryption (e.g., Tornado Cash encrypted notes)",
+            "data_needed": ["target_contract_address", "vulnerable_backup_contract_registry"],
+            "confidence": 0.95
+          },
+          {
+            "name": "no_symmetric_only_flag",
+            "description": "Backup encryption metadata does not indicate symmetric-only encryption (AES-256 with password KDF)",
+            "data_needed": ["backup_metadata", "encryption_scheme_identifier"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "backup_to_known_ecdh_contract triggers BLOCK, ecdh_key_in_backup_header triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "use_symmetric_backup",
+          "description": "Encrypt backup with AES-256-GCM using password-derived key (Argon2id). AES-256 is PQ-safe; the password is the anchor, not ECDH.",
+          "effectiveness": 0.90,
+          "user_cost": "low (password management)",
+          "skill_required": "backup_auditor"
+        },
+        {
+          "action": "use_hybrid_kem_backup",
+          "description": "If threshold/guardian recovery requires public-key encryption, use hybrid ECDH + ML-KEM-768 key exchange",
+          "effectiveness": 0.95,
+          "user_cost": "medium (larger ciphertext, PQ key management)",
+          "skill_required": "backup_auditor"
+        }
+      ],
+      "fundamental_limitation": "Backups already on-chain with ECDH-only encryption cannot be retroactively protected. The ciphertext is permanent. Only new backups can use PQ-safe schemes.",
+      "benchmark_scenario": {
+        "setup": "Scan on-chain backup contracts for ECDH ephemeral key presence in backup ciphertexts",
+        "metric": "fraction of on-chain backups using ECDH-only vs symmetric-only vs hybrid encryption",
+        "baseline": "Tornado Cash used ECDH-encrypted notes; most on-chain backup schemes use ECDH"
+      }
+    },
+
+    "H4_no_coercion_resistance": {
+      "id": "H4",
+      "name": "No coercion resistance",
+      "severity": "high",
+      "description": "Backup/recovery system has a single password that reveals the real seed with no deniable encryption layer. Under duress, the user cannot present a plausible decoy seed while keeping the real one hidden. This matters for dissidents, journalists, and anyone crossing hostile borders with crypto assets.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "single_decryption_path",
+            "description": "Backup ciphertext has exactly one valid decryption key -- no hidden volume or deniable layer",
+            "data_needed": ["backup_encryption_scheme", "deniable_encryption_flag"],
+            "confidence": 0.80
+          },
+          {
+            "name": "deterministic_seed_output",
+            "description": "Any valid password deterministically produces the same seed -- attacker can verify they have the real one",
+            "data_needed": ["backup_decryption_behavior", "seed_verification_method"],
+            "confidence": 0.75
+          },
+          {
+            "name": "no_honey_encryption",
+            "description": "Wrong passwords produce decryption errors instead of plausible fake seeds (no Honey Encryption)",
+            "data_needed": ["backup_encryption_scheme", "error_behavior_on_wrong_password"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "single_decryption_path AND no_honey_encryption triggers WARNING for high-risk user profiles"
+      },
+      "recommendations": [
+        {
+          "action": "use_deniable_encryption",
+          "description": "Implement False-Bottom Encryption (Ahmad et al. 2023): same ciphertext, two passwords, two plaintexts. Real seed under real password, decoy seed under coercion password.",
+          "effectiveness": 0.75,
+          "user_cost": "medium (must maintain two seeds, decoy must be plausible)",
+          "skill_required": "backup_auditor"
+        },
+        {
+          "action": "add_honey_encryption",
+          "description": "Use Honey Encryption (Juels-Ristenpart 2014) so every wrong password produces a plausible-looking seed",
+          "effectiveness": 0.60,
+          "user_cost": "low (transparent to user)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Coercion resistance has a fundamental paradox: the attacker cannot prove all keys have been disclosed, so they may keep pressuring indefinitely. Deniable encryption provides plausible deniability, not guaranteed safety.",
+      "benchmark_scenario": {
+        "setup": "Generate backup ciphertexts with and without deniable encryption. Simulate coercion scenario.",
+        "metric": "probability that an informed attacker can distinguish real seed from decoy seed",
+        "baseline": "without deniable encryption: 100% (single password = single seed)"
+      }
+    },
+
+    "H5_nondeterministic_secrets_not_backed_up": {
+      "id": "H5",
+      "name": "Non-deterministic secrets not backed up",
+      "severity": "high",
+      "description": "Protocol generates random per-action secrets (e.g., original Tornado Cash deposit notes) that cannot be derived from the wallet seed. If the device is lost and only the seed is recovered, these secrets are permanently lost, making the associated funds or state irrecoverable.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "random_note_generation",
+            "description": "Transaction interacts with a protocol known to generate non-deterministic per-action secrets (e.g., Tornado Cash note = random nullifier + random secret)",
+            "data_needed": ["target_contract_address", "nondeterministic_protocol_registry"],
+            "confidence": 0.90
+          },
+          {
+            "name": "no_onchain_backup_for_note",
+            "description": "Non-deterministic secret was generated but no corresponding encrypted backup transaction was submitted on-chain",
+            "data_needed": ["generated_secret_id", "backup_transaction_log"],
+            "confidence": 0.80
+          },
+          {
+            "name": "seed_only_recovery_claimed",
+            "description": "Wallet claims seed-only recovery but uses protocols with non-deterministic state",
+            "data_needed": ["wallet_recovery_mode", "protocol_interaction_history"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "random_note_generation AND no_onchain_backup_for_note triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "backup_non_deterministic_secrets",
+          "description": "Immediately create an encrypted on-chain or off-chain backup of the non-deterministic secret after each protocol interaction",
+          "effectiveness": 0.90,
+          "user_cost": "low (additional gas for on-chain backup, or local encrypted file)",
+          "skill_required": "backup_auditor"
+        },
+        {
+          "action": "prefer_deterministic_protocols",
+          "description": "Use protocols that derive all secrets from seed (modern Railgun, Zcash Sapling+) instead of ones with random per-action secrets",
+          "effectiveness": 0.95,
+          "user_cost": "none (protocol choice)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Non-deterministic secrets are inherently unrecoverable from seed. The only options are explicit backup or protocol redesign. Cannot be fixed retroactively for secrets already generated without backup.",
+      "benchmark_scenario": {
+        "setup": "Enumerate wallet interactions with non-deterministic protocols, check for corresponding backup transactions",
+        "metric": "fraction of non-deterministic secrets with verified on-chain or off-chain backup",
+        "baseline": "Tornado Cash: 5-35% of deposits had on-chain encrypted backup (linkability concerns discouraged backup)"
+      }
+    }
+  },
+
+  "skills": {
+    "guardian_monitor": {
+      "tool": "guardian liveness tracker",
+      "description": "Monitor guardian addresses for on-chain activity, send liveness check requests, alert when guardians go stale or recovery threshold is at risk",
+      "parameters": {"liveness_check_interval_days": 180, "inactivity_threshold_days": 180, "alert_on_threshold_risk": true}
+    },
+    "backup_auditor": {
+      "tool": "backup encryption analyzer",
+      "description": "Analyze backup ciphertext metadata to detect encryption scheme, KDF parameters, key exchange method, and presence of deniable encryption layer. Recommend upgrades.",
+      "parameters": {"check_kdf_strength": true, "check_pq_safety": true, "check_deniability": true, "min_argon2_memory_mb": 256}
+    },
+    "key_rotation_scheduler": {
+      "tool": "key rotation planner",
+      "description": "Schedule and track key rotation events for guardian sets, backup encryption keys, and recovery configurations. Proactive share refresh support.",
+      "parameters": {"rotation_interval_days": 365, "proactive_refresh": true, "notify_guardians": true}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring backup security posture across all recovery dimensions",
+    "methodology": {
+      "step_1": "Inventory all backup and recovery configurations (password, guardians, hardware keys, on-chain backups)",
+      "step_2": "For each backup, assess: encryption strength, KDF parameters, PQ safety, deniability, guardian liveness",
+      "step_3": "For non-deterministic protocol interactions, verify backup existence",
+      "step_4": "Score overall backup security as composite of brute-force resistance, recoverability, and coercion resistance",
+      "step_5": "Generate priority remediation list"
+    },
+    "target": "All backups: PQ-safe encryption, multi-factor, liveness-checked guardians, deterministic or explicitly backed up secrets",
+    "metrics": [
+      "brute_force_resistance_score",
+      "guardian_liveness_rate",
+      "pq_backup_safety_rate",
+      "coercion_resistance_flag",
+      "nondeterministic_secret_backup_rate"
+    ],
+    "adversary_levels": [
+      {"name": "opportunistic", "heuristics": ["H1"], "description": "Brute-force password-only backups with commodity hardware"},
+      {"name": "targeted", "heuristics": ["H1", "H2", "H4"], "description": "Target specific user: brute-force + social-engineer guardians + coercion"},
+      {"name": "quantum_capable", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All attack vectors including CRQC against ECDH-encrypted backups"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Backup {backup_id} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "summary": "Backup security scan: {n_txs} configurations analyzed. {n_risky} at risk ({pct_risky}%). Guardian liveness: {guardian_liveness}%. Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} backup configurations pass security checks. Guardians active, encryption PQ-safe.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This improves backup security by ~{effectiveness_pct}%. {user_cost_note}",
+    "guardian_alert": "Guardian {guardian_address} has been inactive for {inactive_days} days. Recovery threshold at risk: {active_guardians}/{total_guardians} active vs {threshold} required.",
+    "backup_warning": "WARNING: This backup uses {encryption_scheme} which is {vulnerability}. Recommended: {recommendation}."
+  }
+}

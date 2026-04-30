@@ -1,0 +1,360 @@
+{
+  "meta": {
+    "domain_name": "mixing_behavioral",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "arxiv 2308.01703 (ACM Web Conference 2024), Tornado Cash deposit analysis (Chainalysis), Privacy Pools (Buterin et al. 2023)"
+  },
+
+  "risk_domain": {
+    "name": "Post-Mixer Linkability",
+    "crops_property": "P",
+    "description": "Behavioral heuristics that link deposits to withdrawals across mixing protocols (Tornado Cash, Railgun, Privacy Pools) despite correct cryptographic privacy. Generalizes stealth_address_ops H3 (timing) and H6 (amounts) to the broader mixing context, adding multi-denomination, cross-protocol, and mixer-specific metadata leaks.",
+    "protocols": ["Tornado Cash", "Railgun", "Privacy Pools", "Aztec Connect"],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation of all deposits and withdrawals across all mixing protocols",
+        "timing analysis across mempool and block timestamps with second-level precision",
+        "amount distribution modeling across fixed and variable denomination pools",
+        "cross-protocol behavioral correlation (mixer withdrawal -> DeFi interaction)",
+        "relay and gas pattern analysis for mixer-specific transaction fingerprinting",
+        "address clustering across withdrawal addresses (Chainalysis-level)"
+      ],
+      "limitations": [
+        "no private key access",
+        "no ZK proof internals (cannot break cryptographic privacy directly)",
+        "no off-chain metadata (IP, browser) unless combined with RPC provider profile"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_timing_correlation": {
+      "id": "H1",
+      "name": "Timing correlation",
+      "paper_section": "Generalized from stealth_address_ops H3",
+      "severity": "critical",
+      "description": "Deposit-to-withdrawal timing narrows the anonymity set. If a withdrawal occurs shortly after a deposit of the same denomination, the set of possible depositors shrinks to those who deposited within that window. With few concurrent deposits, timing alone can be near-deterministic.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "short_dwell_time",
+            "description": "Time between deposit and withdrawal is less than 1 hour in a pool with fewer than 50 concurrent deposits",
+            "data_needed": ["deposit_timestamp", "withdrawal_timestamp", "pool_deposit_count_in_window"],
+            "confidence": 0.90
+          },
+          {
+            "name": "medium_dwell_time",
+            "description": "Dwell time is less than 6 hours with fewer than 200 concurrent deposits in the pool",
+            "data_needed": ["deposit_timestamp", "withdrawal_timestamp", "pool_deposit_count_in_window"],
+            "confidence": 0.65
+          },
+          {
+            "name": "consistent_dwell_pattern",
+            "description": "User consistently withdraws within a similar time window across multiple mixing operations, creating a behavioral fingerprint",
+            "data_needed": ["user_dwell_history", "withdrawal_timestamps_across_ops"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "short_dwell_time triggers BLOCK, consistent_dwell_pattern triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "enforce_minimum_delay",
+          "description": "Wait a random period (12-72 hours) before withdrawing. Longer delays for smaller pools.",
+          "effectiveness": 0.85,
+          "user_cost": "high (capital locked, inconvenience)",
+          "skill_required": "timing_delay"
+        },
+        {
+          "action": "withdraw_during_peak_activity",
+          "description": "Time withdrawal to coincide with highest deposit activity in the pool to maximize anonymity set",
+          "effectiveness": 0.70,
+          "user_cost": "medium (must wait for peak)",
+          "skill_required": "pool_monitor"
+        }
+      ],
+      "fundamental_limitation": "With few mixer users, even long delays provide small anonymity sets. If the pool has 10 depositors per day, a 24-hour delay still narrows to ~10 candidates. Timing mitigation requires more users.",
+      "benchmark_scenario": {
+        "setup": "Simulate deposit/withdrawal streams at varying activity levels (10, 100, 1000 deposits/day). Adversary matches by timing windows.",
+        "metric": "adversary accuracy in linking deposit-withdrawal pairs at each activity level",
+        "baseline": "Tornado Cash 0.1 ETH pool: median anonymity set ~20 (low activity periods much worse)"
+      }
+    },
+
+    "H2_amount_fingerprinting": {
+      "id": "H2",
+      "name": "Amount fingerprinting",
+      "paper_section": "Generalized from stealth_address_ops H6",
+      "severity": "high",
+      "description": "Unique or unusual amounts link deposits to withdrawals. Fixed-denomination pools (Tornado Cash) mitigate this partially, but variable-amount protocols (Railgun, Privacy Pools) expose the full amount vector. Even in fixed pools, the total amount deposited across denominations creates a fingerprint.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "unique_amount_in_pool",
+            "description": "In variable-amount pools, the deposit amount has fewer than 3 matches within a 24-hour window",
+            "data_needed": ["deposit_amount", "pool_amount_distribution", "time_window"],
+            "confidence": 0.90
+          },
+          {
+            "name": "precise_non_round_amount",
+            "description": "Amount has more than 4 decimal places, making it statistically unique even in active pools",
+            "data_needed": ["deposit_amount"],
+            "confidence": 0.55
+          },
+          {
+            "name": "total_amount_fingerprint",
+            "description": "Total value deposited across multiple fixed-denomination deposits forms a unique combination (e.g., 3x 1ETH + 2x 0.1ETH = 3.2ETH target)",
+            "data_needed": ["user_deposit_history_across_pools", "pool_denomination_set"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "unique_amount_in_pool triggers BLOCK, total_amount_fingerprint triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "use_fixed_denomination_pool",
+          "description": "Prefer fixed-denomination pools (Tornado Cash style) over variable-amount shielded pools for high-privacy transactions",
+          "effectiveness": 0.70,
+          "user_cost": "dust remainder, multiple denominations needed",
+          "skill_required": null
+        },
+        {
+          "action": "normalize_amount",
+          "description": "Round to the nearest standard denomination and leave dust in source wallet",
+          "effectiveness": 0.80,
+          "user_cost": "low (dust loss)",
+          "skill_required": "amount_normalizer"
+        }
+      ],
+      "fundamental_limitation": "Variable-amount pools fundamentally leak more information than fixed-denomination pools. The trade-off is UX (exact amounts) vs privacy (denomination buckets). Privacy Pools may mitigate via association sets, but the amount itself is still a signal.",
+      "benchmark_scenario": {
+        "setup": "Pool of N deposits with realistic amount distribution. Adversary matches by amount + timing combination.",
+        "metric": "adversary's deposit-to-withdrawal linking accuracy for fixed vs variable denomination pools",
+        "baseline": "unique amounts in variable pools: ~95% linkable; fixed pools: timing-only attack"
+      }
+    },
+
+    "H3_multi_denomination_linkage": {
+      "id": "H3",
+      "name": "Multi-denomination linkage",
+      "severity": "high",
+      "description": "Splitting a target amount across multiple denomination pools (e.g., 3.2 ETH as 3x 1ETH + 2x 0.1ETH) creates a multi-deposit fingerprint. The combination of denominations, deposit timing pattern, and withdrawal timing pattern narrows the anonymity set to users who made the same set of deposits.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "correlated_multi_pool_deposits",
+            "description": "Multiple deposits to different denomination pools from addresses in the same cluster within a short time window",
+            "data_needed": ["deposit_events_across_pools", "address_cluster_map", "deposit_timestamps"],
+            "confidence": 0.85
+          },
+          {
+            "name": "matching_withdrawal_pattern",
+            "description": "Withdrawals from multiple pools to addresses in the same cluster with timing that matches the deposit pattern",
+            "data_needed": ["withdrawal_events_across_pools", "address_cluster_map", "withdrawal_timestamps"],
+            "confidence": 0.80
+          },
+          {
+            "name": "denomination_sum_fingerprint",
+            "description": "The sum of denominations deposited matches the sum withdrawn within a reasonable time window, creating a value fingerprint",
+            "data_needed": ["deposit_amounts_per_cluster", "withdrawal_amounts_per_cluster", "time_window"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "correlated_multi_pool_deposits AND matching_withdrawal_pattern triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "stagger_deposits_over_time",
+          "description": "Spread multi-denomination deposits across days or weeks from different addresses to break temporal correlation",
+          "effectiveness": 0.75,
+          "user_cost": "high (extended delay, operational complexity)",
+          "skill_required": "timing_delay"
+        },
+        {
+          "action": "use_single_denomination",
+          "description": "Use only one denomination pool and accept dust loss to avoid multi-pool fingerprinting",
+          "effectiveness": 0.80,
+          "user_cost": "medium (dust loss, may need many transactions)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Multi-denomination usage is inherent when transferring non-round amounts through fixed-denomination pools. The only full mitigation is variable-amount pools (which have their own fingerprinting problem -- H2).",
+      "benchmark_scenario": {
+        "setup": "Simulate N users each splitting amounts across 2-4 denomination pools. Adversary correlates deposit and withdrawal patterns.",
+        "metric": "fraction of users linkable via multi-denomination deposit/withdrawal pattern analysis",
+        "baseline": "Tornado Cash: significant fraction of users deposited to multiple pools within hours"
+      }
+    },
+
+    "H4_cross_protocol_linkage": {
+      "id": "H4",
+      "name": "Cross-protocol linkage",
+      "severity": "critical",
+      "description": "Mixer withdrawal immediately used in DeFi (swap, lend, bridge) links the withdrawal to a behavioral identity. The adversary does not need to break the mixer -- they just observe what happens after the withdrawal. A unique DeFi interaction pattern after withdrawal can narrow the anonymity set to one.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "immediate_defi_interaction",
+            "description": "Withdrawal address interacts with a DeFi protocol within 2 blocks of receiving mixer funds",
+            "data_needed": ["withdrawal_address", "subsequent_transactions", "defi_contract_addresses"],
+            "confidence": 0.85
+          },
+          {
+            "name": "behavioral_continuity",
+            "description": "Post-withdrawal DeFi interaction pattern matches a known address cluster's historical behavior (same protocols, similar amounts, same time-of-day)",
+            "data_needed": ["withdrawal_address_tx_history", "known_cluster_behavioral_profiles"],
+            "confidence": 0.80
+          },
+          {
+            "name": "bridge_after_mixer",
+            "description": "Funds bridged to another chain within 1 hour of mixer withdrawal, creating cross-chain correlation opportunity",
+            "data_needed": ["withdrawal_address", "bridge_contract_interactions", "bridge_timestamps"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "immediate_defi_interaction triggers WARNING, behavioral_continuity triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "hold_before_defi",
+          "description": "Wait at least 24 hours and multiple intervening transactions before using mixed funds in identifiable DeFi protocols",
+          "effectiveness": 0.80,
+          "user_cost": "high (delay, capital inefficiency)",
+          "skill_required": "timing_delay"
+        },
+        {
+          "action": "break_behavioral_pattern",
+          "description": "Vary the DeFi protocols, amounts, and timing used after mixer withdrawal to avoid matching historical behavioral fingerprint",
+          "effectiveness": 0.65,
+          "user_cost": "medium (operational discipline)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Post-mixer behavior is outside the mixer's control. The mixer provides unlinkability at the deposit/withdrawal boundary only. Everything the user does after withdrawal is in the clear and can be correlated.",
+      "benchmark_scenario": {
+        "setup": "Track N mixer withdrawals and their subsequent on-chain activity within 24 hours. Adversary attempts to match withdrawals to known behavioral profiles.",
+        "metric": "fraction of withdrawals linkable to an identity via post-withdrawal DeFi behavior",
+        "baseline": "Chainalysis reports linking Tornado Cash withdrawals via post-withdrawal behavior in multiple investigations"
+      }
+    },
+
+    "H5_mixer_specific_metadata": {
+      "id": "H5",
+      "name": "Mixer-specific metadata leaks",
+      "severity": "high",
+      "description": "Gas patterns, relay usage, withdrawal address reuse, and protocol-specific metadata fingerprint mixer users. Relayer choice narrows the set (few relayers = few anonymity groups). Withdrawal address reuse across multiple mixing operations links them. Non-standard gas settings identify specific wallets.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "relayer_fingerprint",
+            "description": "Withdrawal uses a specific relayer that handles <5% of pool withdrawals, narrowing anonymity set",
+            "data_needed": ["withdrawal_relayer_address", "relayer_market_share_distribution"],
+            "confidence": 0.70
+          },
+          {
+            "name": "withdrawal_address_reuse",
+            "description": "Same address used as withdrawal destination for multiple separate mixing operations",
+            "data_needed": ["withdrawal_address", "mixer_withdrawal_history"],
+            "confidence": 0.90
+          },
+          {
+            "name": "gas_pattern_fingerprint",
+            "description": "Withdrawal transaction gas price or priority fee is distinctive (>2 std devs from block median or matches a known wallet configuration)",
+            "data_needed": ["withdrawal_tx_gas_price", "block_gas_stats", "relayer_gas_patterns"],
+            "confidence": 0.65
+          }
+        ],
+        "threshold": "withdrawal_address_reuse triggers BLOCK, relayer_fingerprint triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "use_fresh_withdrawal_address",
+          "description": "Generate a new address for every mixer withdrawal. Never reuse withdrawal addresses across mixing operations.",
+          "effectiveness": 0.95,
+          "user_cost": "low (address generation is free)",
+          "skill_required": null
+        },
+        {
+          "action": "use_popular_relayer",
+          "description": "Choose the relayer with the highest market share to maximize the anonymity set of relayer users",
+          "effectiveness": 0.60,
+          "user_cost": "none (may affect fee)",
+          "skill_required": "pool_monitor"
+        },
+        {
+          "action": "normalize_gas_to_relayer_default",
+          "description": "Use the relayer's default gas parameters rather than custom settings to blend with other relayer users",
+          "effectiveness": 0.70,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Mixer metadata leakage is protocol-design-dependent. Each mixer has different relayer architectures, gas handling, and withdrawal mechanisms. Countermeasures must be adapted per protocol.",
+      "benchmark_scenario": {
+        "setup": "Analyze N Tornado Cash withdrawals: classify by relayer, gas pattern, and address reuse. Adversary clusters withdrawals by metadata.",
+        "metric": "fraction of withdrawals distinguishable from the anonymity set via metadata alone (without timing or amount analysis)",
+        "baseline": "Tornado Cash: top 3 relayers handled >80% of withdrawals; address reuse was common in early usage"
+      }
+    }
+  },
+
+  "skills": {
+    "timing_delay": {
+      "tool": "local scheduler",
+      "description": "Queue mixer withdrawal for delayed submission after random interval, calibrated to pool activity level",
+      "parameters": {"min_delay_hours": 12, "max_delay_hours": 72, "distribution": "exponential", "calibrate_to_pool_activity": true}
+    },
+    "amount_normalizer": {
+      "tool": "amount rounding",
+      "description": "Round deposit amount to nearest standard denomination for the target mixer protocol",
+      "parameters": {"denominations_eth": [0.1, 1.0, 10.0, 100.0], "protocol_specific": true}
+    },
+    "pool_monitor": {
+      "tool": "mixer pool activity analyzer",
+      "description": "Monitor deposit/withdrawal activity across mixer pools to recommend optimal timing, denomination, and relayer for maximum anonymity set",
+      "parameters": {"supported_protocols": ["tornado_cash", "railgun", "privacy_pools"], "lookback_hours": 168, "min_anonymity_set": 20}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring post-mixer linkability with all behavioral heuristics applied",
+    "methodology": {
+      "step_1": "Generate synthetic deposit/withdrawal dataset with realistic timing, amount, and behavioral distributions across multiple mixer protocols",
+      "step_2": "Run adversary simulator applying all 5 heuristics (timing, amount, multi-denomination, cross-protocol, metadata)",
+      "step_3": "Measure baseline linking rate per heuristic and combined",
+      "step_4": "Apply profile recommendations to all operations",
+      "step_5": "Re-run adversary simulator on modified operations",
+      "step_6": "Compare: linking rate before vs after, broken down by pool activity level"
+    },
+    "target": "Reduce combined linking rate from ~30-50% (estimated baseline) to <5% with all recommendations applied",
+    "metrics": [
+      "per_heuristic_linking_rate",
+      "combined_linking_rate",
+      "anonymity_set_size_distribution",
+      "false_positive_rate",
+      "user_cost_score"
+    ],
+    "adversary_levels": [
+      {"name": "basic", "heuristics": ["H1", "H2"], "description": "Timing + amount analysis only"},
+      {"name": "intermediate", "heuristics": ["H1", "H2", "H3", "H5"], "description": "Add multi-denomination and metadata analysis"},
+      {"name": "advanced", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All heuristics including cross-protocol behavioral correlation"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Mixer operation triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Anonymity set: ~{anon_set}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "summary": "Analyzed {n_txs} mixer operations. {n_risky} linkability risks detected ({pct_risky}%). Average anonymity set: ~{avg_anon_set}. Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} mixer operations pass linkability checks. Anonymity sets adequate.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This improves anonymity set by ~{effectiveness_pct}%. {user_cost_note}",
+    "pool_recommendation": "Pool {pool_name}: {n_deposits} deposits in last {window}h. Optimal withdrawal time: {peak_hour}:00 UTC ({peak_count} withdrawals/hr). Anonymity set: ~{anon_set}.",
+    "cross_protocol_warning": "WARNING: Immediate DeFi interaction after mixer withdrawal. {defi_protocol} interaction within {minutes} minutes links this withdrawal to behavioral profile. Recommendation: wait {recommended_delay}h."
+  }
+}

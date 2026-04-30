@@ -1,0 +1,330 @@
+{
+  "meta": {
+    "domain_name": "wrong_chain_address",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "Address poisoning attacks (SlowMist reports), EIP-155 chain ID specification"
+  },
+
+  "risk_domain": {
+    "name": "Wrong Chain / Address Prevention",
+    "crops_property": "S",
+    "description": "Pre-submission validation to prevent irreversible loss from sending to wrong chain, wrong address, poisoned address, or non-functional contract. Wallet guard that catches common transfer mistakes.",
+    "protocols": ["ERC-20", "ERC-721", "ERC-1155", "ENS", "EIP-155"],
+    "adversary_model": {
+      "capabilities": [
+        "address poisoning via dust transactions with similar-looking addresses",
+        "monitoring user transaction history to craft targeted poisoning attacks",
+        "deploying decoy contracts that mimic legitimate addresses on wrong chains"
+      ],
+      "limitations": [
+        "no private key access",
+        "cannot modify user's address book or wallet UI",
+        "cannot intercept transactions after private relay submission"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_no_activity_on_target_chain": {
+      "id": "H1",
+      "name": "Address has no activity on target chain",
+      "severity": "high",
+      "description": "Recipient address has zero transaction history on the target chain but is active on other chains. This suggests the user may be sending to the right address on the wrong network, resulting in inaccessible funds.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "no_target_chain_history",
+            "description": "Address has zero transactions (sent or received) on the target chain",
+            "data_needed": ["recipient_address", "target_chain_id", "address_tx_count"],
+            "confidence": 0.70
+          },
+          {
+            "name": "active_on_other_chains",
+            "description": "Same address has transaction history on at least one other EVM chain",
+            "data_needed": ["recipient_address", "multi_chain_activity"],
+            "confidence": 0.85
+          },
+          {
+            "name": "user_history_different_chain",
+            "description": "User has previously sent to this address on a different chain",
+            "data_needed": ["user_tx_history", "recipient_address"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "no_target_chain_history AND active_on_other_chains triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "verify_chain",
+          "description": "Confirm the intended chain with the recipient. Address exists on other networks but not this one.",
+          "effectiveness": 0.90,
+          "user_cost": "low (verification delay)",
+          "skill_required": "chain_checker"
+        },
+        {
+          "action": "test_transfer",
+          "description": "Send a minimal test amount first to verify the address is reachable on target chain",
+          "effectiveness": 0.80,
+          "user_cost": "low (extra gas for test tx)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "EVM address reuse across chains means any valid address can technically receive on any chain, even if the recipient cannot access funds there. The check cannot distinguish deliberate cross-chain sends from mistakes.",
+      "benchmark_scenario": {
+        "setup": "Set of N transfers where some target correct chain and others target wrong chain",
+        "metric": "fraction of wrong-chain transfers correctly flagged with acceptable false positive rate",
+        "baseline": "estimated 2-5% of user transfers go to addresses with no target-chain activity"
+      }
+    },
+
+    "H2_contract_cannot_receive": {
+      "id": "H2",
+      "name": "Contract address cannot receive tokens",
+      "severity": "critical",
+      "description": "Recipient is a smart contract that lacks a receive/fallback function for ETH or does not implement the required token receiver interface. Tokens sent to such contracts are permanently locked.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "no_receive_function",
+            "description": "Contract bytecode has no receive() or fallback() function for ETH transfers",
+            "data_needed": ["recipient_address", "contract_bytecode", "transfer_type"],
+            "confidence": 0.95
+          },
+          {
+            "name": "no_token_receiver",
+            "description": "Contract does not implement ERC-721/1155 receiver interface for NFT transfers",
+            "data_needed": ["recipient_address", "contract_interfaces", "token_standard"],
+            "confidence": 0.90
+          }
+        ],
+        "threshold": "no_receive_function for ETH or no_token_receiver for NFTs triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "block_transfer",
+          "description": "Prevent transaction -- tokens would be permanently locked in the contract",
+          "effectiveness": 1.0,
+          "user_cost": "none",
+          "skill_required": "contract_status_checker"
+        },
+        {
+          "action": "suggest_alternative",
+          "description": "If the contract has a deposit function, suggest using that instead of direct transfer",
+          "effectiveness": 0.85,
+          "user_cost": "low (different tx method)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Bytecode analysis can miss proxy contracts where the implementation is upgradeable. A contract that can receive today may not be able to tomorrow, and vice versa.",
+      "benchmark_scenario": {
+        "setup": "N transfers to contracts with and without receive/fallback, including proxy patterns",
+        "metric": "detection rate of non-receivable contracts with false positive rate on proxies",
+        "baseline": "millions of dollars lost annually to tokens sent to non-receivable contracts"
+      }
+    },
+
+    "H3_address_poisoning": {
+      "id": "H3",
+      "name": "Address poisoning",
+      "severity": "critical",
+      "description": "A similar-looking address appears in the user's transaction history, planted by a dust attacker. Users who copy addresses from history may copy the attacker's address instead of the intended recipient.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "similar_address_in_history",
+            "description": "Recipient matches first 4 and last 4 characters of a different address the user previously interacted with",
+            "data_needed": ["recipient_address", "user_tx_history", "known_contacts"],
+            "confidence": 0.85
+          },
+          {
+            "name": "recent_dust_from_similar",
+            "description": "User received a dust transaction (<$0.01) from an address visually similar to the recipient",
+            "data_needed": ["user_incoming_txs", "recipient_address", "dust_threshold"],
+            "confidence": 0.90
+          },
+          {
+            "name": "address_age_mismatch",
+            "description": "Recipient address was created very recently (< 7 days) and has only dust transactions",
+            "data_needed": ["recipient_address", "address_creation_date", "address_tx_history"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "similar_address_in_history AND recent_dust_from_similar triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "block_and_warn",
+          "description": "Block transaction and show the legitimate address alongside the poisoned one for comparison",
+          "effectiveness": 0.95,
+          "user_cost": "none",
+          "skill_required": "address_validator"
+        },
+        {
+          "action": "use_address_book",
+          "description": "Always use saved address book entries instead of copying from transaction history",
+          "effectiveness": 0.90,
+          "user_cost": "none (behavioral change)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Address poisoning exploits UI patterns, not protocol flaws. As long as wallets display truncated addresses and users copy from history, this attack vector persists.",
+      "benchmark_scenario": {
+        "setup": "Inject N poisoned addresses into simulated transaction history, measure detection",
+        "metric": "fraction of poisoned addresses correctly identified before user sends",
+        "baseline": "address poisoning caused >$40M in losses in 2023 (SlowMist)"
+      }
+    },
+
+    "H4_chain_id_mismatch": {
+      "id": "H4",
+      "name": "Chain ID mismatch",
+      "severity": "critical",
+      "description": "Transaction is being signed with a chain ID that doesn't match the intended target network. This can result in the transaction being replayed on the wrong chain or failing entirely.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "chain_id_wrong",
+            "description": "Transaction chain ID does not match the RPC endpoint's reported chain ID",
+            "data_needed": ["tx_chain_id", "rpc_chain_id", "user_intended_network"],
+            "confidence": 0.95
+          },
+          {
+            "name": "network_name_mismatch",
+            "description": "User-selected network name resolves to a different chain ID than expected",
+            "data_needed": ["selected_network", "expected_chain_id", "actual_chain_id"],
+            "confidence": 0.90
+          }
+        ],
+        "threshold": "chain_id_wrong triggers BLOCK immediately"
+      },
+      "recommendations": [
+        {
+          "action": "block_submission",
+          "description": "Prevent transaction from being broadcast until chain ID is corrected",
+          "effectiveness": 1.0,
+          "user_cost": "none",
+          "skill_required": "chain_checker"
+        },
+        {
+          "action": "auto_correct_chain",
+          "description": "Switch wallet to the correct network matching the intended recipient chain",
+          "effectiveness": 0.90,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "EIP-155 replay protection prevents cross-chain replay but doesn't prevent a user from intentionally signing for the wrong chain. Detection relies on inferring user intent.",
+      "benchmark_scenario": {
+        "setup": "N transactions with correct and incorrect chain IDs across mainnet, L2s, and testnets",
+        "metric": "detection rate of mismatched chain IDs with zero false positives",
+        "baseline": "chain ID mismatches are deterministic -- 100% detection expected"
+      }
+    },
+
+    "H5_deprecated_contract": {
+      "id": "H5",
+      "name": "Deprecated contract",
+      "severity": "high",
+      "description": "Recipient contract is paused, has been migrated to a new version, or appears abandoned (no transactions in 90+ days). Sending funds may result in locked tokens or interaction with outdated logic.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "contract_paused",
+            "description": "Contract has a paused state variable set to true or circuit breaker is active",
+            "data_needed": ["contract_address", "contract_state", "pause_status"],
+            "confidence": 0.90
+          },
+          {
+            "name": "migration_detected",
+            "description": "Contract emitted a migration event or has a successor address registered",
+            "data_needed": ["contract_events", "migration_registry"],
+            "confidence": 0.85
+          },
+          {
+            "name": "abandoned_contract",
+            "description": "Contract has had no transactions in 90+ days and no governance activity",
+            "data_needed": ["contract_address", "last_tx_timestamp", "governance_activity"],
+            "confidence": 0.60
+          }
+        ],
+        "threshold": "contract_paused OR migration_detected triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "check_migration",
+          "description": "Look up the new contract address and redirect the transaction to the migrated version",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "contract_status_checker"
+        },
+        {
+          "action": "warn_user",
+          "description": "Display warning about deprecated contract status and let user decide",
+          "effectiveness": 0.70,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Not all abandoned contracts are deprecated -- some are intentionally immutable. Contract pause detection depends on standard patterns; custom implementations may not be detectable.",
+      "benchmark_scenario": {
+        "setup": "N contracts including active, paused, migrated, and abandoned, with known ground truth",
+        "metric": "accuracy in classifying contract status across all categories",
+        "baseline": "paused/migrated detection near 100% for standard patterns, lower for custom"
+      }
+    }
+  },
+
+  "skills": {
+    "address_validator": {
+      "tool": "address comparison engine",
+      "description": "Compare recipient address against known contacts, detect visual similarity with poisoned addresses",
+      "parameters": {"similarity_threshold": 0.8, "check_first_n_chars": 4, "check_last_n_chars": 4, "dust_threshold_usd": 0.01}
+    },
+    "chain_checker": {
+      "tool": "multi-chain address lookup",
+      "description": "Check address activity across EVM chains to detect wrong-chain sends",
+      "parameters": {"chains": ["ethereum", "polygon", "arbitrum", "optimism", "base", "bsc", "avalanche"], "min_tx_count": 1}
+    },
+    "contract_status_checker": {
+      "tool": "contract state analyzer",
+      "description": "Check contract pause status, migration history, and activity recency",
+      "parameters": {"inactivity_threshold_days": 90, "check_pause_patterns": true, "check_migration_events": true}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring detection of wrong-chain and wrong-address transfers before submission",
+    "methodology": {
+      "step_1": "Generate N test transfers: correct, wrong-chain, poisoned-address, non-receivable contract, chain-ID mismatch",
+      "step_2": "Run all 5 heuristics on each transfer",
+      "step_3": "Measure detection rate per category",
+      "step_4": "Measure false positive rate on legitimate transfers",
+      "step_5": "Estimate funds saved by blocked transactions"
+    },
+    "target": "detect >95% of wrong-chain/wrong-address transfers with <5% false positive rate",
+    "metrics": [
+      "per_heuristic_detection_rate",
+      "combined_detection_rate",
+      "false_positive_rate",
+      "estimated_funds_saved"
+    ],
+    "adversary_levels": [
+      {"name": "accidental", "heuristics": ["H1", "H2", "H4"], "description": "User mistakes -- wrong chain, non-receivable contract"},
+      {"name": "social_engineering", "heuristics": ["H3", "H5"], "description": "Attacker-induced -- poisoned addresses, deprecated contracts"},
+      {"name": "full_detection", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All transfer validation heuristics"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Transfer to {recipient} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "summary": "Validated {n_txs} pending transfers. {n_risky} flagged ({pct_risky}%). Issues: {issue_list}.",
+    "skill_suggestion": "To prevent {heuristic_name}, I can {skill_action}. This catches ~{effectiveness_pct}% of cases. {user_cost_note}"
+  }
+}

@@ -1,0 +1,343 @@
+{
+  "meta": {
+    "domain_name": "pq_readiness",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "NIST FIPS 203 (ML-KEM), pq.ethereum.org threat timeline"
+  },
+
+  "risk_domain": {
+    "name": "Post-Quantum Readiness",
+    "crops_property": "S",
+    "description": "Detect quantum-vulnerable keys and cryptographic operations in wallet transactions. Flags ECDH-only key exchanges, classical-only smart account keys, and on-chain data encrypted with quantum-breakable schemes -- all harvestable under HNDL.",
+    "protocols": ["ERC-5564", "ERC-6538", "Umbra", "Fluidkey", "ERC-4337", "EIP-7702"],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation and permanent archival of all transaction data",
+        "future CRQC access capable of running Shor's algorithm against ECDH and BLS",
+        "harvest-now-decrypt-later strategy on all ECDH ephemeral keys and BLS signatures",
+        "retroactive deanonymization of stealth address recipients via archived ciphertexts",
+        "identification of key reuse patterns to prioritize high-value harvest targets"
+      ],
+      "limitations": [
+        "no private key access (pre-quantum)",
+        "no off-chain metadata (IP, browser fingerprints)",
+        "CRQC timeline uncertain (estimated 2030-2035)"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_ecdh_only_stealth_registration": {
+      "id": "H1",
+      "name": "ECDH-only stealth address registration",
+      "severity": "critical",
+      "description": "Stealth address meta-address registered with only an ECDH public key and no ML-KEM hybrid component. All future announcements to this recipient use classical-only key exchange, making every payment permanently harvestable by a future CRQC.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "no_mlkem_in_meta_address",
+            "description": "Meta-address in ERC-6538 registry contains only secp256k1 public keys with no PQ KEM public key appended",
+            "data_needed": ["erc6538_registry_entry", "meta_address_bytes"],
+            "confidence": 0.95
+          },
+          {
+            "name": "classical_announcement_format",
+            "description": "Stealth address announcement uses 33-byte ephemeral key (ECDH) instead of hybrid format (33B ECDH + 1088B ML-KEM ciphertext)",
+            "data_needed": ["announcement_event_data", "ephemeral_key_length"],
+            "confidence": 0.90
+          },
+          {
+            "name": "protocol_version_check",
+            "description": "Protocol version field indicates pre-PQ specification (ERC-5564 v1 without PQ extension)",
+            "data_needed": ["announcement_scheme_id"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "no_mlkem_in_meta_address triggers BLOCK for new registrations, WARNING for existing"
+      },
+      "recommendations": [
+        {
+          "action": "register_hybrid_meta_address",
+          "description": "Re-register meta-address with hybrid ECDH + ML-KEM-768 public key in ERC-6538 registry",
+          "effectiveness": 0.95,
+          "user_cost": "low (one-time registry update gas cost)",
+          "skill_required": "pq_migration_advisor"
+        },
+        {
+          "action": "warn_sender",
+          "description": "If sending to a classical-only recipient, warn that the payment is permanently harvestable",
+          "effectiveness": 0.30,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Cannot retroactively protect announcements already made with classical-only key exchange. Those ciphertexts are permanently on-chain and permanently vulnerable.",
+      "benchmark_scenario": {
+        "setup": "Scan ERC-6538 registry entries and ERC-5564 announcements for meta-address format",
+        "metric": "fraction of active stealth address users with PQ-hybrid meta-addresses vs classical-only",
+        "baseline": "~0% of current 77K+ Umbra registrations have PQ keys (as of April 2026)"
+      }
+    },
+
+    "H2_classical_only_smart_account": {
+      "id": "H2",
+      "name": "Classical-only key in smart account",
+      "severity": "high",
+      "description": "Smart account (ERC-4337 or EIP-7702) uses only ECDSA/secp256k1 signing key with no post-quantum fallback key registered. A CRQC can derive the private key from any on-chain ECDSA signature and take full control of the account.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "no_pq_fallback_key",
+            "description": "Smart account storage or configuration has no registered PQ signature verification key (ML-DSA or Falcon)",
+            "data_needed": ["account_storage_slots", "account_module_list"],
+            "confidence": 0.85
+          },
+          {
+            "name": "ecdsa_only_validation",
+            "description": "Account's validateUserOp function only checks ECDSA signatures with no PQ signature path",
+            "data_needed": ["account_bytecode", "validation_function_selectors"],
+            "confidence": 0.80
+          },
+          {
+            "name": "no_upgrade_path",
+            "description": "Account implementation is non-upgradeable (no proxy pattern) and has no PQ module slot",
+            "data_needed": ["account_bytecode", "proxy_detection"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "no_pq_fallback_key AND ecdsa_only_validation triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "register_pq_fallback",
+          "description": "Add a PQ signature key (ML-DSA-65 or Falcon-512) as fallback signer in the smart account module",
+          "effectiveness": 0.90,
+          "user_cost": "medium (requires account upgrade transaction + PQ key generation)",
+          "skill_required": "pq_migration_advisor"
+        },
+        {
+          "action": "migrate_to_upgradeable",
+          "description": "If account is non-upgradeable, migrate assets to a new upgradeable smart account with PQ module slot",
+          "effectiveness": 0.85,
+          "user_cost": "high (migration cost + new account setup)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "PQ signature verification on Ethereum requires precompiles (EIP-8051/8052) for practical gas costs. Until those ship, on-chain PQ sig verification costs ~131x more than ECDSA.",
+      "benchmark_scenario": {
+        "setup": "Sample N ERC-4337 smart accounts from bundler mempools and check for PQ key registration",
+        "metric": "fraction of smart accounts with PQ fallback keys registered",
+        "baseline": "~0% of current smart accounts have PQ keys"
+      }
+    },
+
+    "H3_quantum_vulnerable_onchain_encryption": {
+      "id": "H3",
+      "name": "On-chain encrypted data using ECDH-derived key",
+      "severity": "critical",
+      "description": "Data encrypted with a key derived from ECDH key exchange and stored on-chain permanently. A CRQC breaks ECDH via Shor's algorithm, recovers the shared secret, and decrypts all such data retroactively. This covers stealth address announcements, encrypted backup notes, shielded pool memo fields, and any application-layer ECDH.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "ecdh_ephemeral_key_detected",
+            "description": "Transaction calldata contains a 33-byte compressed secp256k1 point used as ephemeral ECDH key",
+            "data_needed": ["transaction_calldata", "known_protocol_selectors"],
+            "confidence": 0.90
+          },
+          {
+            "name": "encrypted_blob_without_pq_kem",
+            "description": "Encrypted data blob on-chain with no accompanying ML-KEM ciphertext (1088 bytes), indicating classical-only key exchange",
+            "data_needed": ["transaction_calldata", "calldata_length_analysis"],
+            "confidence": 0.85
+          },
+          {
+            "name": "known_vulnerable_protocol",
+            "description": "Transaction interacts with a contract known to use ECDH-only encryption (Tornado Cash note encryption, Umbra v1 announcements)",
+            "data_needed": ["target_contract_address", "vulnerable_protocol_registry"],
+            "confidence": 0.95
+          }
+        ],
+        "threshold": "known_vulnerable_protocol OR (ecdh_ephemeral_key_detected AND encrypted_blob_without_pq_kem) triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "use_hybrid_encryption",
+          "description": "Encrypt with hybrid ECDH + ML-KEM-768 key exchange so data is protected even if ECDH breaks",
+          "effectiveness": 0.95,
+          "user_cost": "medium (larger ciphertext: +1088 bytes on-chain)",
+          "skill_required": "key_analyzer"
+        },
+        {
+          "action": "use_symmetric_only",
+          "description": "For self-encrypted data (backups), use AES-256-GCM with strong KDF from password -- no ECDH in the path",
+          "effectiveness": 0.90,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Cannot retroactively protect ECDH-encrypted data already stored on-chain. The only mitigation is to stop adding new harvestable ciphertexts.",
+      "benchmark_scenario": {
+        "setup": "Scan recent blocks for transactions containing 33-byte ephemeral public keys or interacting with known ECDH-based protocols",
+        "metric": "volume of new ECDH-encrypted data being added to chain per day (growth rate of the HNDL honeypot)",
+        "baseline": "~$5B+ cumulative value protected by harvestable ECDH keys across all Ethereum privacy protocols"
+      }
+    },
+
+    "H4_bls_threshold_participation": {
+      "id": "H4",
+      "name": "BLS threshold signature participation",
+      "severity": "high",
+      "description": "Participation in BLS-based threshold signature schemes (distributed validators, threshold decryption committees, drand). All BLS constructions break under CRQC via Shor on the pairing-friendly curve. Threshold shares, committee memberships, and signed messages become compromisable.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "bls_deposit_detected",
+            "description": "Transaction deposits to Ethereum Beacon Chain deposit contract or distributed validator registry using BLS12-381 keys",
+            "data_needed": ["target_contract_address", "deposit_data_pubkey"],
+            "confidence": 0.95
+          },
+          {
+            "name": "threshold_committee_join",
+            "description": "Transaction registers a BLS public key share in a threshold committee contract (e.g., Shutter keyper set, drand node)",
+            "data_needed": ["target_contract_address", "committee_registry_events"],
+            "confidence": 0.85
+          },
+          {
+            "name": "bls_signed_attestation",
+            "description": "Transaction includes data signed with a BLS key that will be publicly verifiable and archivable",
+            "data_needed": ["transaction_calldata", "bls_signature_format"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "bls_deposit_detected triggers INFO, threshold_committee_join triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "plan_key_rotation",
+          "description": "Document a PQ migration plan for BLS-dependent operations. When PQ-safe alternatives become available, rotate keys promptly.",
+          "effectiveness": 0.50,
+          "user_cost": "low (planning only)",
+          "skill_required": "pq_migration_advisor"
+        },
+        {
+          "action": "minimize_bls_exposure",
+          "description": "Limit the value and sensitivity of operations committed through BLS threshold schemes where possible",
+          "effectiveness": 0.40,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "No PQ replacement for BLS pairings exists at practical efficiency. Ethereum consensus itself depends on BLS. This is a systemic risk beyond individual wallet control -- it requires protocol-level migration.",
+      "benchmark_scenario": {
+        "setup": "Enumerate wallet interactions with BLS-dependent contracts (beacon deposit, DVT registries, Shutter, drand)",
+        "metric": "count and value of BLS-dependent operations per wallet",
+        "baseline": "all Ethereum validators (~1M) use BLS; Shutter has ~20 keypers; drand has 22 nodes"
+      }
+    },
+
+    "H5_long_term_key_reuse": {
+      "id": "H5",
+      "name": "Long-term key reuse without rotation",
+      "severity": "high",
+      "description": "Same ECDSA or ECDH key used across many transactions over an extended period without rotation. Increases harvest value: a single quantum key recovery compromises all historical transactions signed or encrypted under that key. Key reuse also enables behavioral profiling across the full transaction history.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "key_age_high",
+            "description": "Signing key has been in active use for >2 years without rotation to a new key or account",
+            "data_needed": ["first_tx_timestamp", "latest_tx_timestamp", "account_address"],
+            "confidence": 0.70
+          },
+          {
+            "name": "high_tx_count_single_key",
+            "description": "More than 1000 transactions signed by the same ECDSA key, creating a large harvest target",
+            "data_needed": ["account_tx_count", "account_address"],
+            "confidence": 0.65
+          },
+          {
+            "name": "high_value_single_key",
+            "description": "Key controls >$100K in assets and has been used for >6 months without rotation",
+            "data_needed": ["account_balance", "account_token_balances", "first_tx_timestamp"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "high_value_single_key triggers WARNING, key_age_high AND high_tx_count_single_key triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "rotate_to_smart_account",
+          "description": "Migrate to a smart account where signing keys can be rotated without changing the account address, reducing single-key harvest value",
+          "effectiveness": 0.75,
+          "user_cost": "high (account migration)",
+          "skill_required": "key_analyzer"
+        },
+        {
+          "action": "split_across_accounts",
+          "description": "Distribute assets across multiple accounts with different keys to limit per-key exposure",
+          "effectiveness": 0.60,
+          "user_cost": "medium (operational complexity)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "EOA addresses are derived from the public key. Rotating an EOA key means changing addresses, which breaks all existing approvals, ENS records, and social recovery configurations. Smart accounts solve this but require migration.",
+      "benchmark_scenario": {
+        "setup": "Sample N active Ethereum accounts, measure key age, transaction count, and controlled value",
+        "metric": "distribution of key age and per-key value exposure across the sampled accounts",
+        "baseline": "most EOAs have never rotated keys; many high-value accounts are 3+ years old"
+      }
+    }
+  },
+
+  "skills": {
+    "key_analyzer": {
+      "tool": "account key analysis",
+      "description": "Analyze an account's key configuration: detect classical-only keys, check for PQ fallback registration, measure key age and reuse, assess quantum harvest value",
+      "parameters": {"check_meta_address": true, "check_smart_account_modules": true, "check_key_age": true, "value_threshold_usd": 100000}
+    },
+    "pq_migration_advisor": {
+      "tool": "PQ migration recommendation engine",
+      "description": "Generate a personalized PQ migration plan based on account type (EOA vs smart account), key usage patterns, and controlled value. Recommends hybrid key registration, smart account upgrade paths, and priority ordering.",
+      "parameters": {"include_gas_estimates": true, "include_timeline": true, "target_security_level": "ML-KEM-768"}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring PQ readiness across a wallet's key portfolio",
+    "methodology": {
+      "step_1": "Enumerate all keys controlled by the wallet (EOAs, smart account signers, stealth meta-addresses, BLS keys)",
+      "step_2": "For each key, assess quantum vulnerability (ECDSA, ECDH, BLS) and harvest value (age, tx count, controlled assets)",
+      "step_3": "Score overall PQ readiness as percentage of key operations with PQ protection",
+      "step_4": "Generate migration priority list ordered by harvest value and vulnerability severity",
+      "step_5": "Re-score after user applies recommended migrations"
+    },
+    "target": "0% PQ-ready (current baseline) -> 80%+ with hybrid registrations and smart account PQ modules",
+    "metrics": [
+      "pq_readiness_score",
+      "harvest_value_at_risk_usd",
+      "migration_cost_estimate_gas",
+      "per_key_vulnerability_rating"
+    ],
+    "adversary_levels": [
+      {"name": "passive_harvester", "heuristics": ["H1", "H3"], "description": "Archives ECDH ciphertexts for future CRQC decryption"},
+      {"name": "key_targeter", "heuristics": ["H2", "H5"], "description": "Identifies high-value classical keys to prioritize quantum attack"},
+      {"name": "full_crqc", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All quantum-vulnerable operations across all key types"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "summary": "PQ readiness scan: {n_txs} operations analyzed. {n_risky} quantum-vulnerable ({pct_risky}%). Harvest value at risk: {harvest_value}. Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} operations use PQ-safe cryptography. No quantum vulnerability detected.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This reduces quantum harvest exposure by ~{effectiveness_pct}%. {user_cost_note}",
+    "pq_migration_plan": "Migration plan for {account}: {n_steps} steps, estimated gas {total_gas}. Priority 1: {priority_1}. Timeline: {timeline}.",
+    "harvest_warning": "WARNING: This operation adds {data_size} bytes of ECDH-encrypted data to the permanent on-chain archive. A future CRQC can decrypt this retroactively."
+  }
+}
