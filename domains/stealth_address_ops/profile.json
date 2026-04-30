@@ -58,6 +58,18 @@
             "description": "Both addresses resolve to same ENS domain or are in same ENS ownership",
             "data_needed": ["ens_records"],
             "confidence": 0.90
+          },
+          {
+            "name": "smart_account_factory",
+            "description": "Withdrawal address and deposit address created by same smart account factory with similar bytecode",
+            "data_needed": ["contract_creation_data", "factory_address"],
+            "confidence": 0.75
+          },
+          {
+            "name": "cex_correlation",
+            "description": "Withdrawal address previously received deposits from same CEX hot wallet as the deposit address",
+            "data_needed": ["cex_deposit_history", "known_cex_addresses"],
+            "confidence": 0.70
           }
         ],
         "threshold": "any signal above 0.7 confidence triggers alert"
@@ -263,6 +275,18 @@
             "description": "Transaction sender address matches stealth address registrant",
             "data_needed": ["sender_address", "stealth_meta_address_owner"],
             "confidence": 1.0
+          },
+          {
+            "name": "self_send_via_contract",
+            "description": "Transaction routed through a contract but origin address matches registrant",
+            "data_needed": ["tx_origin", "stealth_meta_address_owner"],
+            "confidence": 0.95
+          },
+          {
+            "name": "round_trip",
+            "description": "Deposit to stealth address followed by withdrawal back to the depositor within 24h",
+            "data_needed": ["deposit_address", "withdrawal_destination", "timing"],
+            "confidence": 0.90
           }
         ],
         "threshold": "any self_send is a BLOCK"
@@ -414,7 +438,23 @@
 
   "templates": {
     "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "risk_assessment_block": "BLOCKED: {heuristic_name} detected with {confidence}% confidence. {signal_description}. This transaction would be deanonymized.",
     "summary": "Analyzed {n_txs} stealth address transactions. {n_risky} flagged ({pct_risky}%). Top risks: {top_risks}.",
-    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This reduces deanonymization risk by ~{effectiveness_pct}%. {user_cost_note}"
+    "summary_clean": "All {n_txs} transactions pass privacy checks. No deanonymization risks detected.",
+    "summary_with_cover": "Analyzed {n_txs} transactions. {n_risky} flagged. Cover score: {cover_score}. Anonymity set: ~{anon_set}.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This reduces deanonymization risk by ~{effectiveness_pct}%. {user_cost_note}",
+    "skill_auto_apply": "Auto-applying {skill_name}: {skill_description}. Original: {original_value}. Modified: {new_value}.",
+    "cover_recommendation": "Optimal parameters for this pool: {amount} ETH (matches {n_matches}), delay {delay_hours}h (peak at {peak_hour}:00), gas {gas} gwei. Cover score: {score}.",
+    "cover_warning": "WARNING: Anonymity set is only {anon_set}. Even with all countermeasures, an adversary can narrow to 1-of-{anon_set}.",
+    "behavioral_alert": "Pattern detected: {pattern_description}. Over your last {n_txs} stealth transactions, {behavioral_detail}. This behavioral consistency is a fingerprint.",
+    "timing_recommendation": "Current pool has {n_deposits} deposits in the last {window}h. Best time to transact: {peak_hour}:00 UTC ({peak_count} deposits/hr).",
+    "amount_recommendation": "Current pool amounts: {amount_histogram}. Most popular: {best_amount} ETH ({best_count} matches). Your {user_amount} ETH has {user_matches} matches.",
+    "gas_recommendation": "Pool gas: median {median} gwei, IQR [{p25}, {p75}]. Your {user_gas} gwei is {deviation} from median.",
+    "funding_recommendation": "Use {method} for gas. Direct funding from known address links your stealth address to your identity with ~95% confidence.",
+    "compound_risk": "Multiple heuristics combine: {heuristic_list}. Individual risks multiply -- your effective anonymity set is {effective_set} (not {nominal_set}).",
+    "fundamental_limit": "Note: {limitation}. No technology can fix this -- it requires more stealth address users.",
+    "daily_report": "Daily privacy report: {n_txs} stealth transactions. {n_clean} clean, {n_risky} flagged. Average cover score: {avg_score}. Biggest risk: {top_risk}.",
+    "onboarding": "Welcome to stealth address privacy advisor. This tool checks your transactions against 6 known deanonymization heuristics before they hit the chain. Running locally -- no data leaves your device."
   }
 }
