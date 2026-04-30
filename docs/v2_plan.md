@@ -125,12 +125,19 @@ e_AI/
 | **v2.5** | L2 profiles (bridge linkage, sequencer, anonymity set) | |
 | **v3.0** | Frontend verification module (application gap) | Research needed |
 
-## Score
+## Score (updated 2026-04-30)
 
-| Access method | v1 | v2.0 (now) | v2.5 (target) |
+| Access method | v1 | v2 (now) | Target |
 |---|---|---|---|
-| AI | 1 profile | 1 profile | 3 profiles |
-| Wallet | 0 | 2 profiles | 8 profiles |
-| Application | 0 | 0 | 3 profiles + gap |
-| L2 | 0 | 0 | 5 profiles |
-| **Total** | **1** | **3** | **19** |
+| AI | 1 (defi_query) | 2 (+ rpc_leakage) | 4 |
+| Wallet | 0 | 3 (stealth_ops, approval_phishing, offchain_signature) | 8 |
+| Application | 0 | 2 (governance_proposal, cross_protocol_risk) | 2 + sybil merged |
+| L2 | 0 | 2 (l2_bridge_linkage, l2_anonymity_set) | 4 |
+| **Total** | **1** | **9** | **18** |
+
+Integration points:
+- Wallet guard (EIP-1193): working demo
+- **RPC proxy: working, tested with real Ethereum RPC**
+- LLM proxy: v1 production
+- AI agent guard: working demo
+- DApp frontend guard: working demo
