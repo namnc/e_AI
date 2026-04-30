@@ -1,0 +1,420 @@
+{
+  "meta": {
+    "domain_name": "stealth_address_ops",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "arxiv 2308.01703 (ACM Web Conference 2024)",
+    "baseline_deanon_rate": 0.485,
+    "target_deanon_rate": 0.10
+  },
+
+  "risk_domain": {
+    "name": "Stealth Address Operational Privacy",
+    "crops_property": "P",
+    "description": "Operational heuristics that deanonymize stealth address transactions despite correct cryptographic construction",
+    "protocols": ["Umbra", "Fluidkey", "ERC-5564"],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation",
+        "timing analysis (mempool + block timestamps)",
+        "gas price distribution modeling",
+        "address clustering (Chainalysis-level)",
+        "amount distribution modeling",
+        "cross-protocol linkage"
+      ],
+      "limitations": [
+        "no private key access",
+        "no RPC provider access (separate profile)",
+        "no off-chain metadata (IP, browser)"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_same_entity_withdrawal": {
+      "id": "H1",
+      "name": "Same-entity withdrawal",
+      "paper_section": "Section 4.1",
+      "severity": "critical",
+      "description": "Sender and receiver belong to the same address cluster. Trivial deanonymization if the withdrawal address has any transaction history with the sender.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "shared_cluster",
+            "description": "Withdrawal address appears in same address cluster as deposit address",
+            "data_needed": ["address_cluster_map", "deposit_address", "withdrawal_address"],
+            "confidence": 0.95
+          },
+          {
+            "name": "common_funding",
+            "description": "Withdrawal and deposit addresses funded by same source",
+            "data_needed": ["funding_history"],
+            "confidence": 0.80
+          },
+          {
+            "name": "ens_linkage",
+            "description": "Both addresses resolve to same ENS domain or are in same ENS ownership",
+            "data_needed": ["ens_records"],
+            "confidence": 0.90
+          }
+        ],
+        "threshold": "any signal above 0.7 confidence triggers alert"
+      },
+      "recommendations": [
+        {
+          "action": "use_fresh_address",
+          "description": "Use a freshly generated address with no on-chain history for withdrawal",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_different_chain",
+          "description": "Withdraw to a different L2 or sidechain with no history linkage",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Address clustering improves over time. A fresh address today may be linked to the user's cluster in the future through subsequent activity.",
+      "benchmark_scenario": {
+        "setup": "Generate N deposit/withdrawal pairs where withdrawal address is in sender's cluster",
+        "metric": "fraction of pairs where adversary correctly links deposit to withdrawal",
+        "baseline": "~95% linkable (near certain if cluster is known)"
+      }
+    },
+
+    "H2_gas_price_fingerprinting": {
+      "id": "H2",
+      "name": "Gas price fingerprinting",
+      "paper_section": "Section 4.2",
+      "severity": "high",
+      "description": "Consistent or unusual gas price settings create a behavioral fingerprint across stealth address transactions.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "gas_outlier",
+            "description": "Gas price/priority fee is >2 std devs from block median",
+            "data_needed": ["tx_gas_price", "block_gas_stats"],
+            "confidence": 0.70
+          },
+          {
+            "name": "gas_consistency",
+            "description": "Same exact gas parameters across multiple stealth transactions",
+            "data_needed": ["user_tx_history_gas"],
+            "confidence": 0.85
+          },
+          {
+            "name": "gas_pattern",
+            "description": "Gas price follows a recognizable pattern (e.g., always round numbers, always +5% above base)",
+            "data_needed": ["user_tx_history_gas", "base_fee_history"],
+            "confidence": 0.60
+          }
+        ],
+        "threshold": "gas_consistency OR gas_outlier triggers alert"
+      },
+      "recommendations": [
+        {
+          "action": "randomize_gas",
+          "description": "Set gas price randomly within the [25th, 75th] percentile of recent block gas distribution",
+          "effectiveness": 0.80,
+          "user_cost": "none",
+          "skill_required": "gas_randomizer"
+        },
+        {
+          "action": "use_wallet_default",
+          "description": "Use wallet's default gas estimation (most common fingerprint = least identifiable)",
+          "effectiveness": 0.60,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Gas randomization only works if other users also have diverse gas patterns. If most wallets use identical gas estimation, any deviation is a fingerprint.",
+      "benchmark_scenario": {
+        "setup": "Pool of N users with varying gas behaviors. Adversary sees 10 stealth txs per user.",
+        "metric": "adversary accuracy in attributing stealth txs to users based on gas fingerprint alone",
+        "baseline": "depends on user gas diversity -- high for custom gas users"
+      }
+    },
+
+    "H3_timing_correlation": {
+      "id": "H3",
+      "name": "Timing correlation",
+      "paper_section": "Section 4.3",
+      "severity": "critical",
+      "description": "Spending from a stealth address shortly after receiving narrows the anonymity set to other deposits in the same time window.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "short_dwell",
+            "description": "Time between deposit receipt and first spend is < 1 hour",
+            "data_needed": ["deposit_timestamp", "spend_timestamp"],
+            "confidence": 0.90
+          },
+          {
+            "name": "medium_dwell",
+            "description": "Dwell time < 6 hours",
+            "data_needed": ["deposit_timestamp", "spend_timestamp"],
+            "confidence": 0.60
+          },
+          {
+            "name": "consistent_dwell",
+            "description": "User consistently spends within similar time windows across stealth addresses",
+            "data_needed": ["user_dwell_history"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "short_dwell triggers BLOCK, medium_dwell triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "delay_spend",
+          "description": "Wait a random period (6-24 hours) before spending from stealth address",
+          "effectiveness": 0.85,
+          "user_cost": "high (inconvenience)",
+          "skill_required": "timing_delay"
+        },
+        {
+          "action": "batch_with_others",
+          "description": "Time spending to coincide with high-activity periods (more deposits = larger anonymity set)",
+          "effectiveness": 0.70,
+          "user_cost": "medium",
+          "skill_required": "activity_monitor"
+        }
+      ],
+      "fundamental_limitation": "With few stealth address users, even a 24h delay may not provide sufficient anonymity set. This heuristic cannot be fully defeated by technology alone -- requires more users.",
+      "benchmark_scenario": {
+        "setup": "Stream of N deposits over 24h. Adversary sees deposit and withdrawal timestamps.",
+        "metric": "adversary's ability to match deposit-withdrawal pairs using timing windows",
+        "baseline": "48.5% of Umbra txs linkable (paper result, all heuristics combined)"
+      }
+    },
+
+    "H4_funding_linkability": {
+      "id": "H4",
+      "name": "Funding linkability",
+      "paper_section": "Section 4.4",
+      "severity": "critical",
+      "description": "The stealth address needs gas to operate. If gas comes from a known address, the stealth address is deanonymized.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "direct_funding",
+            "description": "Stealth address received ETH for gas directly from a known address",
+            "data_needed": ["stealth_address_funding_txs", "known_addresses"],
+            "confidence": 0.95
+          },
+          {
+            "name": "relay_funding",
+            "description": "Stealth address funded through a single intermediary from known address",
+            "data_needed": ["stealth_address_funding_chain"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "direct_funding is an immediate deanonymization"
+      },
+      "recommendations": [
+        {
+          "action": "use_paymaster",
+          "description": "Use ERC-4337 paymaster to pay gas, hiding msg.sender entirely",
+          "effectiveness": 0.95,
+          "user_cost": "paymaster fee (~10-20% gas premium)",
+          "skill_required": "paymaster"
+        },
+        {
+          "action": "use_relay",
+          "description": "Use a relayer/meta-transaction to submit on behalf of stealth address",
+          "effectiveness": 0.85,
+          "user_cost": "relay fee",
+          "skill_required": "relay"
+        },
+        {
+          "action": "prefund_from_fresh",
+          "description": "Fund gas from a fresh address with no history (e.g., CEX withdrawal to new address)",
+          "effectiveness": 0.70,
+          "user_cost": "medium (requires CEX account)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Paymaster usage itself may become a fingerprint if few users use paymasters. The anonymity set of paymaster users matters.",
+      "benchmark_scenario": {
+        "setup": "N stealth addresses with various gas funding patterns",
+        "metric": "fraction of stealth addresses linkable to an identity via gas funding chain",
+        "baseline": "most Umbra users fund gas from known addresses"
+      }
+    },
+
+    "H5_self_transfer": {
+      "id": "H5",
+      "name": "Same sender = recipient",
+      "paper_section": "Section 4.5",
+      "severity": "critical",
+      "description": "User sends to their own stealth address. Trivial to detect and fully deanonymizing.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "self_send",
+            "description": "Transaction sender address matches stealth address registrant",
+            "data_needed": ["sender_address", "stealth_meta_address_owner"],
+            "confidence": 1.0
+          }
+        ],
+        "threshold": "any self_send is a BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "block_self_transfer",
+          "description": "Prevent the transaction from being submitted. There is no privacy-preserving self-transfer.",
+          "effectiveness": 1.0,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "benchmark_scenario": {
+        "setup": "Include self-transfer attempts in test set",
+        "metric": "100% detection rate required",
+        "baseline": "some Umbra users do self-transfers"
+      }
+    },
+
+    "H6_unique_amounts": {
+      "id": "H6",
+      "name": "Unique amounts",
+      "paper_section": "Section 4.6",
+      "severity": "high",
+      "description": "Non-standard transfer amounts (e.g., 1.037 ETH) are unique identifiers. If only one deposit of that amount exists in the time window, timing + amount = certain match.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "rare_amount",
+            "description": "Transfer amount has <5 matches in the stealth address deposit pool within 24h",
+            "data_needed": ["deposit_pool_amounts", "time_window"],
+            "confidence": 0.85
+          },
+          {
+            "name": "precise_amount",
+            "description": "Amount has >4 decimal places (not a round number)",
+            "data_needed": ["transfer_amount"],
+            "confidence": 0.50
+          },
+          {
+            "name": "unique_in_pool",
+            "description": "Exact amount appears only once in the deposit pool",
+            "data_needed": ["deposit_pool_amounts"],
+            "confidence": 0.95
+          }
+        ],
+        "threshold": "unique_in_pool triggers BLOCK, rare_amount triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "round_amount",
+          "description": "Round to standard denomination (0.1, 0.5, 1.0, 5.0, 10.0 ETH)",
+          "effectiveness": 0.80,
+          "user_cost": "dust remainder in source wallet",
+          "skill_required": "amount_normalizer"
+        },
+        {
+          "action": "split_transfer",
+          "description": "Split into multiple round-number transfers across different time windows",
+          "effectiveness": 0.70,
+          "user_cost": "multiple gas fees + delay",
+          "skill_required": "transfer_splitter"
+        },
+        {
+          "action": "match_popular",
+          "description": "Check current deposit pool and choose an amount that matches existing deposits",
+          "effectiveness": 0.90,
+          "user_cost": "may not transfer exact desired amount",
+          "skill_required": "pool_monitor"
+        }
+      ],
+      "fundamental_limitation": "Amount normalization reduces precision. For exact payments, splitting and timing are the only options.",
+      "benchmark_scenario": {
+        "setup": "Deposit pool of N transactions with realistic amount distribution. Adversary matches by amount + timing.",
+        "metric": "adversary accuracy in linking deposits to withdrawals",
+        "baseline": "unique amounts are near-certain matches"
+      }
+    }
+  },
+
+  "skills": {
+    "timing_delay": {
+      "tool": "local scheduler",
+      "description": "Queue transaction for delayed submission after random interval",
+      "parameters": {"min_delay_hours": 6, "max_delay_hours": 24, "distribution": "uniform"}
+    },
+    "gas_randomizer": {
+      "tool": "gas estimation override",
+      "description": "Set gas parameters randomly within normal distribution of recent blocks",
+      "parameters": {"percentile_range": [25, 75], "lookback_blocks": 100}
+    },
+    "paymaster": {
+      "tool": "ERC-4337 bundler API",
+      "description": "Submit UserOperation through paymaster to hide msg.sender",
+      "parameters": {"supported_paymasters": ["pimlico", "stackup", "biconomy"]}
+    },
+    "amount_normalizer": {
+      "tool": "amount rounding",
+      "description": "Round transfer amount to nearest standard denomination",
+      "parameters": {"denominations_eth": [0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0]}
+    },
+    "pool_monitor": {
+      "tool": "stealth address registry reader",
+      "description": "Read current deposit pool to suggest amounts that blend in",
+      "parameters": {"registry_contract": "ERC-5564 registry", "lookback_hours": 24}
+    },
+    "activity_monitor": {
+      "tool": "block activity analyzer",
+      "description": "Monitor stealth address activity to suggest high-traffic windows for spending",
+      "parameters": {"min_anonymity_set": 10}
+    },
+    "relay": {
+      "tool": "meta-transaction relayer",
+      "description": "Submit transaction via relayer to hide stealth address as msg.sender",
+      "parameters": {"supported_relayers": ["OpenGSN", "Biconomy"]}
+    },
+    "transfer_splitter": {
+      "tool": "transaction splitter",
+      "description": "Split a transfer into multiple round-number amounts across different time windows",
+      "parameters": {"max_splits": 5, "min_split_eth": 0.1, "time_spread_hours": 24}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring deanonymization rate with all heuristics applied",
+    "methodology": {
+      "step_1": "Generate synthetic dataset of N stealth address transactions with realistic distributions",
+      "step_2": "Run adversary simulator applying all 6 heuristics",
+      "step_3": "Measure baseline deanonymization rate (expect ~48.5% matching paper)",
+      "step_4": "Apply profile recommendations to all transactions",
+      "step_5": "Re-run adversary simulator on modified transactions",
+      "step_6": "Compare: deanon rate before vs after"
+    },
+    "target": "baseline 48.5% -> <10% with all recommendations applied",
+    "metrics": [
+      "per_heuristic_deanon_rate",
+      "combined_deanon_rate",
+      "false_positive_rate",
+      "user_cost_score"
+    ],
+    "adversary_levels": [
+      {"name": "basic", "heuristics": ["H5", "H6"], "description": "Amount + self-transfer only"},
+      {"name": "intermediate", "heuristics": ["H1", "H3", "H5", "H6"], "description": "Add cluster analysis + timing"},
+      {"name": "advanced", "heuristics": ["H1", "H2", "H3", "H4", "H5", "H6"], "description": "All heuristics"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "summary": "Analyzed {n_txs} stealth address transactions. {n_risky} flagged ({pct_risky}%). Top risks: {top_risks}.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This reduces deanonymization risk by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}

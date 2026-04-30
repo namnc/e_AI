@@ -1,0 +1,325 @@
+{
+  "meta": {
+    "domain_name": "approval_phishing",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "Forta/Scam Sniffer 2025 Phishing Report",
+    "baseline_loss_rate": 713000000
+  },
+
+  "risk_domain": {
+    "name": "Token Approval Phishing",
+    "crops_property": "S",
+    "description": "Phishing attacks exploiting ERC-20/ERC-721 token approval mechanisms to drain user assets",
+    "protocols": ["ERC-20", "ERC-721", "ERC-1155", "Permit2"],
+    "adversary_model": {
+      "capabilities": [
+        "deploy malicious contracts",
+        "create convincing phishing UIs",
+        "register similar ENS names (homoglyph attacks)",
+        "front-run revocation transactions",
+        "monitor mempool for approval transactions"
+      ],
+      "limitations": [
+        "cannot forge signatures without private key",
+        "cannot bypass on-chain approval checks",
+        "malicious contracts are eventually flagged by security databases"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_unlimited_approval": {
+      "id": "H1",
+      "name": "Unlimited token approval",
+      "severity": "high",
+      "description": "Transaction approves a spender for MAX_UINT256 (unlimited) tokens. The spender can drain the entire token balance at any time, indefinitely.",
+      "detection": {
+        "type": "static_analysis",
+        "signals": [
+          {
+            "name": "max_uint_approval",
+            "description": "approve() or increaseAllowance() called with amount >= 2^255",
+            "data_needed": ["calldata", "function_selector", "approval_amount"],
+            "confidence": 0.95
+          },
+          {
+            "name": "permit_unlimited",
+            "description": "EIP-2612 permit() or Permit2 signed with unlimited amount",
+            "data_needed": ["signed_message", "permit_amount"],
+            "confidence": 0.90
+          }
+        ],
+        "threshold": "any unlimited approval triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "limit_approval",
+          "description": "Set approval to exact amount needed for this transaction, not unlimited",
+          "effectiveness": 0.90,
+          "user_cost": "may need re-approval for future transactions",
+          "skill_required": "approval_limiter"
+        },
+        {
+          "action": "use_permit2_expiry",
+          "description": "If using Permit2, set a short expiration (1 hour) on the approval",
+          "effectiveness": 0.85,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Some protocols require unlimited approvals to function (e.g., DEX routers). Limiting breaks these flows. The real fix is protocol-level: ERC-20 should support transaction-scoped approvals.",
+      "benchmark_scenario": {
+        "setup": "Dataset of N approval transactions, mix of limited and unlimited",
+        "metric": "Detection rate for unlimited approvals",
+        "baseline": "~60% of DeFi approvals are unlimited (Etherscan data)"
+      }
+    },
+
+    "H2_unverified_spender": {
+      "id": "H2",
+      "name": "Unverified spender contract",
+      "severity": "critical",
+      "description": "Approval targets a contract that is not verified on Etherscan, not in any known protocol registry, or was deployed very recently.",
+      "detection": {
+        "type": "contract_analysis",
+        "signals": [
+          {
+            "name": "unverified_source",
+            "description": "Spender contract source code not verified on block explorer",
+            "data_needed": ["spender_address", "etherscan_verification_status"],
+            "confidence": 0.85
+          },
+          {
+            "name": "recently_deployed",
+            "description": "Spender contract deployed within last 24 hours",
+            "data_needed": ["spender_address", "contract_creation_timestamp"],
+            "confidence": 0.60
+          },
+          {
+            "name": "no_protocol_registry",
+            "description": "Spender not found in any known protocol registry (DeFi Llama, Etherscan labels)",
+            "data_needed": ["spender_address", "protocol_registries"],
+            "confidence": 0.50
+          }
+        ],
+        "threshold": "unverified_source AND recently_deployed triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "block_unverified",
+          "description": "Do not approve tokens to unverified contracts. Wait for source verification.",
+          "effectiveness": 0.95,
+          "user_cost": "may block legitimate new contracts",
+          "skill_required": null
+        },
+        {
+          "action": "simulate_first",
+          "description": "Simulate the transaction to see what the contract does before approving",
+          "effectiveness": 0.70,
+          "user_cost": "none",
+          "skill_required": "tx_simulator"
+        }
+      ],
+      "fundamental_limitation": "New legitimate contracts are always unverified initially. Time-based heuristics create a bootstrapping problem for new protocols.",
+      "benchmark_scenario": {
+        "setup": "Mix of verified (legitimate) and unverified (mix of legitimate new + malicious) contracts",
+        "metric": "True positive rate for malicious contracts, false positive rate for legitimate new contracts",
+        "baseline": "~15% of phishing targets are unverified contracts"
+      }
+    },
+
+    "H3_known_scam_address": {
+      "id": "H3",
+      "name": "Known scam address",
+      "severity": "critical",
+      "description": "Spender or recipient address appears in a public scam/phishing database (Forta, Scam Sniffer, ChainAbuse).",
+      "detection": {
+        "type": "database_lookup",
+        "signals": [
+          {
+            "name": "scam_database_hit",
+            "description": "Address found in scam/phishing database with confirmed reports",
+            "data_needed": ["target_address", "scam_databases"],
+            "confidence": 0.99
+          },
+          {
+            "name": "similar_to_known_scam",
+            "description": "Address bytecode or deployment pattern matches known scam template",
+            "data_needed": ["target_address", "contract_bytecode", "scam_templates"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "scam_database_hit triggers BLOCK immediately"
+      },
+      "recommendations": [
+        {
+          "action": "block_known_scam",
+          "description": "Block the transaction. This address is confirmed malicious.",
+          "effectiveness": 1.0,
+          "user_cost": "none",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Scam databases are reactive -- new scam addresses are not in the database until reported. Zero-day phishing contracts evade this check entirely.",
+      "benchmark_scenario": {
+        "setup": "Set of known scam addresses + legitimate addresses",
+        "metric": "100% detection for known scams, 0% false positives",
+        "baseline": "databases cover ~70% of reported phishing addresses"
+      }
+    },
+
+    "H4_suspicious_function": {
+      "id": "H4",
+      "name": "Suspicious function selector",
+      "severity": "high",
+      "description": "Transaction calls a function with an unusual or obfuscated selector not matching any known standard interface.",
+      "detection": {
+        "type": "calldata_analysis",
+        "signals": [
+          {
+            "name": "unknown_selector",
+            "description": "Function selector not found in 4byte.directory or common interface databases",
+            "data_needed": ["calldata", "function_selector"],
+            "confidence": 0.55
+          },
+          {
+            "name": "multicall_with_approval",
+            "description": "Multicall/batch that includes hidden approval among other operations",
+            "data_needed": ["decoded_calldata", "nested_calls"],
+            "confidence": 0.85
+          },
+          {
+            "name": "setApprovalForAll_nft",
+            "description": "ERC-721/1155 setApprovalForAll to unknown operator",
+            "data_needed": ["calldata", "operator_address"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "multicall_with_approval triggers BLOCK, unknown_selector triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "decode_and_show",
+          "description": "Decode the calldata and show the user exactly what operations will execute",
+          "effectiveness": 0.80,
+          "user_cost": "none",
+          "skill_required": "tx_simulator"
+        },
+        {
+          "action": "reject_hidden_approvals",
+          "description": "Block multicalls that contain approval operations not explicitly requested by the user",
+          "effectiveness": 0.95,
+          "user_cost": "may block legitimate batched operations",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Sophisticated phishing contracts can use proxy patterns or delegatecall to hide the actual approval logic from static analysis.",
+      "benchmark_scenario": {
+        "setup": "Mix of normal DeFi function calls and known phishing calldata patterns",
+        "metric": "Detection rate for hidden approvals in multicalls",
+        "baseline": "multicall phishing growing rapidly (Scam Sniffer 2025)"
+      }
+    },
+
+    "H5_stale_approval": {
+      "id": "H5",
+      "name": "Stale token approval",
+      "severity": "medium",
+      "description": "User has outstanding unlimited approvals to contracts they haven't interacted with in >30 days. These are dormant attack surface.",
+      "detection": {
+        "type": "historical_analysis",
+        "signals": [
+          {
+            "name": "stale_unlimited",
+            "description": "Unlimited approval to a contract with no user interaction in >30 days",
+            "data_needed": ["user_approvals", "user_interaction_history"],
+            "confidence": 0.70
+          },
+          {
+            "name": "high_value_exposed",
+            "description": "Stale approval exposes >$1000 in token value",
+            "data_needed": ["user_approvals", "token_balances", "token_prices"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "high_value_exposed triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "revoke_stale",
+          "description": "Revoke approvals to contracts you haven't used in 30+ days",
+          "effectiveness": 0.95,
+          "user_cost": "gas for revocation tx (~46K gas per revoke)",
+          "skill_required": "approval_revoker"
+        },
+        {
+          "action": "periodic_audit",
+          "description": "Run weekly audit of all outstanding approvals and revoke unnecessary ones",
+          "effectiveness": 0.85,
+          "user_cost": "low (automated)",
+          "skill_required": "approval_auditor"
+        }
+      ],
+      "fundamental_limitation": "Revocation costs gas. Users with many stale approvals face significant cost to clean up. Protocol-level expiring approvals would solve this.",
+      "benchmark_scenario": {
+        "setup": "User with N historical approvals, varying staleness and value exposed",
+        "metric": "Total value at risk from stale approvals before/after remediation",
+        "baseline": "average DeFi user has 10-50 outstanding approvals"
+      }
+    }
+  },
+
+  "skills": {
+    "approval_limiter": {
+      "tool": "transaction modifier",
+      "description": "Replace unlimited approval amount with exact amount needed for current operation",
+      "parameters": {"max_multiplier": 1.05}
+    },
+    "tx_simulator": {
+      "tool": "Tenderly / eth_call simulation",
+      "description": "Simulate transaction execution and show all state changes including approvals",
+      "parameters": {"simulation_backend": ["tenderly", "local_fork"]}
+    },
+    "approval_revoker": {
+      "tool": "batch revocation",
+      "description": "Generate and submit revocation transactions for stale approvals",
+      "parameters": {"batch_size": 10, "gas_price_strategy": "slow"}
+    },
+    "approval_auditor": {
+      "tool": "approval scanner",
+      "description": "Scan all outstanding approvals, calculate value at risk, flag stale ones",
+      "parameters": {"staleness_threshold_days": 30, "value_threshold_usd": 100}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring phishing detection rate",
+    "methodology": {
+      "step_1": "Collect dataset of known phishing transactions (Forta alerts, Scam Sniffer reports)",
+      "step_2": "Collect dataset of legitimate DeFi approval transactions",
+      "step_3": "Run analyzer against both sets",
+      "step_4": "Measure: true positive rate (phishing caught), false positive rate (legitimate flagged)",
+      "step_5": "Apply recommendations, re-measure exposure"
+    },
+    "target": "Catch >90% of known phishing patterns with <5% false positive rate",
+    "metrics": [
+      "true_positive_rate",
+      "false_positive_rate",
+      "value_at_risk_reduction",
+      "user_friction_score"
+    ],
+    "adversary_levels": [
+      {"name": "basic", "heuristics": ["H1", "H3"], "description": "Unlimited approval + known scam only"},
+      {"name": "intermediate", "heuristics": ["H1", "H2", "H3", "H5"], "description": "Add unverified contracts + stale approvals"},
+      {"name": "advanced", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All heuristics including suspicious calldata"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "summary": "Scanned {n_txs} approval transactions. {n_risky} flagged ({pct_risky}%). Value at risk: ${value_at_risk}. Top risks: {top_risks}.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}. Reduces risk by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}

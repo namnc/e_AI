@@ -1,0 +1,77 @@
+{
+  "meta": {
+    "domain_name": "CHANGE_ME",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": ""
+  },
+
+  "risk_domain": {
+    "name": "CHANGE_ME",
+    "crops_property": "P",
+    "description": "CHANGE_ME",
+    "protocols": [],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation",
+        "CHANGE_ME",
+        "CHANGE_ME"
+      ],
+      "limitations": [
+        "no private key access"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_CHANGE_ME": {
+      "id": "H1",
+      "name": "CHANGE_ME",
+      "severity": "high",
+      "description": "CHANGE_ME",
+      "detection": {
+        "type": "CHANGE_ME",
+        "signals": [
+          {
+            "name": "CHANGE_ME",
+            "description": "CHANGE_ME",
+            "data_needed": ["CHANGE_ME"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "CHANGE_ME"
+      },
+      "recommendations": [
+        {
+          "action": "CHANGE_ME",
+          "description": "CHANGE_ME",
+          "effectiveness": 0.80,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "CHANGE_ME",
+      "benchmark_scenario": {
+        "setup": "CHANGE_ME",
+        "metric": "CHANGE_ME",
+        "baseline": "CHANGE_ME"
+      }
+    }
+  },
+
+  "skills": {},
+
+  "combined_benchmark": {
+    "description": "CHANGE_ME",
+    "methodology": {},
+    "target": "CHANGE_ME",
+    "metrics": []
+  },
+
+  "templates": {
+    "risk_assessment": "Transaction triggers {heuristic_id}: {signal_description}. Confidence: {confidence}.",
+    "summary": "Analyzed {n_txs} transactions. {n_risky} flagged.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}."
+  }
+}
