@@ -17,6 +17,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import sys
+from pathlib import Path
+_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(_root))
+
 from domains.stealth_address_ops.analyzer import (
     SteathTx, AnalysisResult, analyze_transaction, format_result,
 )
