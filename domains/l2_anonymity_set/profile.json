@@ -1,0 +1,385 @@
+{
+  "meta": {
+    "domain_name": "l2_anonymity_set",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "L2 privacy limitations -- sequencer visibility, timing analysis, rollup batch correlation"
+  },
+
+  "risk_domain": {
+    "name": "L2 Anonymity Set Monitoring",
+    "crops_property": "P",
+    "description": "Monitors privacy degradation on Layer 2 rollups where faster block times, sequencer centralization, and rollup batch posting create deanonymization vectors absent on L1",
+    "protocols": ["Optimism", "Arbitrum", "zkSync", "StarkNet", "Base", "Scroll", "Linea"],
+    "adversary_model": {
+      "capabilities": [
+        "full L2 transaction observation including ordering within batches",
+        "L1 batch posting observation and timing analysis",
+        "sequencer-level transaction visibility (pre-confirmation, pre-batch)",
+        "cross-layer correlation between L1 and L2 transactions",
+        "timing analysis at sub-second granularity on L2",
+        "forced inclusion transaction monitoring on L1"
+      ],
+      "limitations": [
+        "no private key access",
+        "no access to sequencer internal state (unless sequencer is the adversary)",
+        "no ability to modify L2 state without valid transactions"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_thin_pool": {
+      "id": "H1",
+      "name": "Thin privacy pool",
+      "severity": "critical",
+      "description": "Privacy protocol on L2 has fewer than 20 active depositors in the user's amount range within the last 24 hours. With a thin anonymity set, even without sophisticated analysis, the adversary can narrow down the deposit-withdrawal link to a handful of candidates, effectively defeating the privacy guarantee.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "low_depositor_count",
+            "description": "Fewer than 20 unique depositors in the user's denomination bracket within the past 24 hours on the target L2 privacy protocol",
+            "data_needed": ["privacy_pool_deposits", "denomination_bracket", "l2_chain_id"],
+            "confidence": 0.95
+          },
+          {
+            "name": "amount_uniqueness_in_pool",
+            "description": "User's deposit amount has fewer than 3 matches in the current pool, making amount-based correlation trivial",
+            "data_needed": ["pool_deposit_amounts", "user_deposit_amount"],
+            "confidence": 0.85
+          },
+          {
+            "name": "temporal_isolation",
+            "description": "No other deposits occurred within 1 hour of user's deposit in the same denomination bracket",
+            "data_needed": ["pool_deposit_timestamps", "user_deposit_timestamp"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "low_depositor_count <20 triggers WARNING, <5 triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "wait_for_larger_pool",
+          "description": "Delay deposit until the anonymity set reaches at least 20 depositors in your amount range. Monitor pool size in real time.",
+          "effectiveness": 0.90,
+          "user_cost": "high (delay, opportunity cost)",
+          "skill_required": "pool_size_monitor"
+        },
+        {
+          "action": "use_l1_instead",
+          "description": "Use the same privacy protocol on L1 where the anonymity set is typically larger due to higher traffic",
+          "effectiveness": 0.80,
+          "user_cost": "high (higher gas costs on L1)",
+          "skill_required": null
+        },
+        {
+          "action": "use_standard_denomination",
+          "description": "Choose a standard denomination (0.1, 1.0, 10.0 ETH) with the most depositors rather than a custom amount",
+          "effectiveness": 0.75,
+          "user_cost": "low (may not transfer exact desired amount)",
+          "skill_required": "pool_size_monitor"
+        }
+      ],
+      "fundamental_limitation": "L2 privacy pools have structurally smaller anonymity sets than L1 due to lower total transaction volume in privacy-specific protocols. This is a chicken-and-egg problem: users avoid thin pools, keeping pools thin.",
+      "benchmark_scenario": {
+        "setup": "Privacy protocol on Optimism with varying pool sizes (5, 10, 20, 50 depositors). Adversary attempts deposit-withdrawal correlation.",
+        "metric": "Adversary success rate in linking deposits to withdrawals as a function of pool size",
+        "baseline": "With <10 depositors, adversary achieves >50% linkage using timing alone"
+      }
+    },
+
+    "H2_sequencer_visibility": {
+      "id": "H2",
+      "name": "Sequencer visibility",
+      "severity": "critical",
+      "description": "The L2 sequencer sees all transactions before they are batched and posted to L1. A centralized sequencer (current state for most rollups) can correlate deposit and withdrawal transactions in real time, even if they appear unlinkable on-chain. The sequencer knows transaction ordering, IP addresses (if not using Tor), and pre-confirmation state.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "centralized_sequencer",
+            "description": "Target L2 uses a single centralized sequencer operated by the rollup team, giving one entity full transaction visibility",
+            "data_needed": ["l2_chain_id", "sequencer_config", "sequencer_decentralization_status"],
+            "confidence": 0.90
+          },
+          {
+            "name": "no_encrypted_mempool",
+            "description": "L2 does not use encrypted mempool or threshold encryption, so sequencer sees transaction contents pre-inclusion",
+            "data_needed": ["l2_mempool_encryption_status"],
+            "confidence": 0.85
+          },
+          {
+            "name": "sequencer_ip_correlation",
+            "description": "User submits deposit and withdrawal from same IP or same RPC endpoint without Tor, allowing sequencer-side correlation",
+            "data_needed": ["rpc_endpoint_config", "tor_usage_status"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "centralized_sequencer AND no_encrypted_mempool triggers WARNING for all privacy transactions"
+      },
+      "recommendations": [
+        {
+          "action": "use_tor_for_rpc",
+          "description": "Route all L2 RPC calls through Tor to prevent IP-based correlation by the sequencer",
+          "effectiveness": 0.75,
+          "user_cost": "low (slower transaction submission)",
+          "skill_required": null
+        },
+        {
+          "action": "use_different_rpc_endpoints",
+          "description": "Submit deposit and withdrawal through different RPC providers to break correlation at the RPC layer",
+          "effectiveness": 0.65,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "prefer_decentralized_sequencer_l2",
+          "description": "Choose L2s with decentralized or shared sequencer designs where no single entity sees all transactions",
+          "effectiveness": 0.85,
+          "user_cost": "medium (limited protocol availability)",
+          "skill_required": "sequencer_analyzer"
+        }
+      ],
+      "fundamental_limitation": "All current major L2s (Optimism, Arbitrum, Base, zkSync) use centralized sequencers as of 2024. Decentralized sequencer designs (Espresso, Astria) are in development but not yet deployed on mainnet rollups. Users must treat the sequencer as an adversary.",
+      "benchmark_scenario": {
+        "setup": "User deposits and withdraws on Optimism using same RPC. Sequencer logs available to adversary.",
+        "metric": "Sequencer's ability to correlate deposit-withdrawal pairs using metadata (IP, timing, nonce patterns)",
+        "baseline": "Centralized sequencer can trivially correlate 100% of transactions it processes"
+      }
+    },
+
+    "H3_forced_inclusion_deanon": {
+      "id": "H3",
+      "name": "Forced inclusion deanonymization",
+      "severity": "high",
+      "description": "Using L1 forced inclusion (submitting an L2 transaction directly to the L1 rollup contract to bypass the sequencer) reveals the L2 transaction origin to L1 observers. The L1 transaction is publicly visible and links the user's L1 address to the L2 operation, defeating privacy if the L2 transaction was intended to be unlinkable.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "forced_inclusion_usage",
+            "description": "User's L2 privacy transaction was submitted via L1 forced inclusion rather than through the L2 sequencer",
+            "data_needed": ["l1_forced_inclusion_txs", "l2_tx_origin_type"],
+            "confidence": 0.90
+          },
+          {
+            "name": "l1_l2_address_link",
+            "description": "The L1 address that submitted the forced inclusion transaction is linkable to the user's identity",
+            "data_needed": ["l1_sender_address", "address_cluster_map"],
+            "confidence": 0.85
+          },
+          {
+            "name": "forced_inclusion_rarity",
+            "description": "Forced inclusion transactions are rare (<1% of L2 transactions), making them stand out and easy to monitor",
+            "data_needed": ["forced_inclusion_rate", "l2_tx_volume"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "forced_inclusion_usage on a privacy transaction triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "avoid_forced_inclusion_for_privacy",
+          "description": "Never use L1 forced inclusion for privacy-sensitive L2 transactions. Accept sequencer submission despite its risks.",
+          "effectiveness": 0.95,
+          "user_cost": "low (accept sequencer trust assumption)",
+          "skill_required": null
+        },
+        {
+          "action": "use_fresh_l1_address",
+          "description": "If forced inclusion is necessary, submit from a fresh L1 address with no history linkage to user identity",
+          "effectiveness": 0.80,
+          "user_cost": "medium (requires fresh funded L1 address)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Forced inclusion is a fundamental rollup security property (censorship resistance). It cannot be made private because L1 transparency is what guarantees the inclusion. Users must choose between censorship resistance and privacy.",
+      "benchmark_scenario": {
+        "setup": "User submits privacy protocol withdrawal via L1 forced inclusion on Arbitrum. L1 observers monitor.",
+        "metric": "Fraction of forced inclusion privacy transactions linkable to L1 identities",
+        "baseline": "Nearly 100% linkable since L1 sender is visible and forced inclusion is rare"
+      }
+    },
+
+    "H4_l2_timing_correlation": {
+      "id": "H4",
+      "name": "L2-specific timing correlation",
+      "severity": "high",
+      "description": "L2 block times are dramatically faster than L1 (2s on Optimism, 0.25s on Arbitrum vs 12s on L1), creating much tighter timing correlation windows. A deposit and withdrawal separated by 30 seconds on an L2 with 2s blocks spans only 15 blocks, giving the adversary precise timing resolution to correlate transactions that would be ambiguous on L1.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "fast_block_dwell",
+            "description": "Time between deposit and withdrawal on L2 is <100 L2 blocks, providing tight timing correlation",
+            "data_needed": ["deposit_l2_block", "withdrawal_l2_block", "l2_block_time"],
+            "confidence": 0.85
+          },
+          {
+            "name": "sub_minute_correlation",
+            "description": "Deposit and withdrawal occur within 60 seconds on the L2, far tighter than L1's 12s resolution",
+            "data_needed": ["deposit_timestamp", "withdrawal_timestamp"],
+            "confidence": 0.90
+          },
+          {
+            "name": "l2_timing_uniqueness",
+            "description": "The timing gap between deposit and withdrawal is unique (no other deposit-withdrawal pair has similar gap) within the pool",
+            "data_needed": ["all_pool_deposit_timestamps", "all_pool_withdrawal_timestamps"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "sub_minute_correlation triggers BLOCK, fast_block_dwell <100 blocks triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "increase_l2_dwell_time",
+          "description": "Wait at least 4 hours between deposit and withdrawal on L2 to accumulate enough other transactions in the window",
+          "effectiveness": 0.85,
+          "user_cost": "high (delay)",
+          "skill_required": "timing_advisor"
+        },
+        {
+          "action": "time_withdrawal_to_peak",
+          "description": "Schedule withdrawal during peak L2 activity hours to maximize the number of concurrent transactions in the timing window",
+          "effectiveness": 0.70,
+          "user_cost": "medium (schedule dependency)",
+          "skill_required": "timing_advisor"
+        },
+        {
+          "action": "randomize_dwell_time",
+          "description": "Use a random delay between 2 and 24 hours to break any behavioral pattern in deposit-withdrawal timing",
+          "effectiveness": 0.80,
+          "user_cost": "medium (unpredictable timing)",
+          "skill_required": "timing_advisor"
+        }
+      ],
+      "fundamental_limitation": "Faster L2 block times are a feature (better UX), not a bug. They cannot be made slower for privacy without degrading the L2's core value proposition. Privacy protocols on L2 must compensate with larger anonymity sets or longer enforced delay periods.",
+      "benchmark_scenario": {
+        "setup": "Privacy deposits and withdrawals on Arbitrum (0.25s blocks) vs Ethereum L1 (12s blocks). Same dwell time in seconds.",
+        "metric": "Adversary correlation accuracy as a function of dwell time and block resolution",
+        "baseline": "On Arbitrum, 5-minute dwell spans 1200 blocks vs 25 blocks on L1 -- 48x more timing resolution for adversary"
+      }
+    },
+
+    "H5_rollup_batch_linkage": {
+      "id": "H5",
+      "name": "Rollup batch linkage",
+      "severity": "high",
+      "description": "Transactions included in the same rollup batch are correlated by timing and batch poster. The batch poster (typically the sequencer) knows exactly which transactions are in each batch. Even external observers can see batch boundaries on L1, narrowing the anonymity set to transactions within the same batch.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "same_batch_deposit_withdrawal",
+            "description": "Deposit and withdrawal appear in the same L1 batch posting, strongly correlating them by timing",
+            "data_needed": ["l1_batch_tx_lists", "deposit_l2_tx_hash", "withdrawal_l2_tx_hash"],
+            "confidence": 0.80
+          },
+          {
+            "name": "adjacent_batch_correlation",
+            "description": "Deposit in batch N and withdrawal in batch N+1, with small batch sizes creating tight correlation",
+            "data_needed": ["batch_numbers", "batch_sizes", "batch_posting_frequency"],
+            "confidence": 0.70
+          },
+          {
+            "name": "batch_size_isolation",
+            "description": "The batch containing the user's transaction is unusually small (<50 transactions), reducing the anonymity set within the batch",
+            "data_needed": ["batch_tx_count", "average_batch_size"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "same_batch_deposit_withdrawal triggers WARNING, combined with batch_size_isolation triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "span_multiple_batches",
+          "description": "Ensure deposit and withdrawal are separated by at least 10 batch postings to avoid same-batch or adjacent-batch correlation",
+          "effectiveness": 0.85,
+          "user_cost": "medium (delay of minutes to hours depending on batch frequency)",
+          "skill_required": "batch_inspector"
+        },
+        {
+          "action": "time_to_large_batches",
+          "description": "Submit transactions during high-activity periods when batch sizes are large, maximizing within-batch anonymity set",
+          "effectiveness": 0.75,
+          "user_cost": "medium (schedule dependency)",
+          "skill_required": "batch_inspector"
+        },
+        {
+          "action": "cross_batch_poster",
+          "description": "If multiple batch posters exist, ensure deposit and withdrawal are submitted to different batch posters",
+          "effectiveness": 0.70,
+          "user_cost": "low (may require specific RPC routing)",
+          "skill_required": "batch_inspector"
+        }
+      ],
+      "fundamental_limitation": "Rollup batching is inherent to the L2 architecture. Batch boundaries are publicly observable on L1. As long as rollups batch transactions, batch-level timing correlation exists. Only a very high transaction volume within each batch can dilute this signal.",
+      "benchmark_scenario": {
+        "setup": "Privacy deposit and withdrawal on Optimism with varying batch separations (same batch, adjacent, 10 apart). Adversary sees L1 batch postings.",
+        "metric": "Adversary success in linking deposit-withdrawal pairs as a function of batch separation",
+        "baseline": "Same-batch transactions are correlated with >80% confidence by batch poster"
+      }
+    }
+  },
+
+  "skills": {
+    "pool_size_monitor": {
+      "tool": "privacy pool analyzer",
+      "description": "Monitor real-time depositor count and amount distribution in L2 privacy protocol pools to assess anonymity set size",
+      "parameters": {"supported_protocols": ["TornadoCash-forks", "Railgun", "Aztec"], "chains": ["optimism", "arbitrum", "zksync", "base"], "update_interval_seconds": 60}
+    },
+    "sequencer_analyzer": {
+      "tool": "sequencer configuration checker",
+      "description": "Check L2 sequencer decentralization status, encrypted mempool support, and known sequencer privacy properties",
+      "parameters": {"supported_l2s": ["Optimism", "Arbitrum", "Base", "zkSync", "StarkNet", "Scroll", "Linea"]}
+    },
+    "batch_inspector": {
+      "tool": "rollup batch analyzer",
+      "description": "Inspect L1 batch postings to determine batch sizes, frequencies, and whether specific L2 transactions share a batch",
+      "parameters": {"l1_rpc": "ethereum_mainnet", "lookback_batches": 100}
+    },
+    "timing_advisor": {
+      "tool": "L2 activity pattern analyzer",
+      "description": "Analyze L2 transaction volume patterns to recommend optimal timing for privacy transactions (peak activity periods with large anonymity sets)",
+      "parameters": {"analysis_window_hours": 168, "granularity_minutes": 15}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring L2 anonymity set degradation across all heuristics compared to L1 baseline",
+    "methodology": {
+      "step_1": "Deploy test privacy transactions on Optimism and Arbitrum testnets with controlled deposit/withdrawal patterns",
+      "step_2": "Record all L2 blocks, batch postings, and sequencer behavior during test period",
+      "step_3": "Run all 5 heuristics against each deposit-withdrawal pair",
+      "step_4": "Compare adversary success rate on L2 vs equivalent transactions on L1",
+      "step_5": "Apply recommendations (timing delays, pool monitoring, batch separation) and re-measure",
+      "step_6": "Quantify anonymity set size improvement from each recommendation"
+    },
+    "target": "Recommendations should bring L2 anonymity set quality to within 2x of L1 baseline for same privacy protocol",
+    "metrics": [
+      "anonymity_set_size_l2_vs_l1",
+      "adversary_correlation_accuracy",
+      "timing_correlation_resolution",
+      "batch_correlation_strength",
+      "recommendation_effectiveness"
+    ],
+    "adversary_levels": [
+      {"name": "external_observer", "heuristics": ["H1", "H4", "H5"], "description": "Can only see L1 batch postings and L2 public state"},
+      {"name": "rpc_provider", "heuristics": ["H1", "H3", "H4", "H5"], "description": "Sees RPC requests and can correlate IP to transactions"},
+      {"name": "sequencer_level", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "Full sequencer visibility including pre-confirmation ordering"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "risk_assessment_block": "BLOCKED: {heuristic_name} detected with {confidence}% confidence. {signal_description}. L2 anonymity set is insufficient for this transaction.",
+    "summary": "Analyzed {n_txs} L2 privacy transactions. {n_risky} flagged ({pct_risky}%). Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} L2 transactions pass anonymity set checks. Pool sizes and timing are within acceptable parameters.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can run {skill_action}. This improves your anonymity set by ~{effectiveness_pct}%. {user_cost_note}",
+    "anonymity_set_report": "L2 anonymity set: {anon_set} depositors in your bracket (last 24h). L1 equivalent: {l1_anon_set}. Ratio: {ratio}x.",
+    "timing_warning": "L2 block time is {block_time}s. Your {dwell_time}s dwell spans {n_blocks} blocks -- adversary has {resolution}x more timing resolution than on L1."
+  }
+}
