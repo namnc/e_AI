@@ -1,0 +1,389 @@
+{
+  "meta": {
+    "domain_name": "governance_proposal",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "various governance attack post-mortems (Beanstalk, Tornado Cash Gov, Compound)"
+  },
+
+  "risk_domain": {
+    "name": "Governance Proposal Risk Analysis",
+    "crops_property": "S",
+    "description": "Detects malicious or high-risk governance proposals before execution, covering treasury drains, parameter manipulation, proxy upgrades, timelock bypasses, and voter concentration",
+    "protocols": ["Compound Governor", "OpenZeppelin Governor", "Aave Governance", "Snapshot", "Tally"],
+    "adversary_model": {
+      "capabilities": [
+        "submit governance proposals with arbitrary calldata",
+        "accumulate or borrow voting power (flash loans, token purchases)",
+        "deploy unverified implementation contracts",
+        "coordinate votes across multiple controlled addresses",
+        "front-run timelock execution with additional proposals"
+      ],
+      "limitations": [
+        "no private key access to treasury multisigs",
+        "cannot bypass on-chain timelock without a governance vote",
+        "cannot forge vote signatures"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_treasury_drain": {
+      "id": "H1",
+      "name": "Treasury drain",
+      "severity": "critical",
+      "description": "Proposal transfers more than 10% of the protocol treasury to a new or low-history address, indicating potential fund extraction. Legitimate large transfers typically go to well-known multisigs or grant programs.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "large_outflow_ratio",
+            "description": "Proposed transfer value exceeds 10% of the current treasury balance",
+            "data_needed": ["proposal_calldata", "treasury_balance", "token_prices"],
+            "confidence": 0.85
+          },
+          {
+            "name": "unknown_recipient",
+            "description": "Recipient address has fewer than 5 transactions and no known label (multisig, grant program, etc.)",
+            "data_needed": ["recipient_address", "address_labels", "transaction_count"],
+            "confidence": 0.80
+          },
+          {
+            "name": "multi_asset_sweep",
+            "description": "Proposal transfers multiple token types in a single execution, consistent with treasury sweep pattern",
+            "data_needed": ["proposal_calldata", "treasury_token_list"],
+            "confidence": 0.90
+          }
+        ],
+        "threshold": "large_outflow_ratio AND unknown_recipient triggers BLOCK; multi_asset_sweep alone triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "flag_for_community_review",
+          "description": "Emit public alert to governance forum and delegate channels before vote closes",
+          "effectiveness": 0.85,
+          "user_cost": "none",
+          "skill_required": null
+        },
+        {
+          "action": "simulate_treasury_impact",
+          "description": "Run proposal through parameter_simulator to show post-execution treasury state",
+          "effectiveness": 0.90,
+          "user_cost": "low",
+          "skill_required": "parameter_simulator"
+        },
+        {
+          "action": "verify_recipient_identity",
+          "description": "Cross-reference recipient against known multisig registries and ENS records",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "On-chain analysis cannot determine intent. A large transfer to a new address may be a legitimate grant to a new contributor or team. Human judgment on proposal context remains essential.",
+      "benchmark_scenario": {
+        "setup": "Generate N proposals including known treasury drain attacks (Beanstalk-style) and legitimate large grants",
+        "metric": "precision and recall in distinguishing malicious drains from legitimate transfers",
+        "baseline": "Beanstalk attack extracted $182M in a single proposal -- 100% detection for >10% threshold"
+      }
+    },
+
+    "H2_parameter_manipulation": {
+      "id": "H2",
+      "name": "Parameter manipulation",
+      "severity": "high",
+      "description": "Proposal changes protocol parameters (liquidation thresholds, fee tiers, oracle sources, interest rate curves) to values outside the historical operating range, which could enable exploitation or destabilize the protocol.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "out_of_range_value",
+            "description": "Proposed parameter value falls outside 2 standard deviations of historical values for that parameter",
+            "data_needed": ["proposal_calldata", "parameter_history", "parameter_bounds"],
+            "confidence": 0.80
+          },
+          {
+            "name": "oracle_source_change",
+            "description": "Proposal replaces a price oracle with an unverified or low-liquidity feed",
+            "data_needed": ["proposal_calldata", "current_oracle_address", "new_oracle_address", "oracle_verification_status"],
+            "confidence": 0.85
+          },
+          {
+            "name": "compound_parameter_shift",
+            "description": "Multiple parameters changed simultaneously in a way that compounds risk (e.g., raise collateral factor + lower liquidation incentive)",
+            "data_needed": ["proposal_calldata", "risk_parameter_dependency_graph"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "oracle_source_change triggers WARNING; out_of_range_value AND compound_parameter_shift triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "simulate_parameter_impact",
+          "description": "Fork mainnet state and simulate protocol behavior under proposed parameters for 1000 blocks",
+          "effectiveness": 0.90,
+          "user_cost": "medium",
+          "skill_required": "parameter_simulator"
+        },
+        {
+          "action": "compare_historical_range",
+          "description": "Display proposed values alongside historical min/max/mean for each parameter",
+          "effectiveness": 0.70,
+          "user_cost": "none",
+          "skill_required": null
+        },
+        {
+          "action": "check_dependency_graph",
+          "description": "Analyze which other protocol behaviors are affected by the changed parameters",
+          "effectiveness": 0.80,
+          "user_cost": "low",
+          "skill_required": "parameter_simulator"
+        }
+      ],
+      "fundamental_limitation": "Novel parameter combinations may have emergent risks that historical data cannot predict. Simulation coverage is bounded by the scenarios tested; adversarial parameter interactions can be combinatorially complex.",
+      "benchmark_scenario": {
+        "setup": "Historical dataset of governance proposals with labeled outcomes (safe execution vs. exploit or protocol instability)",
+        "metric": "detection rate of harmful parameter changes without false-alarming on routine adjustments",
+        "baseline": "Compound governance incident (DAI collateral factor change) should be flagged"
+      }
+    },
+
+    "H3_proxy_upgrade": {
+      "id": "H3",
+      "name": "Proxy upgrade to unverified code",
+      "severity": "critical",
+      "description": "Proposal upgrades an implementation contract behind a proxy to new bytecode that is unverified on Etherscan, has no audit trail, or was deployed very recently. This is the most dangerous governance action as it can replace arbitrary protocol logic.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "unverified_implementation",
+            "description": "New implementation contract has no verified source code on Etherscan/Sourcify",
+            "data_needed": ["new_implementation_address", "etherscan_verification_status"],
+            "confidence": 0.90
+          },
+          {
+            "name": "recent_deployment",
+            "description": "New implementation was deployed within 48 hours of the proposal, leaving insufficient time for community review",
+            "data_needed": ["new_implementation_address", "deployment_timestamp", "proposal_timestamp"],
+            "confidence": 0.70
+          },
+          {
+            "name": "bytecode_divergence",
+            "description": "New implementation bytecode differs from any known audited version by more than minimal changes",
+            "data_needed": ["new_implementation_bytecode", "audited_bytecodes", "diff_size"],
+            "confidence": 0.85
+          },
+          {
+            "name": "selfdestruct_or_delegatecall",
+            "description": "New implementation contains SELFDESTRUCT or unrestricted DELEGATECALL opcodes",
+            "data_needed": ["new_implementation_bytecode"],
+            "confidence": 0.95
+          }
+        ],
+        "threshold": "unverified_implementation OR selfdestruct_or_delegatecall triggers BLOCK; recent_deployment triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "decode_and_diff_proposal",
+          "description": "Decode proposal calldata, identify upgrade target, and diff new bytecode against current implementation",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "proposal_decoder"
+        },
+        {
+          "action": "require_verified_source",
+          "description": "Flag proposal as high-risk until implementation source is verified on Etherscan/Sourcify",
+          "effectiveness": 0.90,
+          "user_cost": "none",
+          "skill_required": null
+        },
+        {
+          "action": "check_audit_trail",
+          "description": "Cross-reference implementation address against known audit reports and security firm disclosures",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Verified source code can still contain subtle vulnerabilities. Bytecode verification confirms code matches source, but does not guarantee correctness. A determined attacker can publish verified-but-malicious code.",
+      "benchmark_scenario": {
+        "setup": "Set of upgrade proposals including known malicious upgrades (Tornado Cash governance attack) and routine protocol upgrades",
+        "metric": "detection rate of malicious upgrades vs. false alarm rate on legitimate upgrades",
+        "baseline": "Tornado Cash governance attacker deployed verified-looking but malicious implementation"
+      }
+    },
+
+    "H4_timelock_bypass": {
+      "id": "H4",
+      "name": "Timelocked bypass",
+      "severity": "critical",
+      "description": "Proposal shortens, removes, or circumvents the governance timelock, eliminating the community's window to react to and potentially veto dangerous proposals before execution.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "timelock_reduction",
+            "description": "Proposal sets timelock delay to a value lower than the current delay or below protocol-defined minimum",
+            "data_needed": ["proposal_calldata", "current_timelock_delay", "minimum_timelock_delay"],
+            "confidence": 0.90
+          },
+          {
+            "name": "timelock_admin_change",
+            "description": "Proposal changes the timelock admin to an address other than the governance contract",
+            "data_needed": ["proposal_calldata", "timelock_admin_address", "governance_contract_address"],
+            "confidence": 0.95
+          },
+          {
+            "name": "emergency_execution_path",
+            "description": "Proposal introduces or invokes an emergency execution function that bypasses the standard timelock queue",
+            "data_needed": ["proposal_calldata", "contract_abi", "emergency_function_selectors"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "timelock_admin_change triggers BLOCK; timelock_reduction below 24h triggers BLOCK; emergency_execution_path triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "decode_timelock_changes",
+          "description": "Parse proposal calldata to identify any modifications to timelock parameters or admin roles",
+          "effectiveness": 0.90,
+          "user_cost": "low",
+          "skill_required": "proposal_decoder"
+        },
+        {
+          "action": "compare_timelock_state",
+          "description": "Show before/after comparison of timelock configuration including delay, admin, and queued transactions",
+          "effectiveness": 0.85,
+          "user_cost": "none",
+          "skill_required": null
+        },
+        {
+          "action": "alert_delegates",
+          "description": "Notify major delegates and security contacts about timelock modification proposal",
+          "effectiveness": 0.80,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Some protocols legitimately need emergency fast-paths (e.g., for oracle failures or exploits in progress). Distinguishing malicious timelock changes from necessary emergency governance requires contextual judgment that on-chain analysis alone cannot provide.",
+      "benchmark_scenario": {
+        "setup": "Proposals that modify timelock parameters: some malicious (attacker shortening delay), some legitimate (emergency response, scheduled maintenance)",
+        "metric": "ability to flag all malicious timelock changes while accepting legitimate emergency proposals",
+        "baseline": "any proposal that sets timelock to 0 should be blocked with 100% confidence"
+      }
+    },
+
+    "H5_voter_concentration": {
+      "id": "H5",
+      "name": "Voter concentration",
+      "severity": "high",
+      "description": "More than 50% of the proposal's voting power comes from fewer than 3 addresses, indicating potential vote buying, flash loan governance attacks, or whale manipulation rather than genuine community consensus.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "whale_dominance",
+            "description": "Top 3 voters by weight account for over 50% of total votes cast",
+            "data_needed": ["vote_records", "voter_weights", "total_votes_cast"],
+            "confidence": 0.85
+          },
+          {
+            "name": "flash_loan_vote",
+            "description": "Large voting-power address acquired tokens within the same block or epoch as the vote",
+            "data_needed": ["voter_address", "token_transfer_history", "vote_timestamp", "snapshot_block"],
+            "confidence": 0.95
+          },
+          {
+            "name": "new_voter_surge",
+            "description": "Majority of voting power comes from addresses that have never voted in this protocol before",
+            "data_needed": ["voter_address", "historical_vote_participation"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "flash_loan_vote triggers BLOCK; whale_dominance AND new_voter_surge triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "analyze_voter_distribution",
+          "description": "Generate voter concentration chart showing power distribution and historical participation of top voters",
+          "effectiveness": 0.80,
+          "user_cost": "none",
+          "skill_required": "vote_analyzer"
+        },
+        {
+          "action": "check_token_provenance",
+          "description": "Trace voting-token acquisition history for top voters to detect recent accumulation or flash loans",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "vote_analyzer"
+        },
+        {
+          "action": "extend_voting_period",
+          "description": "Recommend extending the voting period to allow broader community participation if concentration is detected early",
+          "effectiveness": 0.65,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Voter concentration is not inherently malicious -- many DAOs have legitimate whale delegates. Sybil attacks can also distribute votes across many addresses to appear decentralized. This heuristic detects concentration but cannot determine intent.",
+      "benchmark_scenario": {
+        "setup": "Voting datasets from known governance attacks (Beanstalk flash loan) and normal proposals with whale participation",
+        "metric": "precision in distinguishing attack-driven concentration from legitimate delegate voting",
+        "baseline": "Beanstalk attacker acquired 67% voting power via flash loan -- should be flagged with high confidence"
+      }
+    }
+  },
+
+  "skills": {
+    "proposal_decoder": {
+      "tool": "calldata decoder",
+      "description": "Decode governance proposal calldata into human-readable actions, identifying target contracts, function selectors, and parameters",
+      "parameters": {"supported_abis": ["Governor", "Timelock", "ProxyAdmin", "ERC20"], "decode_nested": true}
+    },
+    "parameter_simulator": {
+      "tool": "forked mainnet simulator",
+      "description": "Fork current mainnet state and simulate protocol behavior under proposed parameter changes",
+      "parameters": {"fork_provider": "alchemy", "simulation_blocks": 1000, "track_liquidations": true, "track_oracle_deviations": true}
+    },
+    "vote_analyzer": {
+      "tool": "governance vote analytics",
+      "description": "Analyze voting power distribution, token provenance, and historical participation patterns for governance proposals",
+      "parameters": {"lookback_proposals": 50, "flash_loan_window_blocks": 2, "whale_threshold_pct": 50}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring detection accuracy across all governance attack vectors",
+    "methodology": {
+      "step_1": "Collect historical governance proposals from Compound, Aave, Uniswap, Tornado Cash, Beanstalk (N >= 500)",
+      "step_2": "Label proposals as benign, suspicious, or confirmed-attack",
+      "step_3": "Run all 5 heuristics against each proposal",
+      "step_4": "Measure per-heuristic precision, recall, and F1",
+      "step_5": "Measure combined detection rate and false alarm rate",
+      "step_6": "Test recommendations by simulating countermeasure application"
+    },
+    "target": "detect 100% of known governance attacks with <5% false alarm rate on benign proposals",
+    "metrics": [
+      "per_heuristic_precision",
+      "per_heuristic_recall",
+      "combined_detection_rate",
+      "false_alarm_rate",
+      "time_to_detection_vs_vote_deadline"
+    ],
+    "adversary_levels": [
+      {"name": "basic", "heuristics": ["H1", "H5"], "description": "Treasury drain + whale vote only"},
+      {"name": "intermediate", "heuristics": ["H1", "H2", "H4", "H5"], "description": "Add parameter manipulation + timelock bypass"},
+      {"name": "advanced", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All heuristics including proxy upgrade analysis"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Proposal {proposal_id} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_block": "BLOCKED: Proposal {proposal_id} flagged by {heuristic_name} with {confidence}% confidence. {signal_description}. This proposal poses unacceptable risk.",
+    "summary": "Analyzed {n_proposals} governance proposals. {n_risky} flagged ({pct_risky}%). Top risks: {top_risks}.",
+    "summary_clean": "All {n_proposals} proposals pass security checks. No governance attack indicators detected.",
+    "skill_suggestion": "To evaluate {heuristic_name} risk, I can {skill_action}. This provides {effectiveness_pct}% detection confidence. {user_cost_note}"
+  }
+}

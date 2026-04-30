@@ -1,0 +1,391 @@
+{
+  "meta": {
+    "domain_name": "cross_protocol_risk",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "DeFi composability risk -- multi-protocol interaction analysis"
+  },
+
+  "risk_domain": {
+    "name": "Cross-Protocol Compound Risk",
+    "crops_property": "S",
+    "description": "Detects compounding risks that emerge when a user holds positions across multiple DeFi protocols simultaneously, where interactions between protocols create risks invisible to any single protocol's risk engine",
+    "protocols": ["Aave", "Compound", "Uniswap", "MakerDAO", "Lido", "Curve", "GMX", "EigenLayer"],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation of all user positions across protocols",
+        "real-time oracle price monitoring and manipulation detection",
+        "flash loan execution capability for attack simulation",
+        "historical liquidation pattern analysis",
+        "cross-protocol approval and allowance enumeration",
+        "mempool observation for front-running opportunity detection"
+      ],
+      "limitations": [
+        "no private key access",
+        "no ability to modify oracle prices without capital commitment",
+        "no access to off-chain order books or centralized exchange data"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_cascading_liquidation": {
+      "id": "H1",
+      "name": "Cascading liquidation",
+      "severity": "critical",
+      "description": "User's Aave/Compound collateral is the same token they are about to swap on a DEX. Executing the swap would reduce collateral value or balance, triggering liquidation on the lending protocol. The user may not realize their swap and lending position are coupled.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "collateral_swap_overlap",
+            "description": "Token being sold on DEX is also posted as collateral in a lending protocol with health factor < 1.5",
+            "data_needed": ["lending_positions", "pending_swap_params", "token_balances"],
+            "confidence": 0.95
+          },
+          {
+            "name": "health_factor_post_swap",
+            "description": "Simulated health factor after swap execution drops below 1.0, triggering liquidation",
+            "data_needed": ["lending_positions", "swap_amount", "current_prices"],
+            "confidence": 0.90
+          },
+          {
+            "name": "price_impact_cascade",
+            "description": "Swap's price impact on the AMM pool is large enough to move the oracle price, affecting collateral valuation",
+            "data_needed": ["amm_pool_depth", "swap_size", "oracle_type", "oracle_update_mechanism"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "health_factor_post_swap < 1.0 triggers BLOCK, < 1.2 triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "add_collateral_first",
+          "description": "Deposit additional collateral before executing the swap to maintain safe health factor",
+          "effectiveness": 0.95,
+          "user_cost": "medium (requires additional capital)",
+          "skill_required": "position_simulator"
+        },
+        {
+          "action": "partial_swap",
+          "description": "Reduce swap size to keep health factor above safe threshold after execution",
+          "effectiveness": 0.85,
+          "user_cost": "low (smaller trade)",
+          "skill_required": "position_simulator"
+        },
+        {
+          "action": "repay_debt_first",
+          "description": "Partially repay lending debt to increase health factor before swapping collateral token",
+          "effectiveness": 0.90,
+          "user_cost": "medium (uses liquid assets)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "DeFi composability means any token can be simultaneously collateral and tradeable. No protocol-level mechanism prevents users from reducing their own collateral via a separate protocol.",
+      "benchmark_scenario": {
+        "setup": "User with Aave position (health factor 1.3) attempts Uniswap swap of 40% of their collateral token",
+        "metric": "Detection rate of swaps that would trigger liquidation, measured as precision and recall",
+        "baseline": "Undetected cascading liquidations caused ~$50M losses in 2023 DeFi liquidation events"
+      }
+    },
+
+    "H2_correlated_oracle_dependency": {
+      "id": "H2",
+      "name": "Correlated oracle dependency",
+      "severity": "critical",
+      "description": "Multiple user positions across lending, derivatives, and staking protocols all depend on the same oracle feed. A single oracle failure, manipulation, or stale price would simultaneously affect all positions, creating correlated losses far exceeding what any single position's risk parameters suggest.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "shared_oracle_feed",
+            "description": "Two or more user positions across different protocols consume the same Chainlink aggregator or oracle contract",
+            "data_needed": ["position_list", "protocol_oracle_contracts", "oracle_dependency_graph"],
+            "confidence": 0.90
+          },
+          {
+            "name": "oracle_staleness_risk",
+            "description": "Shared oracle has a heartbeat > 1 hour or deviation threshold > 1%, meaning stale prices persist longer",
+            "data_needed": ["oracle_config", "heartbeat_interval", "deviation_threshold"],
+            "confidence": 0.80
+          },
+          {
+            "name": "oracle_single_source",
+            "description": "Oracle aggregator has fewer than 5 active data sources, increasing manipulation risk",
+            "data_needed": ["oracle_transmitter_count", "oracle_config"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "shared_oracle_feed across >2 protocols with >30% portfolio value triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "diversify_oracle_exposure",
+          "description": "Spread positions across protocols that use different oracle providers or oracle configurations",
+          "effectiveness": 0.85,
+          "user_cost": "medium (may require moving positions)",
+          "skill_required": "oracle_mapper"
+        },
+        {
+          "action": "reduce_correlated_positions",
+          "description": "Reduce total exposure in positions sharing the same oracle to limit correlated loss potential",
+          "effectiveness": 0.80,
+          "user_cost": "medium (reduces capital efficiency)",
+          "skill_required": "portfolio_scanner"
+        },
+        {
+          "action": "set_oracle_monitoring_alerts",
+          "description": "Configure alerts for oracle staleness or deviation events on the shared feed to enable manual intervention",
+          "effectiveness": 0.60,
+          "user_cost": "low",
+          "skill_required": "oracle_mapper"
+        }
+      ],
+      "fundamental_limitation": "DeFi's oracle landscape is concentrated. Chainlink dominates, so many protocols share identical feeds. True oracle diversification may require using protocols on different chains with independent oracle infrastructure.",
+      "benchmark_scenario": {
+        "setup": "Portfolio with 3 positions (lending, perp, staking) all relying on ETH/USD Chainlink feed. Simulate oracle failure.",
+        "metric": "Percentage of portfolio value at risk from single oracle failure vs naive per-position risk assessment",
+        "baseline": "Correlated oracle risk typically 2-5x higher than sum of individual position risks suggest"
+      }
+    },
+
+    "H3_concentrated_protocol_exposure": {
+      "id": "H3",
+      "name": "Concentrated protocol exposure",
+      "severity": "high",
+      "description": "More than 50% of portfolio value is locked in a single protocol. A protocol exploit, governance attack, or smart contract bug would cause catastrophic loss. Users often underestimate this when they hold multiple positions within the same protocol.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "single_protocol_dominance",
+            "description": "One protocol holds >50% of user's total DeFi portfolio value",
+            "data_needed": ["all_positions", "position_values_usd", "protocol_addresses"],
+            "confidence": 0.95
+          },
+          {
+            "name": "smart_contract_concentration",
+            "description": "User's assets interact with fewer than 3 unique protocol contract systems",
+            "data_needed": ["approved_contracts", "position_contracts"],
+            "confidence": 0.80
+          },
+          {
+            "name": "governance_risk_concentration",
+            "description": "Concentrated protocol has upgradeable contracts controlled by a multisig with <5 signers or a timelock <24h",
+            "data_needed": ["proxy_admin_addresses", "timelock_delay", "multisig_config"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "single_protocol_dominance >50% triggers WARNING, >75% triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "diversify_protocols",
+          "description": "Redistribute positions across multiple protocols to cap any single protocol at 30-40% of portfolio",
+          "effectiveness": 0.90,
+          "user_cost": "medium (gas costs, potential yield difference)",
+          "skill_required": "portfolio_scanner"
+        },
+        {
+          "action": "check_insurance_coverage",
+          "description": "Verify DeFi insurance coverage (Nexus Mutual, InsurAce) for the concentrated protocol position",
+          "effectiveness": 0.50,
+          "user_cost": "low (insurance premium)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Protocol diversification has diminishing returns because many DeFi protocols share dependencies (same oracles, same bridge, same L1 settlement). True risk isolation requires independent infrastructure stacks.",
+      "benchmark_scenario": {
+        "setup": "Portfolio with 70% in Aave, 15% in Uniswap, 15% in Lido. Simulate Aave exploit.",
+        "metric": "Portfolio loss percentage from single protocol failure vs diversified baseline",
+        "baseline": "Historical DeFi exploits average 60-100% loss of protocol TVL for affected users"
+      }
+    },
+
+    "H4_approval_chain_risk": {
+      "id": "H4",
+      "name": "Approval chain risk",
+      "severity": "critical",
+      "description": "User has approved tokens in protocol A that are also collateral in protocol B. If protocol A is compromised, the attacker can drain the approved tokens, which simultaneously collapses the user's collateral in protocol B, causing cascading liquidation. The approval is the attack surface; the collateral is the blast radius.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "approved_collateral_overlap",
+            "description": "Token approved to protocol A (unlimited or high allowance) is also posted as collateral in protocol B",
+            "data_needed": ["token_approvals", "lending_collateral_positions", "approval_amounts"],
+            "confidence": 0.90
+          },
+          {
+            "name": "stale_approval",
+            "description": "Approval to protocol A was set >90 days ago and has not been used recently, suggesting forgotten exposure",
+            "data_needed": ["approval_timestamps", "last_interaction_timestamps"],
+            "confidence": 0.75
+          },
+          {
+            "name": "unaudited_approval_target",
+            "description": "Protocol A has no recent audit or has known vulnerabilities flagged by security researchers",
+            "data_needed": ["protocol_audit_status", "known_vulnerability_feeds"],
+            "confidence": 0.85
+          }
+        ],
+        "threshold": "approved_collateral_overlap with unlimited allowance triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "revoke_stale_approvals",
+          "description": "Revoke token approvals for protocols no longer actively used, especially those overlapping with collateral",
+          "effectiveness": 0.95,
+          "user_cost": "low (gas for revoke tx)",
+          "skill_required": null
+        },
+        {
+          "action": "use_exact_approvals",
+          "description": "Replace unlimited approvals with exact-amount approvals matching intended transaction size",
+          "effectiveness": 0.85,
+          "user_cost": "low (slightly more gas per transaction)",
+          "skill_required": null
+        },
+        {
+          "action": "separate_collateral_wallet",
+          "description": "Use a dedicated wallet for lending collateral that never approves tokens to other protocols",
+          "effectiveness": 0.90,
+          "user_cost": "medium (wallet management complexity)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "ERC-20 approve/transferFrom is an all-or-nothing trust model. Permit2 and session keys improve this but are not yet universally adopted. Users must actively manage approvals as a security practice.",
+      "benchmark_scenario": {
+        "setup": "User with USDC approved to 5 protocols and posted as collateral in Aave. Simulate compromise of one approved protocol.",
+        "metric": "Total value at risk (direct drain + cascading liquidation) vs value visible to any single protocol's risk dashboard",
+        "baseline": "Approval-based exploits drained >$200M in 2023 across DeFi"
+      }
+    },
+
+    "H5_flash_loan_attack_surface": {
+      "id": "H5",
+      "name": "Flash loan attack surface",
+      "severity": "high",
+      "description": "User's position can be profitably attacked via flash loan: an attacker borrows capital in a single transaction to manipulate price, trigger liquidation of the user's position, and profit from the liquidation bonus, all atomically. Positions with low health factors and thin oracle liquidity are most vulnerable.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "low_health_factor",
+            "description": "Lending position health factor is between 1.0 and 1.15, making it cheaply liquidatable after small price movement",
+            "data_needed": ["lending_positions", "health_factors", "liquidation_thresholds"],
+            "confidence": 0.85
+          },
+          {
+            "name": "thin_oracle_liquidity",
+            "description": "Collateral token's price oracle can be moved >2% with <$1M of capital in the reference AMM pool",
+            "data_needed": ["oracle_source_pools", "pool_liquidity_depth", "price_impact_curve"],
+            "confidence": 0.80
+          },
+          {
+            "name": "profitable_liquidation",
+            "description": "Liquidation bonus exceeds the cost of price manipulation plus flash loan fee, making the attack profitable",
+            "data_needed": ["liquidation_bonus_pct", "manipulation_cost_estimate", "flash_loan_fee"],
+            "confidence": 0.75
+          },
+          {
+            "name": "historical_flash_loan_activity",
+            "description": "The collateral token or lending market has been targeted by flash loan attacks in the past 90 days",
+            "data_needed": ["flash_loan_event_history", "attack_database"],
+            "confidence": 0.65
+          }
+        ],
+        "threshold": "profitable_liquidation triggers WARNING, profitable_liquidation AND low_health_factor triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "increase_health_factor",
+          "description": "Add collateral or repay debt to push health factor above 1.5, making price manipulation cost exceed liquidation profit",
+          "effectiveness": 0.90,
+          "user_cost": "medium (capital lockup)",
+          "skill_required": "position_simulator"
+        },
+        {
+          "action": "use_liquid_collateral",
+          "description": "Switch to collateral tokens with deep oracle liquidity (ETH, USDC) that are expensive to manipulate via flash loan",
+          "effectiveness": 0.80,
+          "user_cost": "medium (may change yield profile)",
+          "skill_required": "flash_loan_detector"
+        },
+        {
+          "action": "monitor_and_alert",
+          "description": "Set up automated health factor monitoring with alerts at 1.3 and 1.15 thresholds to enable preemptive action",
+          "effectiveness": 0.60,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Flash loans provide unlimited capital for single-transaction attacks. As long as liquidation mechanisms offer bonuses and oracle prices can be influenced by on-chain trading, this attack vector exists. Protocol-level mitigations (TWAP oracles, delayed liquidation) help but add other tradeoffs.",
+      "benchmark_scenario": {
+        "setup": "User with health factor 1.1 using mid-cap token as collateral on Aave. Simulate flash loan attack profitability.",
+        "metric": "Profitability of flash loan attack (revenue from liquidation bonus minus manipulation cost and fees)",
+        "baseline": "Flash loan attacks extracted >$300M from DeFi in 2022-2023"
+      }
+    }
+  },
+
+  "skills": {
+    "portfolio_scanner": {
+      "tool": "on-chain position aggregator",
+      "description": "Scan all user positions across lending, DEX LP, staking, and derivatives protocols to build a unified risk view",
+      "parameters": {"supported_protocols": ["Aave", "Compound", "Uniswap", "MakerDAO", "Lido", "Curve", "GMX", "EigenLayer"], "chains": ["ethereum", "arbitrum", "optimism", "polygon"]}
+    },
+    "oracle_mapper": {
+      "tool": "oracle dependency graph builder",
+      "description": "Map which oracle feeds each protocol position depends on, detecting shared oracle exposure across the portfolio",
+      "parameters": {"oracle_providers": ["Chainlink", "Uniswap TWAP", "Redstone", "Pyth"], "include_staleness": true}
+    },
+    "position_simulator": {
+      "tool": "DeFi position simulator",
+      "description": "Simulate the effect of a proposed transaction on all user positions, computing post-action health factors and margin levels",
+      "parameters": {"simulation_type": ["swap_impact", "collateral_change", "price_shock"], "price_shock_range_pct": [-50, 50]}
+    },
+    "flash_loan_detector": {
+      "tool": "flash loan profitability analyzer",
+      "description": "Estimate whether a user's position can be profitably attacked via flash loan by computing manipulation cost vs liquidation revenue",
+      "parameters": {"flash_loan_sources": ["Aave", "dYdX", "Balancer"], "max_capital_usd": 100000000}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring detection of cross-protocol compound risks before transaction submission",
+    "methodology": {
+      "step_1": "Build synthetic portfolio with positions across 3-5 protocols with known cross-dependencies",
+      "step_2": "Generate 100 proposed transactions that trigger various compound risk scenarios",
+      "step_3": "Run all 5 heuristics against each proposed transaction",
+      "step_4": "Measure detection rate against ground-truth labels (position simulator confirms actual risk)",
+      "step_5": "Apply recommendations and verify risk reduction",
+      "step_6": "Compute false positive rate to ensure usable signal-to-noise ratio"
+    },
+    "target": "Detect >90% of cross-protocol compound risks with <10% false positive rate",
+    "metrics": [
+      "per_heuristic_detection_rate",
+      "combined_detection_rate",
+      "false_positive_rate",
+      "time_to_detection_ms",
+      "recommendation_effectiveness"
+    ],
+    "adversary_levels": [
+      {"name": "passive", "heuristics": ["H3"], "description": "Only checks protocol concentration (static analysis)"},
+      {"name": "active_monitoring", "heuristics": ["H1", "H2", "H3", "H4"], "description": "Monitors real-time positions and oracle dependencies"},
+      {"name": "adversarial_simulation", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "Full attack simulation including flash loan profitability analysis"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "risk_assessment_block": "BLOCKED: {heuristic_name} detected with {confidence}% confidence. {signal_description}. This transaction would compound your cross-protocol risk.",
+    "summary": "Analyzed {n_txs} transactions against cross-protocol risk heuristics. {n_risky} flagged ({pct_risky}%). Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} transactions pass cross-protocol risk checks. No compound risks detected.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can run {skill_action}. This reduces compound risk by ~{effectiveness_pct}%. {user_cost_note}",
+    "compound_risk": "Multiple cross-protocol risks interact: {heuristic_list}. Combined exposure: ${total_at_risk} across {n_protocols} protocols.",
+    "portfolio_alert": "Portfolio concentration: {pct_concentrated}% in {protocol_name}. Single protocol failure would impact ${value_at_risk}."
+  }
+}

@@ -1,0 +1,17 @@
+{"incident": "Unlimited token approval: approve() or increaseAllowance() called with amount >= 2^255", "label": "H1_positive", "heuristic": "H1", "deanonymized": true, "signal": "max_uint_approval"}
+{"incident": "Unlimited token approval: EIP-2612 permit() or Permit2 signed with unlimited amount", "label": "H1_positive", "heuristic": "H1", "deanonymized": true, "signal": "permit_unlimited"}
+{"incident": "Unlimited token approval: User followed recommendation -- Set approval to exact amount needed for this transaction, not unlimited", "label": "H1_clean", "heuristic": "H1", "deanonymized": false}
+{"incident": "Unverified spender contract: Spender contract source code not verified on block explorer", "label": "H2_positive", "heuristic": "H2", "deanonymized": true, "signal": "unverified_source"}
+{"incident": "Unverified spender contract: Spender contract deployed within last 24 hours", "label": "H2_positive", "heuristic": "H2", "deanonymized": true, "signal": "recently_deployed"}
+{"incident": "Unverified spender contract: Spender not found in any known protocol registry (DeFi Llama, Etherscan labels)", "label": "H2_positive", "heuristic": "H2", "deanonymized": true, "signal": "no_protocol_registry"}
+{"incident": "Unverified spender contract: User followed recommendation -- Do not approve tokens to unverified contracts. Wait for source verification.", "label": "H2_clean", "heuristic": "H2", "deanonymized": false}
+{"incident": "Known scam address: Address found in scam/phishing database with confirmed reports", "label": "H3_positive", "heuristic": "H3", "deanonymized": true, "signal": "scam_database_hit"}
+{"incident": "Known scam address: Address bytecode or deployment pattern matches known scam template", "label": "H3_positive", "heuristic": "H3", "deanonymized": true, "signal": "similar_to_known_scam"}
+{"incident": "Known scam address: User followed recommendation -- Block the transaction. This address is confirmed malicious.", "label": "H3_clean", "heuristic": "H3", "deanonymized": false}
+{"incident": "Suspicious function selector: Function selector not found in 4byte.directory or common interface databases", "label": "H4_positive", "heuristic": "H4", "deanonymized": true, "signal": "unknown_selector"}
+{"incident": "Suspicious function selector: Multicall/batch that includes hidden approval among other operations", "label": "H4_positive", "heuristic": "H4", "deanonymized": true, "signal": "multicall_with_approval"}
+{"incident": "Suspicious function selector: ERC-721/1155 setApprovalForAll to unknown operator", "label": "H4_positive", "heuristic": "H4", "deanonymized": true, "signal": "setApprovalForAll_nft"}
+{"incident": "Suspicious function selector: User followed recommendation -- Decode the calldata and show the user exactly what operations will execute", "label": "H4_clean", "heuristic": "H4", "deanonymized": false}
+{"incident": "Stale token approval: Unlimited approval to a contract with no user interaction in >30 days", "label": "H5_positive", "heuristic": "H5", "deanonymized": true, "signal": "stale_unlimited"}
+{"incident": "Stale token approval: Stale approval exposes >$1000 in token value", "label": "H5_positive", "heuristic": "H5", "deanonymized": true, "signal": "high_value_exposed"}
+{"incident": "Stale token approval: User followed recommendation -- Revoke approvals to contracts you haven't used in 30+ days", "label": "H5_clean", "heuristic": "H5", "deanonymized": false}

@@ -1,0 +1,383 @@
+{
+  "meta": {
+    "domain_name": "l2_bridge_linkage",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "academic cross-chain deanonymization research (e.g., arxiv 2208.02370), bridge protocol analysis"
+  },
+
+  "risk_domain": {
+    "name": "Cross-Chain Identity Linkage via Bridge Usage",
+    "crops_property": "P",
+    "description": "Detects privacy-breaking patterns in L1-to-L2 bridge usage that allow an observer to link addresses across chains, defeating the isolation that separate chains should provide",
+    "protocols": ["Arbitrum Bridge", "Optimism Bridge", "zkSync Bridge", "StarkNet Bridge", "Polygon Bridge", "Hop Protocol", "Across Protocol", "Stargate"],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation across L1 and multiple L2s",
+        "timing analysis on bridge deposits and withdrawals",
+        "amount correlation across chains with fee awareness",
+        "bridge contract event log monitoring",
+        "address clustering on each chain independently"
+      ],
+      "limitations": [
+        "no private key access",
+        "no access to sequencer mempool (if private)",
+        "no off-chain metadata (IP, browser fingerprint)"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_same_address_bridge": {
+      "id": "H1",
+      "name": "Same address bridge",
+      "severity": "critical",
+      "description": "User bridges assets using the same address on both L1 and L2, creating a trivial deterministic link. Most canonical bridges default to sending to the same address, making this the most common and most damaging linkage pattern.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "address_reuse",
+            "description": "Bridge deposit on L1 and withdrawal on L2 use the identical address (canonical bridge default behavior)",
+            "data_needed": ["bridge_deposit_address", "bridge_withdrawal_address", "bridge_contract_events"],
+            "confidence": 1.0
+          },
+          {
+            "name": "ens_cross_chain",
+            "description": "L1 and L2 addresses both resolve to the same ENS name or are in the same ENS ownership graph",
+            "data_needed": ["l1_address", "l2_address", "ens_records", "ens_cross_chain_records"],
+            "confidence": 0.90
+          },
+          {
+            "name": "create2_deterministic",
+            "description": "Smart contract wallet deployed via CREATE2 at the same address on both chains, linking via deterministic deployment",
+            "data_needed": ["l1_address", "l2_address", "contract_creation_opcode"],
+            "confidence": 0.95
+          }
+        ],
+        "threshold": "address_reuse is an immediate and complete linkage -- no mitigation possible after the fact"
+      },
+      "recommendations": [
+        {
+          "action": "use_separate_addresses",
+          "description": "Generate a fresh address on the destination L2 and specify it as the bridge recipient instead of using the default same-address behavior",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": "address_separator"
+        },
+        {
+          "action": "use_third_party_bridge",
+          "description": "Use a liquidity-network bridge (Hop, Across) that routes through liquidity pools rather than direct deposit-withdrawal pairs",
+          "effectiveness": 0.70,
+          "user_cost": "medium (bridge fees + slippage)",
+          "skill_required": null
+        },
+        {
+          "action": "intermediate_mixing",
+          "description": "Bridge to an intermediate address, wait, then transfer to the intended L2 address via multiple hops",
+          "effectiveness": 0.60,
+          "user_cost": "high (multiple gas fees + delay)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "If the user has already bridged with the same address, the linkage is permanent and on-chain. No retroactive fix exists -- the only mitigation is abandoning both addresses and starting fresh.",
+      "benchmark_scenario": {
+        "setup": "Dataset of N bridge transactions from canonical bridges (Arbitrum, Optimism, zkSync) with known same-address and different-address patterns",
+        "metric": "100% detection rate for same-address bridges, false positive rate for CREATE2 matches",
+        "baseline": "majority of canonical bridge users use same address on both chains"
+      }
+    },
+
+    "H2_amount_correlation": {
+      "id": "H2",
+      "name": "Amount correlation",
+      "severity": "high",
+      "description": "A bridge deposit on L1 matches a withdrawal on L2 by exact amount (minus predictable fees) within a narrow time window. Even with different addresses, unique or precise amounts create a strong statistical link.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "exact_amount_match",
+            "description": "L2 withdrawal amount equals L1 deposit minus the bridge fee, within a time window matching the bridge finality period",
+            "data_needed": ["l1_deposit_amount", "l2_withdrawal_amount", "bridge_fee_schedule", "bridge_finality_period"],
+            "confidence": 0.85
+          },
+          {
+            "name": "rare_amount",
+            "description": "The bridged amount has fewer than 3 matches in the bridge deposit pool within 24 hours",
+            "data_needed": ["bridge_deposit_pool", "deposit_amount", "time_window"],
+            "confidence": 0.80
+          },
+          {
+            "name": "precise_amount",
+            "description": "Amount has more than 4 significant decimal places (not a round number), making it nearly unique",
+            "data_needed": ["deposit_amount"],
+            "confidence": 0.65
+          }
+        ],
+        "threshold": "exact_amount_match AND rare_amount triggers WARNING; all three signals together trigger BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "split_bridge_amounts",
+          "description": "Split a single bridge transfer into multiple round-number transfers across different time windows",
+          "effectiveness": 0.80,
+          "user_cost": "medium (multiple bridge fees + timing delays)",
+          "skill_required": "amount_splitter"
+        },
+        {
+          "action": "round_to_common_denomination",
+          "description": "Round bridge amount to a common denomination (0.1, 0.5, 1.0, 10.0 ETH) to increase the anonymity set",
+          "effectiveness": 0.70,
+          "user_cost": "low (dust remainder stays on L1)",
+          "skill_required": "amount_splitter"
+        },
+        {
+          "action": "use_liquidity_bridge",
+          "description": "Use liquidity-network bridges where output amounts are determined by pool state, not input amounts",
+          "effectiveness": 0.75,
+          "user_cost": "medium (slippage, fees)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Amount correlation weakens as bridge volume increases (larger anonymity set), but for low-volume bridges or large amounts, even round numbers may be unique in a given time window. The adversary's ability depends on bridge traffic patterns.",
+      "benchmark_scenario": {
+        "setup": "Historical bridge deposit/withdrawal pairs from Arbitrum and Optimism canonical bridges over 30 days. Adversary attempts amount+timing matching.",
+        "metric": "fraction of bridge transfers where adversary correctly links L1 deposit to L2 withdrawal using amount and timing alone",
+        "baseline": "unique amounts are near-certain matches; round amounts depend on bridge volume"
+      }
+    },
+
+    "H3_bridge_sequence_fingerprint": {
+      "id": "H3",
+      "name": "Bridge sequence fingerprint",
+      "severity": "high",
+      "description": "A user who bridges to the same set of L2s in a recognizable order or pattern creates a behavioral fingerprint. If an address bridges to Arbitrum, then Optimism, then zkSync in a consistent sequence, this pattern is highly identifying even if different addresses are used on each chain.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "chain_sequence_match",
+            "description": "L1 address bridges to the same ordered set of L2 chains as another known address cluster",
+            "data_needed": ["bridge_history_l1", "bridge_destination_chains", "known_address_clusters"],
+            "confidence": 0.75
+          },
+          {
+            "name": "timing_cadence",
+            "description": "Bridge events follow a periodic cadence (e.g., weekly, monthly) that matches a known user's pattern",
+            "data_needed": ["bridge_timestamps", "historical_bridge_cadence"],
+            "confidence": 0.65
+          },
+          {
+            "name": "multi_chain_presence",
+            "description": "Same address or cluster appears on 3+ L2s within a short time window, suggesting systematic bridging",
+            "data_needed": ["address_activity_per_chain", "bridge_timestamps"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "chain_sequence_match AND timing_cadence triggers WARNING; add multi_chain_presence for higher confidence"
+      },
+      "recommendations": [
+        {
+          "action": "randomize_bridge_order",
+          "description": "Vary the order and timing of bridges to different L2s to break recognizable patterns",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "stagger_bridge_timing",
+          "description": "Add random delays (hours to days) between bridges to different chains to prevent cadence fingerprinting",
+          "effectiveness": 0.70,
+          "user_cost": "medium (timing inconvenience)",
+          "skill_required": null
+        },
+        {
+          "action": "use_different_bridges_per_chain",
+          "description": "Use different bridge protocols for different L2s to fragment the observable pattern",
+          "effectiveness": 0.65,
+          "user_cost": "low",
+          "skill_required": "bridge_monitor"
+        }
+      ],
+      "fundamental_limitation": "Behavioral fingerprinting is inherently probabilistic and depends on the user population. With few multi-chain users, any multi-chain activity is identifying regardless of countermeasures. As L2 adoption grows, the anonymity set improves naturally.",
+      "benchmark_scenario": {
+        "setup": "Simulated population of N users with varying multi-chain bridge patterns. Adversary observes all L1 bridge events and L2 activity.",
+        "metric": "adversary accuracy in linking L1 identities to L2 activity sets using bridge sequence alone",
+        "baseline": "depends on population size and chain diversity -- small populations are highly vulnerable"
+      }
+    },
+
+    "H4_gas_funding_post_bridge": {
+      "id": "H4",
+      "name": "Gas funding post-bridge",
+      "severity": "critical",
+      "description": "After bridging to an L2, the user's new L2 address receives its first gas funding from bridged ETH traceable to a known L1 address. This creates a direct funding chain that links the L2 identity to the L1 identity even if different addresses were used for the bridge itself.",
+      "detection": {
+        "type": "graph_analysis",
+        "signals": [
+          {
+            "name": "direct_funding_chain",
+            "description": "L2 address's first ETH transfer comes from an address that received bridge withdrawals from a known L1 address",
+            "data_needed": ["l2_address_funding_history", "bridge_withdrawal_recipients", "known_l1_addresses"],
+            "confidence": 0.90
+          },
+          {
+            "name": "single_hop_funding",
+            "description": "L2 address funded through exactly one intermediary that itself was funded by a bridge withdrawal",
+            "data_needed": ["l2_funding_chain_depth_2", "bridge_withdrawal_events"],
+            "confidence": 0.80
+          },
+          {
+            "name": "funding_timing",
+            "description": "L2 address funded within minutes of a bridge withdrawal completing, suggesting automated pipeline",
+            "data_needed": ["l2_first_funding_timestamp", "bridge_withdrawal_timestamp"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "direct_funding_chain triggers BLOCK; single_hop_funding AND funding_timing triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "use_l2_faucet_or_paymaster",
+          "description": "Fund gas on L2 via a faucet, paymaster, or gasless transaction mechanism to avoid direct funding from bridged assets",
+          "effectiveness": 0.90,
+          "user_cost": "low (faucet limits, paymaster fees)",
+          "skill_required": null
+        },
+        {
+          "action": "pre_fund_from_independent_source",
+          "description": "Fund the L2 address from an independent source (CEX withdrawal, separate bridge session with delay) before using bridged assets",
+          "effectiveness": 0.80,
+          "user_cost": "medium (requires planning)",
+          "skill_required": "address_separator"
+        },
+        {
+          "action": "batch_with_other_activity",
+          "description": "Wait until the L2 address has received funds from multiple independent sources before transacting, muddying the funding chain",
+          "effectiveness": 0.65,
+          "user_cost": "high (delay + complexity)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "On L2s with low activity, any funding event is observable and the graph is sparse enough to trace even through multiple hops. The gas funding problem is fundamentally the same as for stealth addresses -- someone has to pay for gas, and that payment is visible.",
+      "benchmark_scenario": {
+        "setup": "N L2 addresses with varying funding patterns: direct from bridge, via intermediary, from CEX, from faucet",
+        "metric": "fraction of L2 addresses linkable to an L1 identity via funding chain analysis",
+        "baseline": "most L2 users fund gas directly from bridged ETH"
+      }
+    },
+
+    "H5_nft_token_bridge_linkage": {
+      "id": "H5",
+      "name": "NFT/token bridge linkage",
+      "severity": "critical",
+      "description": "Bridging unique tokens (NFTs, tokens with non-fungible amounts, rare ERC-20s with very few holders) creates a deterministic link because the token itself is an identifier. If only one Bored Ape #1234 exists across all chains, bridging it links the source and destination addresses with certainty.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "nft_bridge",
+            "description": "An ERC-721 or ERC-1155 token with a unique ID was bridged, creating a deterministic cross-chain link",
+            "data_needed": ["bridge_token_type", "token_id", "token_contract", "bridge_events"],
+            "confidence": 1.0
+          },
+          {
+            "name": "rare_token_bridge",
+            "description": "An ERC-20 token with fewer than 100 holders was bridged, making the transfer highly identifying",
+            "data_needed": ["bridge_token_contract", "token_holder_count", "bridge_events"],
+            "confidence": 0.85
+          },
+          {
+            "name": "unique_amount_token",
+            "description": "A token amount so specific (e.g., 1,337.42069 USDC) that it effectively acts as an identifier across chains",
+            "data_needed": ["bridge_token_amount", "bridge_deposit_pool_amounts"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "nft_bridge triggers immediate BLOCK (deterministic link); rare_token_bridge triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "avoid_bridging_nfts",
+          "description": "Do not bridge NFTs directly if cross-chain privacy is needed. Sell on L1 and rebuy on L2 through a marketplace.",
+          "effectiveness": 0.90,
+          "user_cost": "high (marketplace fees, price risk, not the same token)",
+          "skill_required": null
+        },
+        {
+          "action": "bridge_only_fungible_common_tokens",
+          "description": "Only bridge high-volume fungible tokens (ETH, USDC, DAI) in round amounts to maximize anonymity set",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "bridge_monitor"
+        },
+        {
+          "action": "check_token_rarity",
+          "description": "Before bridging, check the token's holder count and recent bridge volume to assess linkability risk",
+          "effectiveness": 0.80,
+          "user_cost": "none",
+          "skill_required": "bridge_monitor"
+        }
+      ],
+      "fundamental_limitation": "Unique tokens are inherently non-private to move across chains. No amount of operational security can hide the fact that a specific NFT moved from address A on L1 to address B on L2. The only mitigation is not bridging unique assets.",
+      "benchmark_scenario": {
+        "setup": "Bridge event dataset including NFT bridges, rare token bridges, and high-volume fungible token bridges",
+        "metric": "100% detection rate for NFT bridges; precision on rare token classification",
+        "baseline": "any NFT bridge is a certain link; rare tokens depend on holder count threshold"
+      }
+    }
+  },
+
+  "skills": {
+    "bridge_monitor": {
+      "tool": "cross-chain bridge event indexer",
+      "description": "Monitor bridge contract events across L1 and supported L2s to track deposit/withdrawal pairs, token types, and volumes",
+      "parameters": {"supported_bridges": ["Arbitrum", "Optimism", "zkSync", "StarkNet", "Polygon"], "lookback_hours": 48, "index_nft_bridges": true}
+    },
+    "address_separator": {
+      "tool": "address generation and mapping",
+      "description": "Generate fresh addresses on destination chains and maintain a private mapping to avoid on-chain address reuse",
+      "parameters": {"supported_chains": ["ethereum", "arbitrum", "optimism", "zksync", "starknet"], "derivation": "BIP-44 per chain"}
+    },
+    "amount_splitter": {
+      "tool": "bridge amount optimizer",
+      "description": "Split a bridge transfer into multiple round-number amounts across different time windows to maximize anonymity set",
+      "parameters": {"denominations_eth": [0.1, 0.5, 1.0, 5.0, 10.0], "min_delay_hours": 2, "max_delay_hours": 48, "max_splits": 5}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring cross-chain linkability with all heuristics applied",
+    "methodology": {
+      "step_1": "Collect bridge transaction dataset across Arbitrum, Optimism, zkSync canonical bridges (N >= 10000 pairs)",
+      "step_2": "Label ground truth linkages using known same-address bridges as positive examples",
+      "step_3": "Run all 5 heuristics against each bridge event",
+      "step_4": "Measure per-heuristic linkability rate",
+      "step_5": "Apply profile recommendations to a subset and re-measure",
+      "step_6": "Compare: linkability rate before vs after countermeasures"
+    },
+    "target": "reduce cross-chain linkability from estimated 80%+ to <15% with all recommendations applied",
+    "metrics": [
+      "per_heuristic_linkability_rate",
+      "combined_linkability_rate",
+      "false_positive_rate",
+      "user_cost_score",
+      "anonymity_set_size"
+    ],
+    "adversary_levels": [
+      {"name": "basic", "heuristics": ["H1", "H5"], "description": "Address reuse + unique token linkage only"},
+      {"name": "intermediate", "heuristics": ["H1", "H2", "H4", "H5"], "description": "Add amount correlation + gas funding"},
+      {"name": "advanced", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All heuristics including behavioral fingerprinting"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Bridge transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_block": "BLOCKED: Bridge transaction creates {heuristic_name} linkage with {confidence}% confidence. {signal_description}. This bridge would link your L1 and L2 identities.",
+    "summary": "Analyzed {n_bridges} bridge transactions. {n_linkable} create cross-chain linkages ({pct_linkable}%). Top risks: {top_risks}.",
+    "summary_clean": "All {n_bridges} bridge transactions pass privacy checks. No cross-chain linkage detected.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This reduces linkability by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}
