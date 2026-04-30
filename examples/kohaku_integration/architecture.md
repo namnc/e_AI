@@ -1,148 +1,126 @@
-# e_AI v2 × Kohaku: Integration Architecture
+# e_AI v2 Integration Architecture
 
-## The problem
-
-e_AI has 9 domain profiles. Each hooks into a different layer of the wallet stack. A single middleware wrapping Kohaku plugins only catches 1 of 9.
-
-## Kohaku's 4 integration surfaces
+## 3 integration points, clean split
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  User action (send, sign, query, vote, bridge)          │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │ Layer 4: Plugin Operations                      │    │
-│  │   prepareShield / prepareTransfer / prepareUnshield  │
-│  │   → Railgun, Privacy Pools                      │    │
-│  └────────────────────┬────────────────────────────┘    │
-│                       │                                  │
-│  ┌────────────────────┴────────────────────────────┐    │
-│  │ Layer 3: TxSigner                               │    │
-│  │   signMessage / sendTransaction                 │    │
-│  │   → ALL outgoing transactions and signatures    │    │
-│  └────────────────────┬────────────────────────────┘    │
-│                       │                                  │
-│  ┌────────────────────┴────────────────────────────┐    │
-│  │ Layer 2: EthereumProvider                       │    │
-│  │   getBalance / call / request / getLogs          │    │
-│  │   → ALL RPC queries to the chain                │    │
-│  └────────────────────┬────────────────────────────┘    │
-│                       │                                  │
-│  ┌────────────────────┴────────────────────────────┐    │
-│  │ Layer 1: Host                                   │    │
-│  │   provider + network + storage + keystore       │    │
-│  │   → App context, persistent state               │    │
-│  └─────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  User's machine                                      │
+│                                                      │
+│  ┌────────────────────────────────────────────────┐  │
+│  │  Wallet (MetaMask, Rabby, Frame, any EIP-1193) │  │
+│  │  Guard: pre-sign analysis                      │  │
+│  │  Profiles: stealth_address_ops                 │  │
+│  │            approval_phishing                   │  │
+│  │            offchain_signature                  │  │
+│  │            governance_proposal                 │  │
+│  │            l2_bridge_linkage                   │  │
+│  └─────────────────────┬──────────────────────────┘  │
+│                        │                              │
+│  ┌─────────────────────▼──────────────────────────┐  │
+│  │  Local RPC (Helios / full node / L2 node)      │  │
+│  │  Guard: query pattern + state accumulation     │  │
+│  │  Profiles: rpc_leakage                         │  │
+│  │            cross_protocol_risk                 │  │
+│  │            l2_anonymity_set                    │  │
+│  └────────────────────────────────────────────────┘  │
+│                                                      │
+│  ┌────────────────────────────────────────────────┐  │
+│  │  LLM Proxy                                     │  │
+│  │  Guard: query sanitization + cover queries     │  │
+│  │  Profiles: defi_query (v1)                     │  │
+│  └────────────────────────────────────────────────┘  │
+│                                                      │
+│  Local LLM (Ollama) ← shared by all guards           │
+└──────────────────────────────────────────────────────┘
 ```
 
-## Profile → Layer mapping
+## Why this split
 
-| Profile | Layer | Hook | What it intercepts |
+| Integration point | What it sees | Profiles | Count |
 |---|---|---|---|
-| stealth_address_ops | 4 (Plugin) | `prepareShield/Unshield` | Stealth addr deposits/withdrawals |
-| approval_phishing | 3 (TxSigner) | `sendTransaction` | approve/increaseAllowance calls |
-| offchain_signature | 3 (TxSigner) | `signMessage` | EIP-712, Permit2, Seaport signatures |
-| governance_proposal | 3 (TxSigner) | `sendTransaction` | Governance execute/vote calls |
-| l2_bridge_linkage | 3 (TxSigner) | `sendTransaction` | Bridge deposit/withdraw calls |
-| rpc_leakage | 2 (Provider) | `getBalance/call/request` | All RPC queries |
-| cross_protocol_risk | 1 (Host) | Background monitor | Continuous portfolio state |
-| l2_anonymity_set | 1 (Host) | Background monitor | Continuous pool size monitoring |
+| **Wallet** | User actions (sign, send) | stealth_ops, approval_phishing, offchain_signature, governance_proposal, l2_bridge_linkage | 5 |
+| **Local RPC** | On-chain reads (balances, calls, logs) | rpc_leakage, cross_protocol_risk, l2_anonymity_set | 3 |
+| **LLM Proxy** | AI queries about DeFi | defi_query (v1) | 1 |
 
-## Implementation: 4 guards, not 1 middleware
+**Wallet** handles actions. **Local RPC** handles reads. **LLM Proxy** handles AI queries. No overlap.
 
-### Guard 1: Plugin Guard (Layer 4)
-```typescript
-// Wraps PluginInstance — intercepts privacy protocol operations
-function withPluginGuard<T extends PluginInstance>(plugin: T, profiles: Profile[]): T
-```
-**Profiles:** stealth_address_ops
-**Trigger:** Before prepareShield/prepareTransfer/prepareUnshield
-**Action:** Block or warn based on heuristic analysis
+## Assumptions
 
-### Guard 2: Transaction Guard (Layer 3)
-```typescript
-// Wraps TxSigner — intercepts ALL outgoing transactions and signatures
-function withTxGuard(signer: TxSigner, profiles: Profile[]): TxSigner
-```
-**Profiles:** approval_phishing, offchain_signature, governance_proposal, l2_bridge_linkage
-**Trigger:** Before sendTransaction or signMessage
-**Action:** Decode calldata/typed data → match against relevant profile → block/warn
+- **Local RPC is assumed.** Helios for L1, local node for L2, or any private RPC endpoint the user controls. The analysis reads accumulated local state -- it does NOT query external RPCs to gather data (that would be the privacy leak it's trying to prevent).
+- **Inventing read privacy is out of scope.** PIR, ORAM, FHE-based private state access are research problems. We assume the user has a private way to read chain state. If they don't, the rpc_leakage profile warns them.
+- **Wallet-agnostic.** The wallet guard wraps EIP-1193 (`request` method). Any wallet that implements EIP-1193 works.
 
-This is the highest-value guard. It catches:
-- `sendTransaction`: decode function selector → route to approval_phishing (approve/increaseAllowance), governance_proposal (execute/vote), l2_bridge_linkage (bridge deposit/withdraw)
-- `signMessage`: decode EIP-712 typed data → route to offchain_signature (Permit2, Seaport, setApprovalForAll)
+## Wallet Guard (5 profiles)
 
-### Guard 3: Provider Guard (Layer 2)
-```typescript
-// Wraps EthereumProvider — intercepts ALL RPC queries
-function withProviderGuard(provider: EthereumProvider, profiles: Profile[]): EthereumProvider
-```
-**Profiles:** rpc_leakage
-**Trigger:** Before getBalance, call, request, getLogs
-**Action:** Analyze query pattern over time → warn if pattern reveals strategy → suggest batching, Helios, Tor
-
-This extends e_AI v1's cover query concept to the RPC layer.
-
-### Guard 4: Background Monitor (Layer 1)
-```typescript
-// Runs on Host — continuous monitoring, not per-action
-function startBackgroundMonitor(host: Host, profiles: Profile[]): Monitor
-```
-**Profiles:** cross_protocol_risk, l2_anonymity_set
-**Trigger:** Periodic (every N blocks or every M minutes)
-**Action:** Scan portfolio state → flag concentration risk, thin pools, oracle dependencies
-
-## Routing logic
-
-When a user action hits Kohaku:
+Intercepts `eth_sendTransaction` and `eth_signTypedData_v4` before the wallet signs.
 
 ```
-User action
-    │
-    ├─ Is it a plugin operation? ──→ Guard 1 (Plugin)
-    │
-    ├─ Is it a transaction? ──→ Guard 2 (Transaction)
-    │   ├─ Decode selector
-    │   ├─ approve/permit? → approval_phishing profile
-    │   ├─ governance? → governance_proposal profile  
-    │   ├─ bridge? → l2_bridge_linkage profile
-    │   └─ other? → generic checks only
-    │
-    ├─ Is it a signature? ──→ Guard 2 (Transaction)
-    │   ├─ Decode EIP-712 typed data
-    │   ├─ Permit2/Seaport? → offchain_signature profile
-    │   └─ unknown? → warn "unrecognized signature type"
-    │
-    └─ Is it an RPC query? ──→ Guard 3 (Provider)
-        ├─ Log query to pattern tracker
-        ├─ Check pattern against rpc_leakage profile
-        └─ If pattern detected → suggest cover queries / Helios
+User action → Wallet Guard → decode calldata/typed data → route to profile
+                                  │
+                                  ├── approve/increaseAllowance → approval_phishing
+                                  ├── EIP-712 Permit2/Seaport → offchain_signature
+                                  ├── governance execute/vote → governance_proposal
+                                  ├── bridge deposit/withdraw → l2_bridge_linkage
+                                  └── stealth shield/unshield → stealth_address_ops
 ```
 
-Background monitor runs independently on a timer.
+Implementation options:
+- **MetaMask Snap** (largest reach)
+- **Browser extension** (wallet-agnostic, intercepts `window.ethereum`)
+- **wagmi/viem middleware** (DApp-level, any DApp using wagmi)
+- **Kohaku plugin** (for Kohaku users)
 
-## What this means for Kohaku PR
+See `examples/wallet_eip1193/guard.ts` for working EIP-1193 implementation.
 
-Instead of one `@kohaku-eth/ops-advisor` package, we propose:
+## Local RPC Guard (3 profiles)
+
+Accumulates state from on-chain reads that flow through the local node.
 
 ```
-@kohaku-eth/guards
-├── plugin-guard.ts      ← wraps PluginInstance
-├── tx-guard.ts          ← wraps TxSigner  
-├── provider-guard.ts    ← wraps EthereumProvider
-├── background-monitor.ts ← runs on Host
-├── profile-router.ts    ← routes actions to correct profile
-└── index.ts             ← exports withGuards(host, profiles)
+Wallet/DApp → Local RPC → serves query from local state
+                │
+                └── Guard accumulates:
+                    ├── Balance queries → rpc_leakage (which addresses checked?)
+                    ├── Contract calls → cross_protocol_risk (portfolio state)
+                    └── Pool/log data → l2_anonymity_set (pool sizes over time)
 ```
 
-Single entry point:
-```typescript
-import { withGuards } from '@kohaku-eth/guards';
+The guard does NOT make additional queries. It passively observes what the wallet is already reading and builds the analysis from that.
 
-const guarded = withGuards(host, {
-    profiles: loadAllProfiles('domains/'),
-    onBlock: (alert) => showWarning(alert),
-    onCritical: (alert) => blockAction(alert),
-});
+See `examples/l2_monitor/guard.py` for L2 monitoring implementation.
+
+## LLM Proxy Guard (1 profile)
+
+This is e_AI v1. Sanitizes DeFi queries before sending to cloud LLM.
+
 ```
+User/Agent → LLM Proxy → sanitize query → cloud LLM → synthesize answer
+                │
+                └── Removes: addresses, amounts, positions, strategies
+                    Adds: cover queries (indistinguishable from real)
+```
+
+See `cover_generator.py` and `docs/walkthrough_handcrafted.md` for v1 documentation.
+
+## Profile → Integration mapping
+
+| # | Profile | Access method | Integration | CROPS |
+|---|---|---|---|---|
+| 1 | stealth_address_ops | Wallet | Wallet guard | P |
+| 2 | approval_phishing | Wallet | Wallet guard | S |
+| 3 | offchain_signature | Wallet | Wallet guard | S |
+| 4 | governance_proposal | Application | Wallet guard | S |
+| 5 | l2_bridge_linkage | L2 | Wallet guard | P |
+| 6 | rpc_leakage | AI | Local RPC guard | P |
+| 7 | cross_protocol_risk | Application | Local RPC guard | S |
+| 8 | l2_anonymity_set | L2 | Local RPC guard | P |
+| 9 | defi_query (v1) | AI | LLM proxy | P |
+
+## What the user configures
+
+1. Install wallet guard (snap / extension / library)
+2. Run local RPC (Helios for L1, L2 node for L2)
+3. Point wallet to local RPC
+4. (Optional) Run LLM proxy if using cloud AI for DeFi questions
+
+One-time setup, all profiles active automatically.
