@@ -1,0 +1,690 @@
+{
+  "meta": {
+    "domain_name": "stealth_address_ops",
+    "version": "0.1.0-generated",
+    "generated_by": "qwen2.5:7b via meta-framework",
+    "validation_status": "draft",
+    "source_paper": "arxiv 2308.01703"
+  },
+  "risk_domain": {
+    "name": "Stealth Address Operational Privacy",
+    "crops_property": "P",
+    "description": "Auto-generated profile from labeled deanonymization incidents",
+    "protocols": [
+      "Umbra",
+      "ERC-5564"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation",
+        "timing analysis",
+        "address clustering"
+      ],
+      "limitations": [
+        "no private key access"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_same_entity_transactions": {
+      "name": "same entity transactions",
+      "description": "Transactions where both deposit and withdraw addresses are under the same control or related to a single account, indicating reduced anonymity.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "same_cex_activity",
+            "description": "Detection when both the deposit and withdraw addresses are associated with activities on the same centralized exchange (CEX).",
+            "data_needed": [
+              "deposit_address",
+              "withdraw_address",
+              "celexactions"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "ens_match_deposit_withdraw",
+            "description": "Detection when both the deposit and withdraw addresses are associated with an Ethereum Name Service (ENS) name owned by the same entity.",
+            "data_needed": [
+              "deposit_address",
+              "withdraw_address",
+              "ens_names"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "repeated_source_target",
+            "description": "Detection when both the deposit and withdraw addresses have a transaction history that traces back to or forwards to the same external address.",
+            "data_needed": [
+              "deposit_address",
+              "withdraw_address",
+              "transaction_history"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "fresh_address_withdrawal",
+            "description": "Detection when the withdraw address has no prior transaction history before receiving a withdrawal from the stealth address.",
+            "data_needed": [
+              "deposit_address",
+              "withdraw_address",
+              "transaction_history"
+            ],
+            "confidence": 0.7
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_randomized_addresses",
+          "description": "Use different deposit and withdraw addresses for each transaction to avoid linking activities.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "change_ens_name_for_each_address",
+          "description": "Change the ENS name associated with each address to prevent matching via ENS service.",
+          "effectiveness": 0.65,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "mixer_services",
+          "description": "Use mixer services that anonymize the transactions before sending to a different address.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "mixer_service"
+        },
+        {
+          "action": "timed_transfers",
+          "description": "Schedule transfers at times when detection is less likely, reducing the likelihood of matching transactions to a common entity.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_private_exchanges",
+          "description": "Transact on private exchanges or decentralized marketplaces that do not log personal data, reducing the traceability of transactions.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test same entity transactions",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H2_gas_consistency_pattern": {
+      "name": "gas consistency pattern",
+      "description": "Stealth address withdrawals with consistent gas fees across multiple transactions, hinting at potential shared control or funding mechanism.",
+      "severity": "medium",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "gas_consistency_pattern",
+            "description": "Identify transactions where the gas fee is consistently low across multiple withdrawals from a stealth address, which might indicate automated or shared control.",
+            "data_needed": [
+              "from_address",
+              "to_address",
+              "transaction_hash",
+              "gas_price"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "frequent_low_gas_withdrawals",
+            "description": "Detect a pattern of frequent withdrawals from stealth addresses with unusually low gas fees, suggesting automated or coordinated transactions.",
+            "data_needed": [
+              "from_address",
+              "transaction_hash",
+              "gas_price",
+              "timestamp"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "repeated_low_gas_usage",
+            "description": "Track instances where the same stealth address performs multiple withdrawals with very low gas fees, potentially indicating shared control or a bot.",
+            "data_needed": [
+              "from_address",
+              "transaction_hash",
+              "gas_price"
+            ],
+            "confidence": 0.85
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "audit_low_gas_txs",
+          "description": "Manually review suspicious transactions with unusually low gas fees.",
+          "effectiveness": 0.5,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "implement_gas_fee_monitoring",
+          "description": "Automate monitoring for consistent low gas fee patterns in transaction data.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": "automated_security_tool"
+        },
+        {
+          "action": "enhance_transaction_logging",
+          "description": "Increase the detail and frequency of logged transaction data for analysis.",
+          "effectiveness": 0.6,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test gas consistency pattern",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H3_immediate_withdrawal_behavior": {
+      "name": "immediate withdrawal behavior",
+      "description": "Withdrawals from stealth addresses happen very quickly after deposits, suggesting immediate access to the funds and reduced anonymity.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "withdraw_to_same_cex",
+            "description": "Detects if withdrawals from stealth addresses are directed back to the same CEX account.",
+            "data_needed": [
+              "deposit_address",
+              "withdrawal_address",
+              "funding_source"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "ens_name_match_deposit",
+            "description": "Identifies if the withdrawal address is an ENS name that matches the depositor.",
+            "data_needed": [
+              "deposit_address",
+              "withdrawal_address",
+              "ENS_name"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "prior_funding_match",
+            "description": "Checks if the withdrawal address has previously received funds from the same source as a deposit address.",
+            "data_needed": [
+              "deposit_address",
+              "withdrawal_address",
+              "funding_source"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "fresh_address_used",
+            "description": "Detects if withdrawals are made to addresses that have no prior transaction history.",
+            "data_needed": [
+              "withdrawal_address",
+              "transaction_history"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "implement_2fa",
+          "description": "Enable two-factor authentication to add an extra layer of security.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_transactions",
+          "description": "Regularly review transaction history for unauthorized withdrawals or transfers.",
+          "effectiveness": 0.65,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_hot_wallets",
+          "description": "Transfer funds to a hot wallet that is less likely to be targeted by attackers.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "deploy_cold_storage",
+          "description": "Move sensitive assets into cold storage wallets that are offline and harder to compromise.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "automate_2fa_checking",
+          "description": "Automate the process of checking for 2FA on all accounts using a security tool.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "automation_tool"
+        },
+        {
+          "action": "update_crypto_wallets",
+          "description": "Ensure all crypto wallets are up to date with the latest security patches and features.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test immediate withdrawal behavior",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H4_gas_outlier_behavior": {
+      "name": "gas outlier behavior",
+      "description": "Gas fees for transactions significantly higher than the block median, which may indicate a specific actor with distinct spending habits.",
+      "severity": "medium",
+      "incidents_matched": 1,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "gas_fee_outlier",
+            "description": "Gas fees for transactions significantly higher than the block median, possibly indicating a specific actor's distinct spending habits.",
+            "data_needed": [
+              "transaction.gas_used",
+              "block_median_gas_price"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "repeated_high_fee_transaction",
+            "description": "Frequency of transactions with unusually high gas fees relative to recent history, indicating potential pattern recognition by the actor.",
+            "data_needed": [
+              "transaction.gas_used",
+              "user_address"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "high_gas_fee_sudden_change",
+            "description": "A sudden change in gas fee usage for a transaction, particularly if it is much higher than the user's typical behavior.",
+            "data_needed": [
+              "transaction.gas_used",
+              "user_address"
+            ],
+            "confidence": 0.7
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "enable_gas_fee_limit",
+          "description": "Limit the maximum gas fee for transactions to prevent unusually high fees.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "implement_transaction_rules",
+          "description": "Create rules that automatically flag and log transactions with unusually high gas fees.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "security_monitoring_tool"
+        },
+        {
+          "action": "set_up_alerts_for_suspicious_fees",
+          "description": "Set up alerts for transactions that exceed a certain threshold of gas fees.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_gas_fee_usage",
+          "description": "Regularly review and analyze your transaction history for unusual patterns in gas fee usage.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test gas outlier behavior",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H5_behavioral_deposit_withdrawal_patterns": {
+      "name": "behavioral deposit-withdrawal patterns",
+      "description": "Users consistently perform deposits and withdrawals within short timeframes or at specific intervals, revealing predictable behavior that can be tracked.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "deposit_withdraw_sequence",
+            "description": "Detection of deposits followed by withdrawals within a short timeframe or at specific intervals.",
+            "data_needed": [
+              "timestamp_of_deposit",
+              "timestamp_of_withdrawal",
+              "timeframe"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "recurring_pattern",
+            "description": "Identification of consistent behavioral patterns in deposit and withdrawal times, indicating potential association with a known entity.",
+            "data_needed": [
+              "transaction_times",
+              "frequency_of_transactions"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "shufle_times",
+          "description": "Randomize the timing between deposits and withdrawals.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_mixer",
+          "description": "Mix funds through a mixer service to obfuscate transaction patterns.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "mixer_service"
+        },
+        {
+          "action": "change_wallets",
+          "description": "Regularly switch between different wallets for transactions.",
+          "effectiveness": 0.65,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "anonymize_transactions",
+          "description": "Use services that anonymize your cryptocurrency transactions.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": "privacy_service"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test behavioral deposit-withdrawal patterns",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H6_direct_funding_for_gas": {
+      "name": "direct funding for gas",
+      "description": "Gas fees paid directly from the main wallet to stealth addresses, indicating a direct link between these addresses and the user\u2019s regular funds.",
+      "severity": "medium",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "direct_gas_funding",
+            "description": "Detection of direct gas fee payments from main wallet to stealth addresses.",
+            "data_needed": [
+              "main_wallet_address",
+              "stealth_address",
+              "gas_transaction_data"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "same_cex_usage",
+            "description": "Both deposit and withdrawal address are associated with the same crypto exchange (CEX) account.",
+            "data_needed": [
+              "main_wallet_address",
+              "stealth_address",
+              "deposited_tokens_source",
+              "withdrawn_tokens_destination"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "ens_domain_match",
+            "description": "Stealth address withdrawal sent to an ENS domain name owned by the depositor.",
+            "data_needed": [
+              "main_wallet_address",
+              "stealth_address",
+              "ENS_owner"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_transactions",
+          "description": "Monitor transactions to identify unusual direct gas funding patterns.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_stealth_wallets",
+          "description": "Utilize separate wallets for stealth operations to avoid linking main and stealth addresses.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "rotate_addresses",
+          "description": "Regularly change wallet addresses to reduce the risk of direct link detection.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "automate_monitoring_with_tool",
+          "description": "Implement a monitoring tool that automatically flags suspicious gas funding transactions.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "auto_security_monitor"
+        }
+      ],
+      "id": "H6",
+      "benchmark_scenario": {
+        "setup": "Test direct funding for gas",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H7_self_send_transactions": {
+      "name": "self-send transactions",
+      "description": "Transactions where deposits are sent from one address (e.g., main wallet) directly to stealth addresses, showing a clear connection between wallets.",
+      "severity": "high",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "self_send_deposit_withdrawal",
+            "description": "Detection of deposits and withdrawals between the same addresses, indicating potential control by the same entity.",
+            "data_needed": [
+              "sender_address",
+              "recipient_address",
+              "transaction_value"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "ens_name_match_deposit",
+            "description": "Check if the withdrawal address is an ENS name associated with the depositor's known addresses.",
+            "data_needed": [
+              "sender_address",
+              "recipient_ens_name"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "name": "previous_transaction_history",
+            "description": "Verify if the recipient address of a withdrawal has a history of receiving tokens from the same source as the deposit address.",
+            "data_needed": [
+              "sender_address",
+              "recipient_address",
+              "transaction_source"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "blockchain_monitoring",
+          "description": "Implement blockchain monitoring tools to track unusual self-send transactions.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": "blockchain_analytics_tool"
+        },
+        {
+          "action": "multisig_wallets",
+          "description": "Use multisig wallets for sending tokens to stealth addresses.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "address_rotation",
+          "description": "Rotate sender and recipient addresses frequently to avoid pattern recognition.",
+          "effectiveness": 0.7,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "whitelist_addresses",
+          "description": "Maintain a whitelist of known good ENS names associated with your wallets.",
+          "effectiveness": 0.65,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H7",
+      "benchmark_scenario": {
+        "setup": "Test self-send transactions",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    },
+    "H8_unique_and_frequent_denominations": {
+      "name": "unique and frequent denominations",
+      "description": "Deposits or withdrawals of unique amounts that do not match other transactions in the same period, which may indicate controlled spending.",
+      "severity": "medium",
+      "incidents_matched": 2,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "unique_deposit_amount",
+            "description": "Identifies deposits made in unique amounts that do not match other transactions within the same time frame.",
+            "data_needed": [
+              "transaction_amount",
+              "timestamp"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "uncommon_withdrawal_pattern",
+            "description": "Detects withdrawals to addresses with no prior transaction history, indicating potential stealthy behavior.",
+            "data_needed": [
+              "recipient_address",
+              "timestamp",
+              "transaction_amount"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "automate_unique_deposit_monitoring",
+          "description": "Automatically monitor for unique deposit amounts to identify potential stealthy transactions.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "implement_account_segmentation",
+          "description": "Manually create separate accounts or wallets for different types of transactions to isolate them.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "use_randomized_transaction_amounts",
+          "description": "Automatically randomize transaction amounts to avoid detection by unique and frequent denominations heuristics.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "crypto-security-software"
+        },
+        {
+          "action": "periodic_address_rotation",
+          "description": "Manually rotate addresses to prevent linking transactions, even if they have similar amounts.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        }
+      ],
+      "id": "H8",
+      "benchmark_scenario": {
+        "setup": "Test unique and frequent denominations",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure_analysis.md"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "Benchmark against labeled incidents",
+    "methodology": {
+      "step_1": "Run against labeled data",
+      "step_2": "Measure detection rate"
+    },
+    "target": "TBD",
+    "metrics": [
+      "detection_rate",
+      "false_positive_rate"
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Transaction triggers {heuristic_id}: {signal_description}. Confidence: {confidence}.",
+    "summary": "Analyzed {n_txs} transactions. {n_risky} flagged.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}."
+  }
+}

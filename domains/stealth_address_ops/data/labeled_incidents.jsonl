@@ -1,0 +1,27 @@
+{"incident": "User deposited 5 ETH to stealth address, then withdrew to an address funded by the same CEX account", "label": "H1_same_entity", "heuristic": "H1", "deanonymized": true}
+{"incident": "Stealth address withdrawal sent to an ENS name owned by the depositor", "label": "H1_same_entity", "heuristic": "H1", "deanonymized": true}
+{"incident": "Withdrawal address previously received tokens from the same source as deposit address", "label": "H1_same_entity", "heuristic": "H1", "deanonymized": true}
+{"incident": "User withdrew to a completely fresh address with no prior history", "label": "H1_clean", "heuristic": "H1", "deanonymized": false}
+{"incident": "Withdrawal sent to a different CEX deposit address", "label": "H1_clean", "heuristic": "H1", "deanonymized": false}
+{"incident": "All 8 stealth address withdrawals used exactly 42 gwei priority fee", "label": "H2_gas_consistency", "heuristic": "H2", "deanonymized": true}
+{"incident": "User always sets gas to base_fee + 5, creating a unique fingerprint across 12 transactions", "label": "H2_gas_pattern", "heuristic": "H2", "deanonymized": true}
+{"incident": "Stealth withdrawal used 150 gwei while block median was 30 gwei", "label": "H2_gas_outlier", "heuristic": "H2", "deanonymized": true}
+{"incident": "Transaction used wallet default gas estimation, indistinguishable from 80% of other transactions", "label": "H2_clean", "heuristic": "H2", "deanonymized": false}
+{"incident": "Stealth address received 10 ETH at 14:00, first outgoing transaction at 14:03", "label": "H3_immediate", "heuristic": "H3", "deanonymized": true}
+{"incident": "Deposit at 09:00, withdrawal at 09:45 -- only 2 other deposits in that 1-hour window", "label": "H3_short_window", "heuristic": "H3", "deanonymized": true}
+{"incident": "User consistently spends within 30 minutes of deposit across 5 stealth addresses", "label": "H3_behavioral", "heuristic": "H3", "deanonymized": true}
+{"incident": "Deposit at Monday 10:00, withdrawal at Wednesday 15:00 -- 847 deposits in that window", "label": "H3_clean", "heuristic": "H3", "deanonymized": false}
+{"incident": "Withdrawal delayed 18 hours after deposit, coinciding with high-activity period", "label": "H3_clean", "heuristic": "H3", "deanonymized": false}
+{"incident": "Stealth address received 0.01 ETH for gas directly from depositor main wallet", "label": "H4_direct_funding", "heuristic": "H4", "deanonymized": true}
+{"incident": "Gas funded through a single intermediary hop from known address", "label": "H4_relay_funding", "heuristic": "H4", "deanonymized": true}
+{"incident": "Stealth address gas paid via Pimlico paymaster, no ETH transfer visible", "label": "H4_clean", "heuristic": "H4", "deanonymized": false}
+{"incident": "Gas funded from a fresh CEX withdrawal address with no other activity", "label": "H4_partial", "heuristic": "H4", "deanonymized": false}
+{"incident": "User sent 2 ETH from 0xaaaa to stealth address registered to 0xaaaa", "label": "H5_self_send", "heuristic": "H5", "deanonymized": true}
+{"incident": "Deposit and stealth meta-address share the same owner on Umbra registry", "label": "H5_self_send", "heuristic": "H5", "deanonymized": true}
+{"incident": "Transfer from 0xaaaa to stealth address registered to 0xbbbb (different person)", "label": "H5_clean", "heuristic": "H5", "deanonymized": false}
+{"incident": "Deposit of exactly 3.14159 ETH -- only transfer of that amount in 24 hours", "label": "H6_unique", "heuristic": "H6", "deanonymized": true}
+{"incident": "Transfer of 0.73821 ETH, no other deposits within 0.001 ETH in the pool", "label": "H6_unique", "heuristic": "H6", "deanonymized": true}
+{"incident": "Deposit of 1.0 ETH -- 47 other deposits of exactly 1.0 ETH in same 24h period", "label": "H6_clean", "heuristic": "H6", "deanonymized": false}
+{"incident": "Transfer of 10.0 ETH -- common denomination with 23 matches in pool", "label": "H6_clean", "heuristic": "H6", "deanonymized": false}
+{"incident": "User deposited 7.382 ETH, withdrew 12 minutes later from same-cluster address, gas from main wallet -- all 4 heuristics match", "label": "combined_critical", "heuristic": "H1+H3+H4+H6", "deanonymized": true}
+{"incident": "Transfer of 1.0 ETH, paymaster gas, withdrawal after 2 days to fresh address -- clean", "label": "combined_clean", "heuristic": "none", "deanonymized": false}
