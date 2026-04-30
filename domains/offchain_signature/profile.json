@@ -1,0 +1,398 @@
+{
+  "meta": {
+    "domain_name": "offchain_signature",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "Scam Sniffer 2025 Phishing Report; EIP-2612; EIP-712; Permit2 (Uniswap)"
+  },
+
+  "risk_domain": {
+    "name": "Off-chain Signature Phishing",
+    "crops_property": "S",
+    "description": "Phishing attacks that exploit off-chain signature mechanisms (EIP-712 typed data, EIP-2612 permits, Permit2, Seaport orders) to steal tokens without requiring on-chain approval transactions",
+    "protocols": ["EIP-712", "EIP-2612", "Permit2", "Seaport", "ERC-721", "ERC-1155"],
+    "adversary_model": {
+      "capabilities": [
+        "deploy convincing phishing dApp frontends mimicking legitimate protocols",
+        "craft arbitrary EIP-712 typed data payloads for user signing",
+        "register lookalike ENS domains and deploy clone contracts",
+        "monitor mempool for signed permits and front-run revocations",
+        "chain multiple signed permits into a single drain transaction"
+      ],
+      "limitations": [
+        "cannot forge signatures without private key",
+        "cannot modify signed message after signature",
+        "cannot bypass EIP-712 domain separator verification in compliant wallets"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_permit2_unlimited_expiry": {
+      "id": "H1",
+      "name": "Permit2 unlimited or long expiry",
+      "severity": "critical",
+      "description": "User signs a Permit2 approval with MAX_UINT160 amount or expiration set far into the future (>30 days). This grants the spender indefinite access to drain tokens, functionally equivalent to an unlimited on-chain approval but harder to detect and revoke.",
+      "detection": {
+        "type": "signature_analysis",
+        "signals": [
+          {
+            "name": "max_amount_permit2",
+            "description": "Permit2 PermitSingle or PermitBatch signed with amount >= 2^159 (effectively unlimited)",
+            "data_needed": ["signed_typed_data", "permit2_amount_field"],
+            "confidence": 0.95
+          },
+          {
+            "name": "long_expiry",
+            "description": "Permit2 expiration timestamp set more than 30 days from signing time",
+            "data_needed": ["permit2_expiration_field", "current_timestamp"],
+            "confidence": 0.80
+          },
+          {
+            "name": "unknown_spender_permit2",
+            "description": "Permit2 spender address is not in any known protocol registry or verified contract list",
+            "data_needed": ["permit2_spender_address", "protocol_registries"],
+            "confidence": 0.85
+          }
+        ],
+        "threshold": "max_amount_permit2 AND unknown_spender_permit2 triggers BLOCK; long_expiry triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "limit_permit2_scope",
+          "description": "Set Permit2 amount to the exact transfer value and expiration to 1 hour",
+          "effectiveness": 0.95,
+          "user_cost": "requires re-signing for future transfers",
+          "skill_required": "signature_decoder"
+        },
+        {
+          "action": "reject_unknown_spender",
+          "description": "Do not sign Permit2 messages where the spender is not a verified protocol contract",
+          "effectiveness": 0.90,
+          "user_cost": "may block new legitimate protocols",
+          "skill_required": "dapp_verifier"
+        }
+      ],
+      "fundamental_limitation": "Permit2 was designed for UX improvement (gasless approvals), but the same mechanism is a phishing amplifier. Users cannot distinguish legitimate vs malicious signing prompts without external verification tooling.",
+      "benchmark_scenario": {
+        "setup": "Dataset of N Permit2 signing requests: mix of legitimate DeFi (Uniswap, 1inch) and known phishing payloads",
+        "metric": "Detection rate for unlimited/long-expiry permits to unverified spenders vs false positives on legitimate DeFi",
+        "baseline": "Permit2 phishing accounted for >$400M losses in 2024 (Scam Sniffer)"
+      }
+    },
+
+    "H2_eip712_disguised_transfer": {
+      "id": "H2",
+      "name": "EIP-712 typed data encoding token transfer",
+      "severity": "critical",
+      "description": "Phishing dApp presents an EIP-712 typed data signing request that encodes a token transfer or approval, but the UI labels it as a benign 'sign message' or 'verify identity' action. The signed data, once submitted on-chain, executes the encoded transfer.",
+      "detection": {
+        "type": "signature_analysis",
+        "signals": [
+          {
+            "name": "transfer_in_typed_data",
+            "description": "EIP-712 typed data contains fields matching token transfer patterns (recipient, amount, token address)",
+            "data_needed": ["eip712_typed_data", "eip712_domain_separator", "primary_type"],
+            "confidence": 0.90
+          },
+          {
+            "name": "approval_in_typed_data",
+            "description": "EIP-712 typed data encodes an approval or permit (spender, value, deadline fields)",
+            "data_needed": ["eip712_typed_data", "eip712_type_definitions"],
+            "confidence": 0.85
+          },
+          {
+            "name": "mismatch_ui_payload",
+            "description": "dApp UI description does not match the decoded EIP-712 payload semantics (e.g., UI says 'login' but payload is a permit)",
+            "data_needed": ["dapp_ui_context", "decoded_eip712_payload"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "transfer_in_typed_data OR approval_in_typed_data triggers WARNING; both plus mismatch_ui_payload triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "decode_before_sign",
+          "description": "Decode and display the full EIP-712 typed data in human-readable form before signing, highlighting any transfer/approval semantics",
+          "effectiveness": 0.85,
+          "user_cost": "none",
+          "skill_required": "signature_decoder"
+        },
+        {
+          "action": "reject_transfer_typed_data",
+          "description": "Block signing of EIP-712 messages that encode token transfers unless the user explicitly confirms the transfer details",
+          "effectiveness": 0.90,
+          "user_cost": "may add confirmation step to legitimate flows",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "EIP-712 is a general-purpose typed data signing standard. Any typed structure can be constructed, and wallets cannot know the on-chain semantics of arbitrary types without protocol-specific decoders.",
+      "benchmark_scenario": {
+        "setup": "Set of N EIP-712 signing requests: legitimate DeFi permits, Seaport orders, governance votes, plus known phishing payloads with disguised transfers",
+        "metric": "True positive rate for phishing payloads with transfer semantics, false positive rate on legitimate EIP-712 messages",
+        "baseline": "EIP-712 phishing is the dominant vector for wallet-drainer kits (2024-2025)"
+      }
+    },
+
+    "H3_setApprovalForAll_unknown": {
+      "id": "H3",
+      "name": "setApprovalForAll to unknown operator",
+      "severity": "high",
+      "description": "User signs or submits a setApprovalForAll (ERC-721/1155) granting an unknown operator address full control over all NFTs in a collection. This is the NFT equivalent of unlimited ERC-20 approval and is heavily exploited by wallet drainers.",
+      "detection": {
+        "type": "signature_analysis",
+        "signals": [
+          {
+            "name": "setApprovalForAll_call",
+            "description": "Transaction or signed message invokes setApprovalForAll with approved=true",
+            "data_needed": ["calldata_or_typed_data", "function_selector", "operator_address"],
+            "confidence": 0.85
+          },
+          {
+            "name": "unknown_operator",
+            "description": "Operator address is not a verified marketplace (OpenSea, Blur, LooksRare) or known protocol",
+            "data_needed": ["operator_address", "marketplace_registries", "protocol_registries"],
+            "confidence": 0.75
+          },
+          {
+            "name": "recently_deployed_operator",
+            "description": "Operator contract deployed within last 48 hours",
+            "data_needed": ["operator_address", "contract_creation_timestamp"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "setApprovalForAll_call AND unknown_operator triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "verify_operator",
+          "description": "Check operator address against known marketplace and protocol registries before signing",
+          "effectiveness": 0.85,
+          "user_cost": "none",
+          "skill_required": "dapp_verifier"
+        },
+        {
+          "action": "use_per_token_approval",
+          "description": "Use per-token approve() instead of setApprovalForAll where possible",
+          "effectiveness": 0.70,
+          "user_cost": "higher gas for individual approvals",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "NFT marketplaces require setApprovalForAll for efficient listing. Per-token approval is not supported by major marketplace contracts, creating a forced choice between usability and security.",
+      "benchmark_scenario": {
+        "setup": "Mix of setApprovalForAll calls: legitimate marketplace listings (OpenSea, Blur) vs phishing operators",
+        "metric": "Detection rate for malicious operators with false positive rate on legitimate marketplaces",
+        "baseline": "NFT approval phishing caused >$100M losses in 2024"
+      }
+    },
+
+    "H4_unverified_dapp_origin": {
+      "id": "H4",
+      "name": "Signature from unverified dApp origin",
+      "severity": "high",
+      "description": "Signing request originates from a dApp whose domain is not in a verified registry, uses a recently registered domain, or impersonates a known protocol via homoglyph/typosquatting domain.",
+      "detection": {
+        "type": "origin_analysis",
+        "signals": [
+          {
+            "name": "unknown_domain",
+            "description": "dApp domain not found in any curated protocol directory (DeFi Llama, Etherscan dApp list)",
+            "data_needed": ["dapp_origin_url", "protocol_directories"],
+            "confidence": 0.60
+          },
+          {
+            "name": "homoglyph_domain",
+            "description": "Domain is visually similar to a known protocol domain (e.g., uniswap.com vs un1swap.com)",
+            "data_needed": ["dapp_origin_url", "known_protocol_domains"],
+            "confidence": 0.90
+          },
+          {
+            "name": "recent_domain_registration",
+            "description": "Domain registered within last 30 days (WHOIS data)",
+            "data_needed": ["dapp_origin_url", "whois_creation_date"],
+            "confidence": 0.65
+          }
+        ],
+        "threshold": "homoglyph_domain triggers BLOCK; unknown_domain AND recent_domain_registration triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "verify_dapp_origin",
+          "description": "Check dApp origin against curated allowlist of known protocol domains before signing",
+          "effectiveness": 0.80,
+          "user_cost": "none",
+          "skill_required": "dapp_verifier"
+        },
+        {
+          "action": "bookmark_legitimate",
+          "description": "Use bookmarked URLs for DeFi protocols instead of following links from social media or messages",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "New legitimate dApps are indistinguishable from phishing dApps by domain age alone. Allowlists create a walled garden that slows legitimate innovation. Social engineering can bypass origin checks if users override warnings.",
+      "benchmark_scenario": {
+        "setup": "Set of dApp origins: known protocols, new legitimate dApps, homoglyph domains, known phishing domains",
+        "metric": "True positive rate for phishing origins, false positive rate on legitimate new dApps",
+        "baseline": "Fake dApp domains are the primary phishing entry vector (Google Ads, Twitter links)"
+      }
+    },
+
+    "H5_batch_permit": {
+      "id": "H5",
+      "name": "Batch permit (multiple tokens)",
+      "severity": "critical",
+      "description": "User signs a single Permit2 PermitBatch message granting approval for multiple tokens simultaneously. Wallet drainers use this to drain all tokens in one signature, maximizing theft per interaction.",
+      "detection": {
+        "type": "signature_analysis",
+        "signals": [
+          {
+            "name": "permit_batch",
+            "description": "Permit2 PermitBatch signed with 2+ token approvals in a single message",
+            "data_needed": ["signed_typed_data", "permit2_batch_details"],
+            "confidence": 0.90
+          },
+          {
+            "name": "high_value_batch",
+            "description": "Combined value of all tokens in the batch exceeds $1000",
+            "data_needed": ["permit2_batch_details", "token_balances", "token_prices"],
+            "confidence": 0.85
+          },
+          {
+            "name": "mixed_token_types",
+            "description": "Batch includes both high-value and low-value tokens (drainer sweeping all holdings)",
+            "data_needed": ["permit2_batch_details", "token_prices"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "permit_batch AND high_value_batch triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "decompose_batch",
+          "description": "Sign individual permits for each token instead of a single batch, reviewing each one",
+          "effectiveness": 0.85,
+          "user_cost": "multiple signing prompts instead of one",
+          "skill_required": "signature_decoder"
+        },
+        {
+          "action": "verify_batch_context",
+          "description": "Check that the batch permit matches an expected multi-token operation (e.g., portfolio rebalance on a verified DEX)",
+          "effectiveness": 0.80,
+          "user_cost": "none",
+          "skill_required": "dapp_verifier"
+        }
+      ],
+      "fundamental_limitation": "Batch operations are a legitimate UX improvement for multi-token DeFi (portfolio managers, aggregators). Blocking all batches would break legitimate workflows. Detection must distinguish legitimate batches from drain attempts by context.",
+      "benchmark_scenario": {
+        "setup": "Mix of Permit2 batch requests: legitimate multi-token swaps (1inch, Cowswap) vs wallet drainer batch drain payloads",
+        "metric": "Detection rate for drainer batches vs false positive rate on legitimate aggregator batches",
+        "baseline": "Batch drains account for majority of high-value single-tx thefts (>$50K per incident)"
+      }
+    },
+
+    "H6_seaport_below_market": {
+      "id": "H6",
+      "name": "Seaport order below market price",
+      "severity": "high",
+      "description": "User signs a Seaport (OpenSea) order listing an NFT or token bundle at significantly below market price. Phishing dApps trick users into signing orders that sell valuable assets for near-zero consideration.",
+      "detection": {
+        "type": "price_analysis",
+        "signals": [
+          {
+            "name": "below_floor_price",
+            "description": "Seaport order lists NFT at <50% of collection floor price",
+            "data_needed": ["seaport_order_data", "nft_collection_address", "floor_price_feed"],
+            "confidence": 0.85
+          },
+          {
+            "name": "near_zero_consideration",
+            "description": "Seaport order consideration (payment) is <0.001 ETH for an asset with known value",
+            "data_needed": ["seaport_order_data", "asset_valuation"],
+            "confidence": 0.95
+          },
+          {
+            "name": "bulk_listing_underpriced",
+            "description": "Seaport order bundles multiple valuable assets with total consideration far below combined value",
+            "data_needed": ["seaport_order_data", "asset_valuations", "bundle_total_value"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "near_zero_consideration triggers BLOCK; below_floor_price triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "check_market_price",
+          "description": "Fetch current floor price and recent sales data before signing any Seaport listing order",
+          "effectiveness": 0.90,
+          "user_cost": "none",
+          "skill_required": "price_checker"
+        },
+        {
+          "action": "reject_underpriced",
+          "description": "Block Seaport orders where consideration is <50% of floor price unless user explicitly confirms",
+          "effectiveness": 0.85,
+          "user_cost": "may block intentional below-market sales (gifts, OTC)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Price feeds can be manipulated or stale. Floor prices are volatile for low-liquidity collections. Legitimate below-market sales (gifts, OTC deals) produce false positives. The fundamental issue is that Seaport orders are opaque blobs to most wallet UIs.",
+      "benchmark_scenario": {
+        "setup": "Set of Seaport orders: legitimate listings at market price, intentional below-market OTC, and phishing-crafted zero-consideration orders",
+        "metric": "Detection rate for phishing orders vs false positive rate on legitimate listings and OTC deals",
+        "baseline": "Seaport order phishing was a top-3 NFT theft vector in 2024"
+      }
+    }
+  },
+
+  "skills": {
+    "signature_decoder": {
+      "tool": "EIP-712 typed data decoder",
+      "description": "Decode and display EIP-712 typed data, Permit2 messages, and Seaport orders in human-readable form with semantic annotations",
+      "parameters": {"supported_types": ["EIP-2612 Permit", "Permit2 PermitSingle", "Permit2 PermitBatch", "Seaport Order", "generic EIP-712"]}
+    },
+    "dapp_verifier": {
+      "tool": "dApp origin checker",
+      "description": "Verify dApp domain against curated protocol registries, check domain age, detect homoglyph impersonation, verify contract addresses against known deployments",
+      "parameters": {"registries": ["DeFi Llama", "Etherscan labels", "Scam Sniffer blocklist"], "homoglyph_detection": true, "whois_lookup": true}
+    },
+    "price_checker": {
+      "tool": "NFT and token price oracle",
+      "description": "Fetch current floor prices, recent sales, and token valuations to compare against Seaport order consideration amounts",
+      "parameters": {"sources": ["OpenSea API", "Blur API", "Reservoir"], "staleness_threshold_minutes": 15}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring off-chain signature phishing detection across all vectors",
+    "methodology": {
+      "step_1": "Collect dataset of known phishing signatures from Scam Sniffer, Forta alerts, and wallet drainer kit analysis",
+      "step_2": "Collect dataset of legitimate off-chain signatures from DeFi protocols (Uniswap, OpenSea, 1inch, Cowswap)",
+      "step_3": "Run analyzer against both sets with all 6 heuristics",
+      "step_4": "Measure: true positive rate (phishing caught), false positive rate (legitimate flagged)",
+      "step_5": "Apply recommendations and re-measure user exposure"
+    },
+    "target": "Catch >90% of known phishing signatures with <5% false positive rate on legitimate DeFi",
+    "metrics": [
+      "true_positive_rate",
+      "false_positive_rate",
+      "value_at_risk_reduction",
+      "user_friction_score",
+      "time_to_detection_ms"
+    ],
+    "adversary_levels": [
+      {"name": "basic", "heuristics": ["H1", "H3"], "description": "Unlimited permits + NFT approval to unknown operator"},
+      {"name": "intermediate", "heuristics": ["H1", "H2", "H3", "H4"], "description": "Add disguised EIP-712 transfers + unverified origin"},
+      {"name": "advanced", "heuristics": ["H1", "H2", "H3", "H4", "H5", "H6"], "description": "All heuristics including batch drain and Seaport manipulation"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "Signature request triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "summary": "Analyzed {n_sigs} off-chain signature requests. {n_risky} flagged ({pct_risky}%). Value at risk: ${value_at_risk}. Top risks: {top_risks}.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}. Reduces phishing risk by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}

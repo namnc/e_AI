@@ -1,0 +1,373 @@
+{
+  "meta": {
+    "domain_name": "rpc_leakage",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "Weintraub et al. 2022 (blockchain RPC privacy); EF Privacy & Scaling Explorations research"
+  },
+
+  "risk_domain": {
+    "name": "RPC Query Pattern Leakage",
+    "crops_property": "P",
+    "description": "Privacy leakage through RPC query patterns that reveal user intent, address ownership, portfolio composition, and trading behavior to RPC providers and network observers",
+    "protocols": ["JSON-RPC", "eth_call", "eth_getBalance", "eth_getLogs", "Helios", "ERC-5564"],
+    "adversary_model": {
+      "capabilities": [
+        "full observation of all RPC queries from user to provider (RPC provider or network eavesdropper)",
+        "timing correlation across queries within a session",
+        "cross-session user identification via IP, API key, or query fingerprint",
+        "correlation of query patterns with on-chain state changes",
+        "aggregation of query metadata across multiple users for pattern analysis"
+      ],
+      "limitations": [
+        "cannot observe queries routed through Tor or encrypted tunnels without endpoint compromise",
+        "cannot distinguish cover queries from real queries if properly constructed",
+        "cannot access local execution results (Helios light client)",
+        "no private key access"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_balance_check_linkage": {
+      "id": "H1",
+      "name": "Balance checks linking addresses",
+      "severity": "critical",
+      "description": "User queries eth_getBalance for multiple addresses within a short time window from the same session, revealing that these addresses are controlled by or of interest to the same entity. This is the simplest and most common address-linkage leak at the RPC layer.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "multi_address_balance_burst",
+            "description": "eth_getBalance called for 2+ distinct addresses within a 60-second window from the same session",
+            "data_needed": ["rpc_query_log", "session_identifier", "query_timestamps"],
+            "confidence": 0.90
+          },
+          {
+            "name": "periodic_balance_sweep",
+            "description": "Same set of addresses queried repeatedly on a schedule (e.g., every 5 minutes), indicating portfolio monitoring",
+            "data_needed": ["rpc_query_log", "query_timestamps", "address_set_history"],
+            "confidence": 0.85
+          },
+          {
+            "name": "balance_after_transfer",
+            "description": "eth_getBalance query for an address immediately after that address receives a transfer, correlating the query origin with the transfer recipient",
+            "data_needed": ["rpc_query_log", "pending_tx_pool", "confirmed_transfers"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "multi_address_balance_burst with 3+ addresses triggers BLOCK; 2 addresses triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "batch_with_cover",
+          "description": "Pad balance queries with cover addresses (random valid addresses) to obscure which addresses the user actually controls",
+          "effectiveness": 0.80,
+          "user_cost": "slight latency increase",
+          "skill_required": "cover_queries"
+        },
+        {
+          "action": "use_local_node",
+          "description": "Run a local light client (Helios) to query balances without revealing query patterns to a remote provider",
+          "effectiveness": 0.95,
+          "user_cost": "bandwidth and compute for light client sync",
+          "skill_required": "helios_local"
+        },
+        {
+          "action": "route_through_tor",
+          "description": "Route each balance query through a different Tor circuit to prevent session linkage",
+          "effectiveness": 0.85,
+          "user_cost": "high latency (2-5s per query)",
+          "skill_required": "tor_routing"
+        }
+      ],
+      "fundamental_limitation": "Any remote RPC provider can observe query patterns. Even with cover queries, a provider seeing queries from the same IP/session can apply statistical analysis over time to separate real from cover queries. True privacy requires local execution.",
+      "benchmark_scenario": {
+        "setup": "User with N addresses queries balances through a monitored RPC endpoint. Adversary attempts to cluster addresses by session.",
+        "metric": "Fraction of user's address set correctly identified by the adversary",
+        "baseline": "Without mitigation, 100% linkable for same-session queries"
+      }
+    },
+
+    "H2_position_monitoring": {
+      "id": "H2",
+      "name": "Position monitoring via repeated eth_call",
+      "severity": "high",
+      "description": "Repeated eth_call to DeFi protocol read methods (getPosition, balanceOf, getReserves) reveals the user's DeFi positions, LP holdings, and lending health factors. Patterns of position monitoring reveal portfolio composition even without direct balance queries.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "repeated_position_read",
+            "description": "eth_call to the same DeFi contract read method (e.g., balanceOf, getPosition) repeated more than 5 times in an hour for the same target address",
+            "data_needed": ["rpc_query_log", "eth_call_targets", "decoded_calldata"],
+            "confidence": 0.80
+          },
+          {
+            "name": "multi_protocol_scan",
+            "description": "eth_call queries fan out across multiple DeFi protocols (Aave, Compound, Uniswap, Maker) for the same address within a session",
+            "data_needed": ["rpc_query_log", "known_defi_contracts", "decoded_calldata"],
+            "confidence": 0.85
+          },
+          {
+            "name": "health_factor_monitoring",
+            "description": "Repeated queries to lending protocol health factor or liquidation price methods, indicating leveraged position monitoring",
+            "data_needed": ["rpc_query_log", "lending_protocol_methods", "query_frequency"],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "multi_protocol_scan triggers WARNING; repeated_position_read with >10 queries/hour triggers BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "batch_position_queries",
+          "description": "Aggregate all position queries into a single multicall and pad with queries for positions the user does not hold",
+          "effectiveness": 0.75,
+          "user_cost": "none",
+          "skill_required": "query_batching"
+        },
+        {
+          "action": "local_state_cache",
+          "description": "Use a local light client to sync relevant state and compute positions locally without per-query RPC calls",
+          "effectiveness": 0.90,
+          "user_cost": "higher bandwidth for state sync",
+          "skill_required": "helios_local"
+        }
+      ],
+      "fundamental_limitation": "DeFi position monitoring inherently requires reading on-chain state. Reducing query frequency sacrifices real-time awareness (critical for liquidation protection). The tradeoff is privacy vs position safety.",
+      "benchmark_scenario": {
+        "setup": "Simulated user with positions across N DeFi protocols. Adversary observes RPC queries and attempts to reconstruct the user's portfolio.",
+        "metric": "Fraction of user's DeFi positions correctly identified by the adversary from query patterns alone",
+        "baseline": "Without mitigation, all monitored positions are trivially identifiable"
+      }
+    },
+
+    "H3_pretrade_intent": {
+      "id": "H3",
+      "name": "Pre-trade intent via swap simulation",
+      "severity": "critical",
+      "description": "User simulates swap transactions via eth_call before submitting them, revealing trading intent (which token, direction, size) to the RPC provider. This enables front-running, sandwich attacks, or selling intent data to MEV searchers.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "swap_simulation",
+            "description": "eth_call targeting a DEX router contract (Uniswap, Sushiswap, 1inch) with swap function selectors",
+            "data_needed": ["rpc_query_log", "known_dex_routers", "decoded_calldata"],
+            "confidence": 0.90
+          },
+          {
+            "name": "simulation_then_submit",
+            "description": "eth_call swap simulation followed by eth_sendRawTransaction for the same swap within 60 seconds",
+            "data_needed": ["rpc_query_log", "submitted_transactions", "timing_correlation"],
+            "confidence": 0.95
+          },
+          {
+            "name": "multiple_route_simulations",
+            "description": "Multiple eth_call simulations to different DEX contracts for the same token pair, indicating price comparison before trade",
+            "data_needed": ["rpc_query_log", "decoded_calldata", "token_pair_extraction"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "simulation_then_submit triggers BLOCK; swap_simulation alone triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "simulate_locally",
+          "description": "Run swap simulations against local state (Helios light client or cached state) instead of remote eth_call",
+          "effectiveness": 0.95,
+          "user_cost": "requires local node or state cache",
+          "skill_required": "helios_local"
+        },
+        {
+          "action": "use_private_rpc",
+          "description": "Route swap simulations through a private/encrypted RPC endpoint (Flashbots Protect, MEV Blocker) that commits to not selling intent data",
+          "effectiveness": 0.70,
+          "user_cost": "none (free private RPCs available)",
+          "skill_required": "tor_routing"
+        },
+        {
+          "action": "add_cover_simulations",
+          "description": "Pad real swap simulation with fake simulations for other token pairs to obscure actual trading intent",
+          "effectiveness": 0.65,
+          "user_cost": "slight latency increase",
+          "skill_required": "cover_queries"
+        }
+      ],
+      "fundamental_limitation": "Local simulation requires fresh on-chain state, which itself may require RPC queries to fetch. Fully private simulation requires either a full local node or trusted execution environment. Private RPCs are trust-based (no cryptographic guarantee they won't leak).",
+      "benchmark_scenario": {
+        "setup": "User simulates N swap transactions through a monitored RPC. Adversary attempts to extract trading intent and front-run.",
+        "metric": "Fraction of swap intents correctly identified by the adversary before on-chain submission",
+        "baseline": "Without mitigation, 100% of simulated swaps reveal full intent to the RPC provider"
+      }
+    },
+
+    "H4_stealth_address_scanning": {
+      "id": "H4",
+      "name": "Stealth address scanning pattern",
+      "severity": "high",
+      "description": "User scans for incoming stealth address payments by querying the ERC-5564 announcement contract logs. The scanning pattern (frequency, filter parameters, view key derivation queries) reveals the user as a stealth address recipient and may leak the stealth meta-address.",
+      "detection": {
+        "type": "temporal",
+        "signals": [
+          {
+            "name": "announcement_log_scan",
+            "description": "eth_getLogs queries targeting the ERC-5564 Announcer contract with specific topic filters matching stealth address announcement events",
+            "data_needed": ["rpc_query_log", "erc5564_announcer_address", "log_topic_filters"],
+            "confidence": 0.85
+          },
+          {
+            "name": "periodic_scan_pattern",
+            "description": "Repeated eth_getLogs to the announcement contract at regular intervals, indicating automated stealth address scanning",
+            "data_needed": ["rpc_query_log", "query_timestamps", "scan_interval_distribution"],
+            "confidence": 0.80
+          },
+          {
+            "name": "narrow_block_range",
+            "description": "eth_getLogs queries with narrow block ranges (scanning incrementally for new announcements), revealing an active stealth address user",
+            "data_needed": ["rpc_query_log", "fromBlock", "toBlock", "block_range_sizes"],
+            "confidence": 0.70
+          }
+        ],
+        "threshold": "periodic_scan_pattern with >3 scans/hour triggers WARNING; announcement_log_scan from non-anonymized session triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "scan_via_local_node",
+          "description": "Run stealth address scanning against a local light client to avoid revealing scan patterns to remote RPC providers",
+          "effectiveness": 0.95,
+          "user_cost": "bandwidth and compute for light client",
+          "skill_required": "helios_local"
+        },
+        {
+          "action": "scan_via_tor",
+          "description": "Route stealth address scan queries through Tor with rotating circuits to prevent session linkage",
+          "effectiveness": 0.80,
+          "user_cost": "high latency, may miss time-sensitive payments",
+          "skill_required": "tor_routing"
+        },
+        {
+          "action": "batch_scan_with_cover",
+          "description": "Pad stealth address scans with cover queries for other contract logs to obscure the scanning pattern",
+          "effectiveness": 0.70,
+          "user_cost": "increased bandwidth",
+          "skill_required": "cover_queries"
+        }
+      ],
+      "fundamental_limitation": "Stealth address recipients must scan the announcement contract to discover payments. This is inherent to the protocol design (ERC-5564). Without a trusted server or TEE-based scanning service, the scanning pattern always leaks to whoever serves the query.",
+      "benchmark_scenario": {
+        "setup": "N stealth address users scanning via a shared RPC endpoint. Adversary observes query patterns and attempts to identify stealth address recipients.",
+        "metric": "Fraction of stealth address users correctly identified from their scanning patterns",
+        "baseline": "Regular periodic scans to the announcement contract are trivially identifiable"
+      }
+    },
+
+    "H5_price_check_correlation": {
+      "id": "H5",
+      "name": "Token price checking correlated with holdings",
+      "severity": "medium",
+      "description": "User queries token prices or DEX pool reserves for specific tokens, and this pattern correlates with their actual holdings. Repeated price monitoring for a narrow set of tokens reveals portfolio composition even without direct balance queries.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "selective_price_monitoring",
+            "description": "eth_call to DEX pool contracts (getReserves, slot0) for a consistent small set of token pairs across sessions",
+            "data_needed": ["rpc_query_log", "dex_pool_contracts", "token_pair_extraction", "session_history"],
+            "confidence": 0.70
+          },
+          {
+            "name": "price_then_trade",
+            "description": "Price check query for a token pair followed by a swap transaction for the same pair within 5 minutes",
+            "data_needed": ["rpc_query_log", "submitted_transactions", "token_pair_correlation"],
+            "confidence": 0.85
+          },
+          {
+            "name": "holding_correlated_frequency",
+            "description": "Price check frequency for a token correlates with the user's on-chain balance of that token (more frequent checks for larger positions)",
+            "data_needed": ["rpc_query_log", "on_chain_balances", "query_frequency_per_token"],
+            "confidence": 0.60
+          }
+        ],
+        "threshold": "price_then_trade triggers WARNING; selective_price_monitoring over 3+ sessions triggers WARNING"
+      },
+      "recommendations": [
+        {
+          "action": "broaden_price_queries",
+          "description": "Query prices for a broad set of tokens (top 50 by market cap) regardless of holdings, to obscure which tokens the user actually cares about",
+          "effectiveness": 0.75,
+          "user_cost": "slight bandwidth increase",
+          "skill_required": "cover_queries"
+        },
+        {
+          "action": "use_public_price_feeds",
+          "description": "Fetch token prices from public aggregator APIs (CoinGecko, DeFi Llama) over Tor instead of querying on-chain pools via RPC",
+          "effectiveness": 0.70,
+          "user_cost": "prices may be slightly delayed vs on-chain",
+          "skill_required": "tor_routing"
+        }
+      ],
+      "fundamental_limitation": "Price checking is correlated with trading intent by nature. Cover queries add noise but a persistent adversary can filter them out over many sessions using consistency analysis. Truly private price feeds require local execution or oblivious query protocols that don't yet exist at scale.",
+      "benchmark_scenario": {
+        "setup": "User with known portfolio monitors prices via RPC. Adversary observes query patterns over N sessions and attempts to infer holdings.",
+        "metric": "Adversary accuracy in identifying top-5 token holdings from price query patterns alone",
+        "baseline": "Without cover queries, selective price monitoring reveals holdings with high accuracy"
+      }
+    }
+  },
+
+  "skills": {
+    "helios_local": {
+      "tool": "Helios light client",
+      "description": "Run Ethereum light client locally to execute eth_call, eth_getBalance, and eth_getLogs against verified state without revealing query patterns to remote RPC providers",
+      "parameters": {"consensus_rpc": "configurable", "execution_rpc_fallback": "optional", "sync_mode": "light"}
+    },
+    "tor_routing": {
+      "tool": "Tor SOCKS proxy for RPC",
+      "description": "Route RPC queries through Tor with per-query circuit rotation to prevent session linkage and IP-based user identification",
+      "parameters": {"socks_port": 9050, "circuit_rotation": "per_query", "dns_resolution": "remote"}
+    },
+    "query_batching": {
+      "tool": "multicall query aggregator",
+      "description": "Aggregate multiple RPC queries into a single multicall to reduce the number of observable query events and add cover queries in the same batch",
+      "parameters": {"max_batch_size": 50, "cover_query_ratio": 0.5, "multicall_contract": "MakerDAO Multicall3"}
+    },
+    "cover_queries": {
+      "tool": "cover traffic generator",
+      "description": "Generate plausible cover queries (random valid addresses, popular token pairs, trending contract calls) to pad real queries and obscure user intent",
+      "parameters": {"cover_ratio": 3.0, "address_source": "recent_block_participants", "token_source": "top_50_by_volume"}
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring RPC provider's ability to infer user identity, portfolio, and trading intent from query patterns",
+    "methodology": {
+      "step_1": "Simulate N users with known portfolios and trading patterns generating RPC queries through a monitored endpoint",
+      "step_2": "Run adversary simulator applying all 5 heuristics to the query log",
+      "step_3": "Measure baseline inference accuracy (address linkage, portfolio reconstruction, intent detection)",
+      "step_4": "Apply profile recommendations (cover queries, local execution, Tor routing) to all users",
+      "step_5": "Re-run adversary simulator on modified query patterns",
+      "step_6": "Compare: inference accuracy before vs after mitigation"
+    },
+    "target": "Reduce adversary inference accuracy from >90% to <20% for address linkage, <30% for portfolio reconstruction",
+    "metrics": [
+      "address_linkage_accuracy",
+      "portfolio_reconstruction_accuracy",
+      "trade_intent_detection_rate",
+      "cover_query_overhead_ratio",
+      "query_latency_increase_ms"
+    ],
+    "adversary_levels": [
+      {"name": "basic", "heuristics": ["H1", "H5"], "description": "Balance checks and price correlation only"},
+      {"name": "intermediate", "heuristics": ["H1", "H2", "H3", "H5"], "description": "Add position monitoring and pre-trade intent"},
+      {"name": "advanced", "heuristics": ["H1", "H2", "H3", "H4", "H5"], "description": "All heuristics including stealth address scanning"}
+    ]
+  },
+
+  "templates": {
+    "risk_assessment": "RPC query pattern triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "summary": "Analyzed {n_queries} RPC queries in session. {n_risky} patterns flagged ({pct_risky}%). Leaked information: {leaked_info}. Top risks: {top_risks}.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}. Reduces leakage by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}
