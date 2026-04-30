@@ -1,0 +1,492 @@
+{
+  "meta": {
+    "domain_name": "cross_protocol_risk",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Cross-Protocol Compound Risk",
+    "crops_property": "S",
+    "description": "Detects compounding risks that emerge when a user holds positions across multiple DeFi protocols simultaneously, where interactions between protocols create risks invisible to any single protocol's risk engine",
+    "protocols": [
+      "Aave",
+      "Compound",
+      "Uniswap",
+      "MakerDAO",
+      "Lido",
+      "Curve",
+      "GMX",
+      "EigenLayer"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation of all user positions across protocols",
+        "real-time oracle price monitoring and manipulation detection",
+        "flash loan execution capability for attack simulation",
+        "historical liquidation pattern analysis",
+        "cross-protocol approval and allowance enumeration",
+        "mempool observation for front-running opportunity detection"
+      ],
+      "limitations": [
+        "no private key access",
+        "no ability to modify oracle prices without capital commitment",
+        "no access to off-chain order books or centralized exchange data"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_cascading_liquidation_risk": {
+      "name": "cascading liquidation risk",
+      "description": "Health factor is likely to drop below critical levels, leading to automatic liquidation.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "health_factor_below_1",
+            "description": "Simulated health factor after swap execution drops below critical threshold (e.g., 1.0)",
+            "data_needed": [
+              "current_health_factor",
+              "simulated_health_factor"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "collateral_valuation_fluctuation",
+            "description": "Large price impact on AMM pool causing oracle price movement, affecting collateral valuation",
+            "data_needed": [
+              "oracle_price_change",
+              "amm_pool_volume",
+              "health_factor"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "dex_collateral_overlap",
+            "description": "Token being sold on DEX is also posted as collateral in a lending protocol with health factor < 1.5",
+            "data_needed": [
+              "token_sold",
+              "used_as_collateral",
+              "lending_protocol_health_factor"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "hedge_position",
+          "description": "Hedge the position to mitigate potential losses.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_health_factor",
+          "description": "Regularly monitor health factor levels and take action if they drop below critical thresholds.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "rebalance_collateral",
+          "description": "Rebalance collateral to ensure diverse and resilient asset mix.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_liquidation_thresholds",
+          "description": "Set liquidation thresholds higher than the critical levels to avoid frequent triggers.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "deploy_smart_contract_security_audit",
+          "description": "Conduct a smart contract security audit to prevent coding errors causing health factor drops.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "automated_tool"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test cascading liquidation risk",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_correlated_oracle_dependency": {
+      "name": "correlated oracle dependency",
+      "description": "Shared oracles increase the risk of price manipulation affecting multiple positions.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "oracle_shared",
+            "description": "Identify if multiple user positions in different protocols rely on the same oracle contract.",
+            "data_needed": [
+              "user_positions",
+              "oracle_contract"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "oracle_stale_data",
+            "description": "Detect oracles with heartbeat intervals greater than 1 hour or deviation thresholds above 1% indicating potential for stale pricing data.",
+            "data_needed": [
+              "heartbeat_interval",
+              "deviation_threshold"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "oracle_data_sources",
+            "description": "Flag oracles with fewer than 5 active data sources as they may be more susceptible to manipulation.",
+            "data_needed": [
+              "active_data_sources_count"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "reduce_oracle_dependency",
+          "description": "Minimize the number of positions relying on the same oracle.",
+          "effectiveness": 0.7,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "oracle_monitoring",
+          "description": "Automate monitoring for changes in heartbeat intervals and deviation thresholds.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": "automated_security_tool"
+        },
+        {
+          "action": "increase_data_sources",
+          "description": "Increase the number of data sources feeding into critical oracles.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "oracle_selection",
+          "description": "Manually select oracles with better redundancy and less risk.",
+          "effectiveness": 0.65,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test correlated oracle dependency",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_concentrated_protocol_exposure": {
+      "name": "concentrated protocol exposure",
+      "description": "Heavy reliance on a single protocol increases systemic risk and potential impact from protocol-specific issues.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "high_protocol_value_concentration",
+            "description": "A single protocol's value exceeds 50% of the user\u2019s total DeFi portfolio.",
+            "data_needed": [
+              "user_total_portfolio_value",
+              "protocol_value"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "low_unique_protocol_interactions",
+            "description": "User interacts with fewer than 3 unique protocol contract systems.",
+            "data_needed": [
+              "unique_protocol_count"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "multisig_signer_risk",
+            "description": "Protocol contracts controlled by a multisig with less than 5 signers or a timelock duration of less than 24 hours.",
+            "data_needed": [
+              "multisig_signers",
+              "timelock_duration"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "distribute_protocol_risk",
+          "description": "Diversify protocol exposure across multiple DeFi systems.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_multi_protocol_wallets",
+          "description": "Utilize wallet solutions supporting multiple protocols for better diversification.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "audit_protocols",
+          "description": "Regularly audit the protocols you engage with to identify potential risks.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": "manual"
+        },
+        {
+          "action": "monitor_protocol_security",
+          "description": "Set up automated alerts for security incidents in critical protocols.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": "watchmen"
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test concentrated protocol exposure",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_approval_chain_risk": {
+      "name": "approval chain risk",
+      "description": "Forgotten or insecure token approvals increase the attack surface for unauthorized access or manipulation.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "approval_token_overlap",
+            "description": "Identify if the same token approval exists in multiple protocols.",
+            "data_needed": [
+              "token_address",
+              "protocol_a_approval",
+              "protocol_b_approval"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "forgotten_approval",
+            "description": "Detect approvals that have not been used recently and may be forgotten or insecure.",
+            "data_needed": [
+              "token_address",
+              "last_used_timestamp",
+              "approval_expiration"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "protocol_audit_status",
+            "description": "Check if the protocol has undergone a recent security audit.",
+            "data_needed": [
+              "protocol_name",
+              "latest_audit_date",
+              "audit_status"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "unused_recommended_removal",
+            "description": "Identify tokens with recommendations to revoke approvals for inactive protocols.",
+            "data_needed": [
+              "token_address",
+              "protocols_used_recently",
+              "inactive_protocols_recommendations"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "revoke_approval",
+          "description": "Revoke approvals for tokens that have not been used recently.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "audit_protocol",
+          "description": "Perform a security audit on protocols with forgotten or overlapping token approvals.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": "manual"
+        },
+        {
+          "action": "remove_inactive_recs",
+          "description": "Remove recommended inactive protocol approvals for the specified tokens.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "verify_approval_chain",
+          "description": "Verify token approval chains to ensure they are not duplicated across protocols.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "automation_tool"
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test approval chain risk",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_flash_loan_vulnerability": {
+      "name": "flash loan vulnerability",
+      "description": "Conditions are ripe for flash loan attacks, particularly when health factors and market dynamics align.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "cascading_liquidation",
+            "description": "Detection of a situation where the health factor drops below a threshold due to a swap, potentially leading to liquidation.",
+            "data_needed": [
+              "user_health_factor",
+              "swap_execution_price_impact",
+              "health_threshold"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "oracle_dependency",
+            "description": "Identification of multiple user positions relying on the same oracle contract, which can introduce dependency risks.",
+            "data_needed": [
+              "user_positions",
+              "oracle_used_by_position"
+            ],
+            "confidence": 0.7
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_health_factor",
+          "description": "Continuously monitor user health factor to detect potential flash loan attacks.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "oracle diversification",
+          "description": "Diversify oracle usage across positions to mitigate dependency risks.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "automated_health_monitoring",
+          "description": "Implement automated health factor monitoring and alert systems.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "SecurityMonitoringTool"
+        },
+        {
+          "action": "oracle_selection_tool",
+          "description": "Use a tool to select oracles with minimal historical discrepancies.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "OracleSelectionTool"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test flash loan vulnerability",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring detection of cross-protocol compound risks before transaction submission",
+    "methodology": {
+      "step_1": "Build synthetic portfolio with positions across 3-5 protocols with known cross-dependencies",
+      "step_2": "Generate 100 proposed transactions that trigger various compound risk scenarios",
+      "step_3": "Run all 5 heuristics against each proposed transaction",
+      "step_4": "Measure detection rate against ground-truth labels (position simulator confirms actual risk)",
+      "step_5": "Apply recommendations and verify risk reduction",
+      "step_6": "Compute false positive rate to ensure usable signal-to-noise ratio"
+    },
+    "target": "Detect >90% of cross-protocol compound risks with <10% false positive rate",
+    "metrics": [
+      "per_heuristic_detection_rate",
+      "combined_detection_rate",
+      "false_positive_rate",
+      "time_to_detection_ms",
+      "recommendation_effectiveness"
+    ],
+    "adversary_levels": [
+      {
+        "name": "passive",
+        "heuristics": [
+          "H3"
+        ],
+        "description": "Only checks protocol concentration (static analysis)"
+      },
+      {
+        "name": "active_monitoring",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4"
+        ],
+        "description": "Monitors real-time positions and oracle dependencies"
+      },
+      {
+        "name": "adversarial_simulation",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "Full attack simulation including flash loan profitability analysis"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "risk_assessment_block": "BLOCKED: {heuristic_name} detected with {confidence}% confidence. {signal_description}. This transaction would compound your cross-protocol risk.",
+    "summary": "Analyzed {n_txs} transactions against cross-protocol risk heuristics. {n_risky} flagged ({pct_risky}%). Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} transactions pass cross-protocol risk checks. No compound risks detected.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can run {skill_action}. This reduces compound risk by ~{effectiveness_pct}%. {user_cost_note}",
+    "compound_risk": "Multiple cross-protocol risks interact: {heuristic_list}. Combined exposure: ${total_at_risk} across {n_protocols} protocols.",
+    "portfolio_alert": "Portfolio concentration: {pct_concentrated}% in {protocol_name}. Single protocol failure would impact ${value_at_risk}."
+  }
+}

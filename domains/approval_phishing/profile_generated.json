@@ -33,24 +33,15 @@
   "heuristics": {
     "H1_unlimited_approval_risk": {
       "name": "Unlimited Approval Risk",
-      "description": "Approving an unlimited amount of tokens to any contract poses a high risk.",
+      "description": "Risk associated with approving unlimited token transfers, which could be used for unauthorized access.",
       "severity": "high",
-      "incidents_matched": 4,
+      "incidents_matched": 3,
       "detection": {
         "type": "mixed",
         "signals": [
           {
-            "name": "unlimited_approval_amount",
-            "description": "Identifies calls to approve() or increaseAllowance() where the amount parameter is equal to or greater than the maximum value (2^255) for a given token standard.",
-            "data_needed": [
-              "function_call",
-              "amount"
-            ],
-            "confidence": 0.9
-          },
-          {
-            "name": "eip2612_unlimited_approval",
-            "description": "Detects calls to permit() or Permit2 where the amount parameter is set to its maximum value, indicating an unlimited approval.",
+            "name": "unlimited_approval",
+            "description": "Identifies calls to approve() or increaseAllowance() with extremely high values, potentially indicating unlimited approval.",
             "data_needed": [
               "function_call",
               "amount"
@@ -58,12 +49,21 @@
             "confidence": 0.85
           },
           {
-            "name": "unverified_spender_contract",
-            "description": "Detects interactions with contracts that are not verified on a block explorer and were deployed within the last 24 hours.",
+            "name": "eip2612_unlimited",
+            "description": "Detects calls to EIP-2612 permit() or Permit2 with an unlimited amount.",
+            "data_needed": [
+              "function_call",
+              "unlimited_amount"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "unverified_contract",
+            "description": "Detects the use of smart contracts that have not been verified on a block explorer and were deployed recently.",
             "data_needed": [
               "contract_address",
               "verification_status",
-              "deployment_time"
+              "deployment_timestamp"
             ],
             "confidence": 0.75
           }
@@ -72,32 +72,32 @@
       },
       "recommendations": [
         {
-          "action": "limit_approval_amount",
-          "description": "Ensure all approve() or increaseAllowance() calls are for finite token amounts.",
+          "action": "limit_approvals",
+          "description": "Set maximum approved token transfers to reasonable limits.",
           "effectiveness": 0.9,
-          "user_cost": "low",
+          "user_cost": "medium",
           "skill_required": null
         },
         {
-          "action": "verify_spender_contract",
-          "description": "Verify the spender contract on a reputable blockchain explorer before approving unlimited tokens.",
+          "action": "verify_contracts",
+          "description": "Verify the smart contracts before deployment on a reputable block explorer.",
           "effectiveness": 0.75,
           "user_cost": "high",
           "skill_required": null
         },
         {
-          "action": "use_standard_approvals",
-          "description": "Utilize EIP-2612 permit() for granting approvals, reducing risk of transaction fees and front-running.",
-          "effectiveness": 0.85,
-          "user_cost": "medium",
-          "skill_required": null
+          "action": "implement_security_libraries",
+          "description": "Use security libraries that prevent unlimited approvals by default.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": "foundry"
         },
         {
-          "action": "automated_approval_monitoring",
-          "description": "Implement automated monitoring for approval calls exceeding a certain threshold or to unverified contracts.",
-          "effectiveness": 0.9,
+          "action": "audits_and_reviews",
+          "description": "Regularly conduct code audits and peer reviews focusing on approval logic.",
+          "effectiveness": 0.8,
           "user_cost": "high",
-          "skill_required": "smart_contract_monitor"
+          "skill_required": null
         }
       ],
       "id": "H1",
@@ -108,9 +108,9 @@
       },
       "fundamental_limitation": "See failure analysis"
     },
-    "H2_unverified_contract_spender": {
-      "name": "Unverified Contract Spender",
-      "description": "Using unverified smart contracts can result in unauthorized access or loss of funds.",
+    "H2_unverified_contract_risk": {
+      "name": "Unverified Contract Risk",
+      "description": "Approving tokens to unverified contracts poses a high risk of falling victim to scams or malicious actors.",
       "severity": "high",
       "incidents_matched": 3,
       "detection": {
@@ -118,18 +118,17 @@
         "signals": [
           {
             "name": "unverified_spender",
-            "description": "Identifies transactions where the spender is a smart contract that has not been verified on a block explorer.",
+            "description": "Spender contract source code not verified on block explorer.",
             "data_needed": [
-              "spender_address",
-              "block_explorer_url"
+              "spender_contract_address"
             ],
             "confidence": 0.85
           },
           {
-            "name": "recently_deployed_spender",
-            "description": "Detects transactions where the spender is a smart contract that was deployed within the last 24 hours.",
+            "name": "new_spender_contract",
+            "description": "Spender contract deployed within last 24 hours.",
             "data_needed": [
-              "spender_address",
+              "spender_contract_address",
               "deployment_timestamp"
             ],
             "confidence": 0.9
@@ -139,216 +138,187 @@
       },
       "recommendations": [
         {
-          "action": "verify_contract",
-          "description": "Manually verify the smart contract before interacting.",
-          "effectiveness": 0.8,
+          "action": "reject_unverified_spender",
+          "description": "Reject any token transfers to unverified contracts.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "block_new_spender",
+          "description": "Block transactions involving new spender contracts deployed recently.",
+          "effectiveness": 0.85,
           "user_cost": "medium",
           "skill_required": null
         },
         {
-          "action": "use_reputable_explorer",
-          "description": "Interact only with verified contracts from reputable block explorers.",
-          "effectiveness": 0.9,
-          "user_cost": "low",
-          "skill_required": null
-        },
-        {
-          "action": "automatic_verification",
-          "description": "Automatically verify the contract using a security audit service before spending funds.",
+          "action": "verify_contract_automatically",
+          "description": "Automatically verify the contract source code before approving token transfers.",
           "effectiveness": 0.95,
           "user_cost": "high",
-          "skill_required": "security_audit_tool"
+          "skill_required": "smart_contracts_tool"
         }
       ],
       "id": "H2",
       "benchmark_scenario": {
-        "setup": "Test Unverified Contract Spender",
+        "setup": "Test Unverified Contract Risk",
         "metric": "detection rate",
         "baseline": "TBD"
       },
       "fundamental_limitation": "See failure analysis"
     },
-    "H3_scam_address_detection": {
-      "name": "Scam Address Detection",
-      "description": "Interaction with known scam addresses indicates a high likelihood of fraud.",
+    "H3_known_scam_address_risk": {
+      "name": "Known Scam Address Risk",
+      "description": "Interactions with known scam addresses are highly risky and may result in financial loss.",
       "severity": "critical",
       "incidents_matched": 2,
       "detection": {
         "type": "mixed",
         "signals": [
           {
-            "name": "unlimited_token_approval",
-            "description": "Check if the approve() or increaseAllowance() function is called with an amount equal to or greater than the maximum uint256 value (2^255). Also, check for EIP-2612 permit() calls with unlimited approval.",
+            "name": "known_scam_address_interactions",
+            "description": "Transactions sent to known scam addresses.",
             "data_needed": [
-              "tx.input",
-              "tx.to"
+              "transaction_to_address",
+              "scam_addresses"
             ],
-            "confidence": 0.8
+            "confidence": 0.95
           },
           {
-            "name": "unverified_spender_contract",
-            "description": "Identify if the spender contract is not verified on a block explorer and has been deployed within the last 24 hours.",
+            "name": "frequent_interactions_with_scam_addresses",
+            "description": "Multiple transactions with known scam addresses within a short period of time.",
             "data_needed": [
-              "tx.to",
-              "block_explorer_verification_status",
-              "contract_deployment_time"
+              "transaction_count",
+              "scam_address_transactions"
             ],
-            "confidence": 0.7
+            "confidence": 0.85
           },
           {
-            "name": "suspicious_transaction_volume",
-            "description": "Detect unusually high transaction volume or frequency from the same address within a short time frame.",
+            "name": "suspicious_transaction_amounts",
+            "description": "Transaction amounts that match common patterns used by scammers, such as very small or large values.",
             "data_needed": [
-              "tx.from",
-              "transaction_amount",
-              "timestamp"
+              "transaction_value",
+              "scam_patterns"
             ],
-            "confidence": 0.65
-          },
-          {
-            "name": "new_contract_interaction",
-            "description": "Look for interactions with contracts that are new and have not been tested or reviewed yet, indicating a higher risk of fraud.",
-            "data_needed": [
-              "tx.to",
-              "contract_deployment_time"
-            ],
-            "confidence": 0.7
+            "confidence": 0.75
           }
         ],
         "threshold": "any signal above 0.7"
       },
       "recommendations": [
         {
-          "action": "block_unverified_spender",
-          "description": "Block transactions from unverified contracts.",
-          "effectiveness": 0.9,
+          "action": "block_scam_transactions",
+          "description": "Block all transactions to known scam addresses.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_frequent_interactions",
+          "description": "Regularly review and report any interactions with suspected scam addresses.",
+          "effectiveness": 0.85,
           "user_cost": "medium",
           "skill_required": null
         },
         {
-          "action": "verify_spender",
-          "description": "Manually verify the spender contract before approving tokens.",
+          "action": "use_scam_filter_tool",
+          "description": "Utilize a blockchain analysis tool that filters out known scam addresses.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": "blockchain_analysis_tool"
+        },
+        {
+          "action": "set_transaction_filters",
+          "description": "Automatically flag or block suspicious transaction amounts based on predefined thresholds.",
           "effectiveness": 0.75,
           "user_cost": "high",
-          "skill_required": null
-        },
-        {
-          "action": "use_limit_approvals",
-          "description": "Set limits on token approvals to prevent unlimited allowances.",
-          "effectiveness": 0.85,
-          "user_cost": "low",
-          "skill_required": null
-        },
-        {
-          "action": "monitor_transaction_volume",
-          "description": "Set up alerts for suspicious transaction volumes.",
-          "effectiveness": 0.65,
-          "user_cost": "low",
-          "skill_required": null
-        },
-        {
-          "action": "avoid_new_contracts",
-          "description": "Do not interact with new, untested contracts.",
-          "effectiveness": 0.7,
-          "user_cost": "medium",
-          "skill_required": null
+          "skill_required": "transaction_filtering_tool"
         }
       ],
       "id": "H3",
       "benchmark_scenario": {
-        "setup": "Test Scam Address Detection",
+        "setup": "Test Known Scam Address Risk",
         "metric": "detection rate",
         "baseline": "TBD"
       },
       "fundamental_limitation": "See failure analysis"
     },
-    "H4_suspicious_function_selector_u": {
-      "name": "Suspicious Function Selector Usage",
-      "description": "Execution of unknown function selectors could indicate malicious intent or unexpected behavior.",
+    "H4_suspicious_function_selector": {
+      "name": "Suspicious Function Selector",
+      "description": "Use of non-standard function selectors can indicate hidden malicious activities or unexpected behavior.",
       "severity": "medium",
       "incidents_matched": 3,
       "detection": {
         "type": "mixed",
         "signals": [
           {
-            "name": "unknown_function_selector",
-            "description": "Detection of function selectors that are not recognized or documented in the smart contract's source code.",
+            "name": "non_standard_selector",
+            "description": "Function selectors not present in official or commonly used contract interfaces.",
             "data_needed": [
-              "function_signature",
-              "contract_source_code"
+              "function_selector"
             ],
             "confidence": 0.85
           },
           {
-            "name": "unusual_input_pattern",
-            "description": "Identify unusual input patterns to function selectors that deviate significantly from typical usage, such as unexpected parameters or frequency.",
+            "name": "multicall_hidden_approval",
+            "description": "Use of multicall functions with hidden approval operations among others.",
             "data_needed": [
-              "function_inputs",
-              "transaction_frequency"
-            ],
-            "confidence": 0.75
-          },
-          {
-            "name": "external_call_to_unverified_contract",
-            "description": "External calls made to contracts whose source code has not been verified on a block explorer, indicating potential risk.",
-            "data_needed": [
-              "called_address",
-              "contract_verification_status"
+              "function_list",
+              "call_data"
             ],
             "confidence": 0.9
           },
           {
-            "name": "recently_deployed_spender",
-            "description": "Detection of function selectors from spender contracts that were deployed within the last 24 hours, which may be untrusted or malicious.",
+            "name": "unknown_operator_approval",
+            "description": "SetApprovalForAll function targeting an unknown or suspicious operator address.",
             "data_needed": [
-              "spender_address",
-              "timestamp_of_deployment"
+              "operator_address"
             ],
-            "confidence": 0.8
+            "confidence": 0.75
           }
         ],
         "threshold": "any signal above 0.7"
       },
       "recommendations": [
         {
-          "action": "verify_contract_source",
-          "description": "Verify the source code of unfamiliar smart contracts on a blockchain explorer.",
-          "effectiveness": 0.8,
-          "user_cost": "medium",
-          "skill_required": null
-        },
-        {
-          "action": "use_defensive_programming",
-          "description": "Implement input validation and parameter checks to prevent unexpected behavior.",
-          "effectiveness": 0.7,
-          "user_cost": "high",
-          "skill_required": null
-        },
-        {
-          "action": "integrate_safelibs",
-          "description": "Use established, audited libraries instead of writing custom functions.",
+          "action": "exclude_non_standard",
+          "description": "Exclude contracts using non-standard function selectors from your application.",
           "effectiveness": 0.9,
           "user_cost": "medium",
-          "skill_required": "truffle-harden"
+          "skill_required": null
         },
         {
-          "action": "monitor_unusual_inputs",
-          "description": "Set up alerts for unusual input patterns to suspicious function selectors.",
-          "effectiveness": 0.75,
+          "action": "monitor_multicall",
+          "description": "Monitor and review the use of multicall functions in smart contracts.",
+          "effectiveness": 0.85,
           "user_cost": "low",
-          "skill_required": "blockchain_analytics_tool"
+          "skill_required": null
         },
         {
-          "action": "deploy_verification_scripts",
-          "description": "Automatically verify new contracts and their functions using a script.",
+          "action": "validate_approvals",
+          "description": "Validate operator addresses for approval calls to ensure they are legitimate.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_solidity_security_libraries",
+          "description": "Implement Solidity security libraries to prevent the use of non-standard function selectors.",
+          "effectiveness": 1.0,
+          "user_cost": "high",
+          "skill_required": "auditing_tool"
+        },
+        {
+          "action": "automated_audit",
+          "description": "Run automated audits on smart contracts for suspicious function selectors and approvals.",
           "effectiveness": 0.95,
           "user_cost": "high",
-          "skill_required": "solidity_code_analysis_tool"
+          "skill_required": "smart_contract_auditor"
         }
       ],
       "id": "H4",
       "benchmark_scenario": {
-        "setup": "Test Suspicious Function Selector Usage",
+        "setup": "Test Suspicious Function Selector",
         "metric": "detection rate",
         "baseline": "TBD"
       },
@@ -356,69 +326,72 @@
     },
     "H5_stale_approval_risk": {
       "name": "Stale Approval Risk",
-      "description": "Unrevoked, unlimited token approvals pose a risk as they can be exploited over time.",
+      "description": "Unrevoked approvals for contracts not used in a long time may expose users to potential risks.",
       "severity": "medium",
       "incidents_matched": 2,
       "detection": {
         "type": "mixed",
         "signals": [
           {
-            "name": "unlimited_approval",
-            "description": "Check if approve() or increaseAllowance() calls are made with an amount equal to the maximum value (2^256 - 1) or EIP-2612 Permit with unlimited approval.",
+            "name": "stale_approval_duration",
+            "description": "Tracks the duration since the last interaction with an approval.",
             "data_needed": [
-              "transaction.input"
-            ],
-            "confidence": 0.9
-          },
-          {
-            "name": "recent_unverified_spender",
-            "description": "Identify if the spender contract has been deployed recently and its code is not verified on a public blockchain explorer like Etherscan.",
-            "data_needed": [
-              "contract.spender_address",
-              "blockchain.explorer_url"
+              "user_address",
+              "contract_address",
+              "approval_timestamp"
             ],
             "confidence": 0.8
           },
           {
-            "name": "stale_approval",
-            "description": "Detect if the token approval has been set to an amount greater than what is needed for the transaction, indicating potential misuse or accidental use of a high approval.",
+            "name": "low_recent_activity",
+            "description": "Monitors low activity levels in a contract over a long period.",
             "data_needed": [
-              "transaction.value",
-              "token.approval_amount"
+              "contract_address",
+              "last_transaction_time"
             ],
-            "confidence": 0.7
+            "confidence": 0.75
+          },
+          {
+            "name": "unlimited_approval",
+            "description": "Detects approvals with an amount equal to the maximum value (2^256-1).",
+            "data_needed": [
+              "user_address",
+              "contract_address",
+              "approval_amount"
+            ],
+            "confidence": 0.9
           }
         ],
         "threshold": "any signal above 0.7"
       },
       "recommendations": [
         {
-          "action": "limit_approval",
-          "description": "Set approval limits to the minimum required amount for transactions.",
-          "effectiveness": 0.9,
-          "user_cost": "low",
-          "skill_required": null
-        },
-        {
-          "action": "monitor_unverified_spender",
-          "description": "Regularly monitor and verify newly deployed spender contracts on blockchain explorers.",
+          "action": "review_stale_approvals",
+          "description": "Review approvals not used for a long time.",
           "effectiveness": 0.8,
           "user_cost": "medium",
           "skill_required": null
         },
         {
-          "action": "use_secure_approvals",
-          "description": "Implement secure approval mechanisms like EIP-2612 for token allowances.",
-          "effectiveness": 0.75,
+          "action": "revoke_unneeded_approvals",
+          "description": "Revoke approvals that are no longer needed.",
+          "effectiveness": 0.95,
           "user_cost": "high",
-          "skill_required": "auditing_tool"
+          "skill_required": null
         },
         {
-          "action": "automate_approval_check",
-          "description": "Automatically check and revoke unnecessary high approvals using smart contracts.",
-          "effectiveness": 1.0,
-          "user_cost": "high",
-          "skill_required": "smart_contract_platform"
+          "action": "set_approval_expiration",
+          "description": "Set a time limit for approval validity.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_smart_contract_security_tool",
+          "description": "Use a smart contract security tool to automatically detect and manage stale approvals.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "smart_contract_security_tool"
         }
       ],
       "id": "H5",

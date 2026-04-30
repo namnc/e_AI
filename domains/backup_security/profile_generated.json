@@ -1,0 +1,448 @@
+{
+  "meta": {
+    "domain_name": "backup_security",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Backup Encryption and Recovery Security",
+    "crops_property": "S",
+    "description": "Detect weak backup encryption, stale guardians, quantum-vulnerable backup key exchange, lack of coercion resistance, and non-deterministic secrets that cannot be recovered from seed. Protects the recoverability and confidentiality of wallet secrets.",
+    "protocols": [
+      "SLIP-39",
+      "ERC-4337 social recovery",
+      "Safe recovery modules",
+      "Tornado Cash encrypted notes",
+      "Argent guardians"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation of all encrypted backup data (permanent, public)",
+        "offline brute-force against password-encrypted backups (GPU/ASIC acceleration)",
+        "social engineering against individual guardians",
+        "future CRQC access for ECDH-encrypted backup key exchange",
+        "coercion of user to reveal backup passwords under duress"
+      ],
+      "limitations": [
+        "no private key access (pre-compromise)",
+        "no physical access to hardware wallets or secure enclaves",
+        "cannot compromise a threshold of independent guardians simultaneously (assumed)"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_weak_kdf_parameters": {
+      "name": "Weak KDF Parameters",
+      "description": "Use of weak key derivation function parameters that could allow for brute force attacks.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "weak_kdf_memory",
+            "description": "KDF parameters configured with insufficient memory cost, indicating potential brute force vulnerability.",
+            "data_needed": [
+              "kdf_function",
+              "memory_cost"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "low_kdf_iterations",
+            "description": "KDF iterations set to a low number, making it easier for attackers to perform brute force attacks.",
+            "data_needed": [
+              "kdf_function",
+              "iterations"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "increase_memory_cost",
+          "description": "Increase the memory cost parameter.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_strong_kdf",
+          "description": "Switch to a stronger key derivation function.",
+          "effectiveness": 1.0,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "increase_iterations_automate",
+          "description": "Automatically increase the number of iterations using security software.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "security_tool"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test Weak KDF Parameters",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_stale_guardian_addresses": {
+      "name": "Stale Guardian Addresses",
+      "description": "Lack of recent on-chain activity from guardians indicating potential compromise or inactivity.",
+      "severity": "medium",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "no_onchain_activity",
+            "description": "No transactions or interactions with smart contracts from the guardian address.",
+            "data_needed": [
+              "guardian_address",
+              "transaction_history"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "lack_of_recent_staking",
+            "description": "Guardian has not participated in staking rewards within the last year, indicating possible inactivity or compromise.",
+            "data_needed": [
+              "guardian_address",
+              "staking_history"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "low_transaction_volume",
+            "description": "Low transaction volume or frequency from the guardian address over a period of six months.",
+            "data_needed": [
+              "guardian_address",
+              "transaction_frequency"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_guardian",
+          "description": "Regularly review guardian addresses for on-chain activity.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "implement_automated_alerts",
+          "description": "Set up alerts for lack of recent on-chain activity from guardians.",
+          "effectiveness": 0.95,
+          "user_cost": "medium",
+          "skill_required": "security_monitoring_tool"
+        },
+        {
+          "action": "rotate_keys_periodically",
+          "description": "Periodically update guardian keys to prevent long-term inactivity or compromise.",
+          "effectiveness": 0.7,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "increase_staking_frequency",
+          "description": "Encourage guardians to participate more frequently in staking rewards.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test Stale Guardian Addresses",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_quantum_vulnerability_in_backu": {
+      "name": "Quantum Vulnerability in Backup Encryption",
+      "description": "Backup uses encryption methods vulnerable to quantum attacks due to reliance on elliptic curve cryptography.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "ecdsa_signature_length",
+            "description": "Length of ECDSA signatures used in backup encryption is less than 128 bytes.",
+            "data_needed": [
+              "signature_length"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "name": "elliptic_curve_used",
+            "description": "Elliptic curve algorithm (e.g., P-256, Curve25519) is known to be vulnerable to quantum attacks.",
+            "data_needed": [
+              "curve_algorithm"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "kdf_parameters_weak",
+            "description": "Key derivation function (KDF) parameters are below recommended minimums, e.g., iterations <1000 or memory <64MB.",
+            "data_needed": [
+              "kdf_iterations",
+              "kdf_memory"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "use_quantum_resistant_algorithms",
+          "description": "Migrate to quantum-resistant encryption algorithms such as NewHope or NTRU.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "increase_kdf_strength",
+          "description": "Increase KDF iterations and memory parameters to recommended minimums (e.g., >1000 iterations, >64MB).",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "deploy_post_quantum_cryptography",
+          "description": "Deploy PQC algorithms in your encryption process.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "automated_tool_for_qc_migration"
+        },
+        {
+          "action": "verify_curve_security",
+          "description": "Ensure the elliptic curve used is not vulnerable to quantum attacks and update if necessary.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": "security_audit_tool"
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test Quantum Vulnerability in Backup Encryption",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_no_coercion_resistance": {
+      "name": "No Coercion Resistance",
+      "description": "Single key backup or deterministic password-to-seed mapping, making it easier for attackers to derive the correct seed under duress.",
+      "severity": "critical",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "single_backup_key",
+            "description": "Backup ciphertext decrypts to the correct plaintext using exactly one valid key.",
+            "data_needed": [
+              "backup_ciphertext",
+              "valid_keys"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "name": "deterministic_password_seed",
+            "description": "The same password always produces the same seed, without honey encryption protections.",
+            "data_needed": [
+              "passwords",
+              "seeds"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "decryption_errors_on_wrong_passwords",
+            "description": "Incorrect passwords result in decryption errors rather than plausible fake seeds.",
+            "data_needed": [
+              "incorrect_passwords",
+              "ciphertext"
+            ],
+            "confidence": 0.7
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "enable_honey_encryption",
+          "description": "Enable honey encryption to prevent attackers from distinguishing correct seeds.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_multi_backup_keys",
+          "description": "Store backup ciphertexts encrypted with multiple keys to deter coercion.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "implement_password_derivation_variations",
+          "description": "Use different password-to-seed mappings for each user session to avoid deterministic patterns.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": "custom_script"
+        },
+        {
+          "action": "deploy_honeypot_keys",
+          "description": "Deploy honeypot keys that produce incorrect seeds but still decrypt to gibberish.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test No Coercion Resistance",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_non_deterministic_secrets_not_": {
+      "name": "Non-Deterministic Secrets Not Backed Up",
+      "description": "Failure to back up non-deterministic secrets generated during transactions, leading to loss of state consistency.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "non_deterministic_secret_generation",
+            "description": "Detection of transactions interacting with protocols that are known to generate non-deterministic secrets.",
+            "data_needed": [
+              "transaction_input_details",
+              "involved_protocol"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "missing_backup_transaction",
+            "description": "Identification of non-deterministic secret generation without an on-chain backup transaction being submitted.",
+            "data_needed": [
+              "secret_generation_event",
+              "backup_transaction"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "recovery_method_discrepancy",
+            "description": "Detection of wallets claiming seed-only recovery while using protocols that generate non-deterministic secrets.",
+            "data_needed": [
+              "wallet_recovery_details",
+              "used_protocols"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "backup_secrets",
+          "description": "Manually back up non-deterministic secrets generated in each transaction.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "use_backup_contract",
+          "description": "Automatically send backup transactions to a smart contract for secret storage.",
+          "effectiveness": 0.95,
+          "user_cost": "medium",
+          "skill_required": "automation_tool"
+        },
+        {
+          "action": "audit_recovery_methods",
+          "description": "Regularly audit wallet recovery methods against current protocol usage.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test Non-Deterministic Secrets Not Backed Up",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring backup security posture across all recovery dimensions",
+    "methodology": {
+      "step_1": "Inventory all backup and recovery configurations (password, guardians, hardware keys, on-chain backups)",
+      "step_2": "For each backup, assess: encryption strength, KDF parameters, PQ safety, deniability, guardian liveness",
+      "step_3": "For non-deterministic protocol interactions, verify backup existence",
+      "step_4": "Score overall backup security as composite of brute-force resistance, recoverability, and coercion resistance",
+      "step_5": "Generate priority remediation list"
+    },
+    "target": "All backups: PQ-safe encryption, multi-factor, liveness-checked guardians, deterministic or explicitly backed up secrets",
+    "metrics": [
+      "brute_force_resistance_score",
+      "guardian_liveness_rate",
+      "pq_backup_safety_rate",
+      "coercion_resistance_flag",
+      "nondeterministic_secret_backup_rate"
+    ],
+    "adversary_levels": [
+      {
+        "name": "opportunistic",
+        "heuristics": [
+          "H1"
+        ],
+        "description": "Brute-force password-only backups with commodity hardware"
+      },
+      {
+        "name": "targeted",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H4"
+        ],
+        "description": "Target specific user: brute-force + social-engineer guardians + coercion"
+      },
+      {
+        "name": "quantum_capable",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "All attack vectors including CRQC against ECDH-encrypted backups"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Backup {backup_id} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "summary": "Backup security scan: {n_txs} configurations analyzed. {n_risky} at risk ({pct_risky}%). Guardian liveness: {guardian_liveness}%. Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} backup configurations pass security checks. Guardians active, encryption PQ-safe.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This improves backup security by ~{effectiveness_pct}%. {user_cost_note}",
+    "guardian_alert": "Guardian {guardian_address} has been inactive for {inactive_days} days. Recovery threshold at risk: {active_guardians}/{total_guardians} active vs {threshold} required.",
+    "backup_warning": "WARNING: This backup uses {encryption_scheme} which is {vulnerability}. Recommended: {recommendation}."
+  }
+}

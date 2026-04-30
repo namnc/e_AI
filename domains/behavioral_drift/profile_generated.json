@@ -1,0 +1,461 @@
+{
+  "meta": {
+    "domain_name": "behavioral_drift",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Behavioral Drift Monitoring",
+    "crops_property": "S",
+    "description": "Long-term behavioral monitoring detecting gradual security and privacy degradation. Wallet + RPC guard that tracks portfolio concentration, leverage creep, approval accumulation, gas inefficiency, and behavioral fingerprinting over time.",
+    "protocols": [
+      "Aave",
+      "Compound",
+      "Uniswap",
+      "Maker",
+      "Lido",
+      "ERC-20 approvals"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "longitudinal on-chain behavioral analysis across all user addresses",
+        "approval monitoring to detect exploitable unlimited allowances",
+        "pattern recognition of recurring transaction sequences for fingerprinting",
+        "portfolio composition inference from token transfer patterns"
+      ],
+      "limitations": [
+        "no private key access",
+        "cannot observe off-chain portfolio (CEX holdings, fiat)",
+        "behavioral drift detection requires extended observation period (weeks/months)"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_portfolio_concentration": {
+      "name": "portfolio_concentration",
+      "description": "High percentage of value held in one protocol or lack of cross-chain diversification.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "high_protocol_concentration",
+            "description": "Percentage of portfolio value held in a single protocol exceeds 50%.",
+            "data_needed": [
+              "total_value",
+              "protocol_values"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "increasing_concentration",
+            "description": "Percentage of total value held in one protocol has increased by more than 10% over the last 30 days.",
+            "data_needed": [
+              "total_value",
+              "protocol_values_over_time"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "single_chain_exposure",
+            "description": "User's entire portfolio is confined to a single blockchain with no cross-chain assets present.",
+            "data_needed": [
+              "chain_ids",
+              "assets_by_chain"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "distribute_assets",
+          "description": "Diversify your portfolio across multiple protocols.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "add_cross_chain_assets",
+          "description": "Add assets from other blockchains to reduce single-chain exposure.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": "automated_asset_trading_bot"
+        },
+        {
+          "action": "reduce_protocol_exposure",
+          "description": "Reduce the percentage of total value held in any one protocol to below 30%.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test portfolio_concentration",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_leverage_creep": {
+      "name": "leverage_creep",
+      "description": "Increasing risk from borrowing and collateral usage over time.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "total_borrow_ratio_increase",
+            "description": "The percentage increase in the total borrow-to-collateral ratio over a given period.",
+            "data_needed": [
+              "user_total_borrow",
+              "user_total_collateral",
+              "previous_period_borrow_ratio"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "consecutive_weekly_increase",
+            "description": "The total borrow/collateral ratio has increased for three or more consecutive weeks.",
+            "data_needed": [
+              "weekly_borrow_ratios"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "ratio_increase_above_threshold",
+            "description": "The total borrow/collateral ratio increase exceeds a predefined threshold over the last month.",
+            "data_needed": [
+              "monthly_borrow_ratios",
+              "risk_threshold"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_borrow",
+          "description": "Regularly review total borrow-to-collateral ratio.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "set_thresholds",
+          "description": "Define and set risk thresholds for monitoring.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "automate_monitoring",
+          "description": "Automatically alert on significant changes in borrow ratio.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "automation_tool"
+        },
+        {
+          "action": "risk_assessment",
+          "description": "Conduct regular risk assessments and adjust strategies accordingly.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test leverage_creep",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_approval_accumulation": {
+      "name": "approval_accumulation",
+      "description": "Multiple token approvals to potentially untrusted or vulnerable contracts.",
+      "severity": "medium",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "multiple_token_approvals",
+            "description": "User approves multiple tokens to the same contract address.",
+            "data_needed": [
+              "user_address",
+              "contract_address",
+              "token_addresses"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "untrusted_contract_approval",
+            "description": "User approves a token to an untrusted or less-vetted contract.",
+            "data_needed": [
+              "user_address",
+              "contract_address",
+              "contract_trust_score"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "vulnerable_contract_approval",
+            "description": "User approves a token to a known vulnerable contract.",
+            "data_needed": [
+              "user_address",
+              "contract_address",
+              "contract_vulnerabilities"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "review_tokens",
+          "description": "Review the tokens before approving them.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_security_tool",
+          "description": "Use a security tool to check contract vulnerabilities and trust score.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "security_scanner"
+        },
+        {
+          "action": "avoid_unverified_contracts",
+          "description": "Do not approve tokens to unverified contracts.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test approval_accumulation",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_gas_spend_trend": {
+      "name": "gas_spend_trend",
+      "description": "Unusually high gas spending with no increase in transaction volume, indicating potential inefficiency.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "high_gas_spend",
+            "description": "Unusually high gas spending without corresponding increase in transaction volume.",
+            "data_needed": [
+              "gas_spent",
+              "transaction_count"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "spending_increase",
+            "description": "Sudden and significant increase in gas spending over a short period.",
+            "data_needed": [
+              "gas_spent_last_period",
+              "gas_spent_current_period"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_gas_spending",
+          "description": "Regularly monitor gas spending trends to catch anomalies early.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_optimized_smart_contracts",
+          "description": "Review and optimize smart contracts to reduce unnecessary gas costs.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "smart_contract_analyzer"
+        },
+        {
+          "action": "gas_spending_alerts",
+          "description": "Set up alerts for sudden increases in gas spending.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "security_monitoring_tool"
+        },
+        {
+          "action": "optimize_transaction_flow",
+          "description": "Optimize the transaction flow to reduce overall gas usage.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": null
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test gas_spend_trend",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_interaction_pattern_rigidity": {
+      "name": "interaction_pattern_rigidity",
+      "description": "Repetitive transaction patterns that could be identifiable and traceable over time.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "repetitive_interactions",
+            "description": "Detection of repeated interactions with the same protocol or address over time.",
+            "data_needed": [
+              "transaction_count",
+              "sender_address",
+              "receiver_address",
+              "timestamp"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "consistent_transaction_volume",
+            "description": "Identify consistent transaction volume from a user to a specific address over several transactions.",
+            "data_needed": [
+              "transaction_value",
+              "sender_address",
+              "receiver_address",
+              "timestamp"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "recurring_transaction_times",
+            "description": "Detection of recurring transaction times with the same frequency and duration for multiple consecutive days.",
+            "data_needed": [
+              "transaction_time",
+              "sender_address",
+              "receiver_address",
+              "timestamp"
+            ],
+            "confidence": 0.85
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "implement_transaction_limits",
+          "description": "Limit the number of transactions per address to reduce repetitive interactions.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_address_rotation",
+          "description": "Rotate sender addresses to avoid detection by patterns.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "enable_time_varying_transactions",
+          "description": "Randomize transaction times to disrupt recurring patterns.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "implement_transaction_value_randomization",
+          "description": "Randomize transaction values to avoid consistent volume detection.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_secure_multi_party_computation",
+          "description": "Utilize secure computation methods for transactions to anonymize data.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "automated_tool"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test interaction_pattern_rigidity",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring behavioral drift detection accuracy over extended monitoring periods",
+    "methodology": {
+      "step_1": "Select N wallets with 90+ days of DeFi activity history",
+      "step_2": "Run all 5 heuristics on historical data with sliding window analysis",
+      "step_3": "Correlate detected drift signals with actual adverse outcomes (liquidations, exploits, gas waste)",
+      "step_4": "Measure detection lead time: how far in advance drift signals predicted the adverse event",
+      "step_5": "Calculate false positive rate on wallets that experienced no adverse outcomes"
+    },
+    "target": "detect 70% of adverse outcomes with 2+ week lead time and <20% false positive rate",
+    "metrics": [
+      "per_heuristic_detection_rate",
+      "detection_lead_time_days",
+      "false_positive_rate",
+      "adverse_outcome_correlation"
+    ],
+    "adversary_levels": [
+      {
+        "name": "passive_monitor",
+        "heuristics": [
+          "H1",
+          "H4"
+        ],
+        "description": "Portfolio and gas trend analysis only"
+      },
+      {
+        "name": "security_focused",
+        "heuristics": [
+          "H2",
+          "H3"
+        ],
+        "description": "Leverage and approval risk detection"
+      },
+      {
+        "name": "full_behavioral",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "All behavioral drift heuristics including fingerprinting"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Behavioral drift detected: {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Trend: {trend_direction} over {time_window}. Recommendation: {recommendation}.",
+    "summary": "Behavioral analysis over {time_window}: {n_signals} drift signals detected. {n_critical} critical. Portfolio concentration: {concentration_pct}%. Leverage trend: {leverage_trend}. Outstanding approvals: {approval_count}.",
+    "skill_suggestion": "To address {heuristic_name}, I can {skill_action}. This reduces drift risk by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}

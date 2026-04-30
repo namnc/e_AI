@@ -1,0 +1,500 @@
+{
+  "meta": {
+    "domain_name": "l2_anonymity_set",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "L2 Anonymity Set Monitoring",
+    "crops_property": "P",
+    "description": "Monitors privacy degradation on Layer 2 rollups where faster block times, sequencer centralization, and rollup batch posting create deanonymization vectors absent on L1",
+    "protocols": [
+      "Optimism",
+      "Arbitrum",
+      "zkSync",
+      "StarkNet",
+      "Base",
+      "Scroll",
+      "Linea"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full L2 transaction observation including ordering within batches",
+        "L1 batch posting observation and timing analysis",
+        "sequencer-level transaction visibility (pre-confirmation, pre-batch)",
+        "cross-layer correlation between L1 and L2 transactions",
+        "timing analysis at sub-second granularity on L2",
+        "forced inclusion transaction monitoring on L1"
+      ],
+      "limitations": [
+        "no private key access",
+        "no access to sequencer internal state (unless sequencer is the adversary)",
+        "no ability to modify L2 state without valid transactions"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_thin_privacy_pool": {
+      "name": "thin privacy pool",
+      "description": "Few unique depositors or matches in the current pool, reducing anonymity.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "few_unique_depositors",
+            "description": "Few unique depositors within the user's denomination bracket over a certain period.",
+            "data_needed": [
+              "user_deposit_amount",
+              "timestamp",
+              "denomination_bracket",
+              "unique_depositors"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "sparse_match_count",
+            "description": "Deposit amount has few matches in the current pool, indicating reduced anonymity.",
+            "data_needed": [
+              "user_deposit_amount",
+              "pool_amounts",
+              "match_threshold"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "timed_lag_deposit",
+            "description": "No other deposits occurred within a specified time frame after the user's deposit in the same denomination bracket.",
+            "data_needed": [
+              "user_deposit_amount",
+              "timestamp",
+              "denomination_bracket",
+              "time_window"
+            ],
+            "confidence": 0.7
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "shuffle_assets",
+          "description": "Mix assets across different addresses before depositing.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_multisig_wallets",
+          "description": "Use a multisignature wallet for transactions to spread out activity.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "token_swaps",
+          "description": "Perform token swaps between different tokens within the same blockchain.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "mixer_service",
+          "description": "Utilize a cryptocurrency mixing service to enhance privacy.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "automated_tool"
+        },
+        {
+          "action": "delay_transactions",
+          "description": "Wait for a random period before making deposits.",
+          "effectiveness": 0.6,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test thin privacy pool",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_sequencer_visibility": {
+      "name": "sequencer visibility",
+      "description": "Centralized sequencer provides full transaction content visibility without encryption.",
+      "severity": "critical",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "single_sequencer",
+            "description": "Identifies presence of a single centralized sequencer.",
+            "data_needed": [
+              "sequencer_count"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "unencrypted_mempool",
+            "description": "Detects the lack of encryption in the mempool or transaction content.",
+            "data_needed": [
+              "mempool_encryption",
+              "transaction_encryption"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "ip_correlation",
+            "description": "Looks for user activity from same IP address, indicating potential sequencer-side correlation.",
+            "data_needed": [
+              "user_ip"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "rpc_endpoint_reuse",
+            "description": "Detects usage of the same RPC endpoint by a user, which could enable sequencer to correlate transactions.",
+            "data_needed": [
+              "rpc_endpoint"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "enable_encryption",
+          "description": "Enable encryption for mempool and transaction content.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "decentralize_sequencer",
+          "description": "Implement a decentralized sequencer system to reduce single point of failure.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_unique_ips",
+          "description": "Ensure users switch IPs for each transaction to avoid IP correlation.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "rotate_rpc_endpoints",
+          "description": "Periodically change the RPC endpoint used by clients.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "implement_node_redundancy",
+          "description": "Add redundancy to network nodes to avoid relying on a single sequencer.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test sequencer visibility",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_forced_inclusion_deanonymizati": {
+      "name": "forced inclusion deanonymization",
+      "description": "Use of L1 forced inclusion for privacy-sensitive transactions leaks user identity.",
+      "severity": "critical",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "forced_inclusion",
+            "description": "Transaction submitted via L1 forced inclusion rather than the L2 sequencer.",
+            "data_needed": [
+              "transaction_type",
+              "submitting_address"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "linkable_address",
+            "description": "The L1 address submitting the transaction is associated with user's identity.",
+            "data_needed": [
+              "submitting_address",
+              "user_identity_links"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "rare_transaction",
+            "description": "Transaction is a rare forced inclusion, making it stand out.",
+            "data_needed": [
+              "transaction_type_frequency"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "disable_l1_inclusion",
+          "description": "Disable forced L1 inclusion for privacy-sensitive transactions.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "use_zero_knowledge_proofs",
+          "description": "Implement zero-knowledge proofs to obfuscate transaction details.",
+          "effectiveness": 1.0,
+          "user_cost": "medium",
+          "skill_required": "zk_tool"
+        },
+        {
+          "action": "anonymize_addresses",
+          "description": "Anonymize the L1 address used for transactions.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "distribute_transactions",
+          "description": "Distribute privacy-sensitive transactions across multiple addresses.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "transaction_distributor"
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test forced inclusion deanonymization",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_l2_specific_timing_correlation": {
+      "name": "L2-specific timing correlation",
+      "description": "Short time between deposit and withdrawal on the same chain limits anonymity.",
+      "severity": "high",
+      "incidents_matched": 5,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "short_deposit_withdraw_gap",
+            "description": "Detects short time interval between deposit and withdraw on the same L2 chain.",
+            "data_needed": [
+              "deposit_block",
+              "withdraw_block"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "tight_timing_correlation",
+            "description": "Identifies deposits and withdrawals occurring within a specific timeframe (e.g., <100 blocks or seconds) on the same L2 chain.",
+            "data_needed": [
+              "deposit_block",
+              "withdraw_block",
+              "block_time"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "unique_timing_gap",
+            "description": "Checks if the time gap between a deposit and withdraw is unique within the pool of transactions on the same L2 chain.",
+            "data_needed": [
+              "deposit_block",
+              "withdraw_block",
+              "block_time"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_transactions",
+          "description": "Monitor for short deposit-withdrawal intervals to detect suspicious activity.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "implement_delay_strategies",
+          "description": "Delay deposits or withdrawals by a random amount of time to obscure timing patterns.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "automated_security_tool"
+        },
+        {
+          "action": "blockchain_mixing_services",
+          "description": "Use blockchain mixing services that anonymize transactions by pooling them with others.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": "mixing_service_provider"
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test L2-specific timing correlation",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_rollup_batch_linkage": {
+      "name": "rollup batch linkage",
+      "description": "Transactions appearing in close batches on L1 reduce overall anonymity.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "batch_size_small",
+            "description": "Identifies unusually small batches containing user transactions.",
+            "data_needed": [
+              "user_transaction_batch_id",
+              "batch_size"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "same_batch_transactions",
+            "description": "Detects deposits and withdrawals appearing in the same L1 batch posting.",
+            "data_needed": [
+              "deposit_batch_id",
+              "withdrawal_batch_id"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "adjacent_batches",
+            "description": "Checks if a deposit and withdrawal are within adjacent batches.",
+            "data_needed": [
+              "deposit_batch_id",
+              "withdrawal_batch_id"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "shuffle_batches",
+          "description": "Manually spread transactions across different batches.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "batch_spreading_script",
+          "description": "Automate batch spreading with a custom script.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "python"
+        },
+        {
+          "action": "randomize_timing",
+          "description": "Randomly delay transactions by variable time intervals.",
+          "effectiveness": 0.75,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "batch_scheduling_tool",
+          "description": "Use a tool to schedule transactions across batches automatically.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": "batch_schedul3r"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test rollup batch linkage",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring L2 anonymity set degradation across all heuristics compared to L1 baseline",
+    "methodology": {
+      "step_1": "Deploy test privacy transactions on Optimism and Arbitrum testnets with controlled deposit/withdrawal patterns",
+      "step_2": "Record all L2 blocks, batch postings, and sequencer behavior during test period",
+      "step_3": "Run all 5 heuristics against each deposit-withdrawal pair",
+      "step_4": "Compare adversary success rate on L2 vs equivalent transactions on L1",
+      "step_5": "Apply recommendations (timing delays, pool monitoring, batch separation) and re-measure",
+      "step_6": "Quantify anonymity set size improvement from each recommendation"
+    },
+    "target": "Recommendations should bring L2 anonymity set quality to within 2x of L1 baseline for same privacy protocol",
+    "metrics": [
+      "anonymity_set_size_l2_vs_l1",
+      "adversary_correlation_accuracy",
+      "timing_correlation_resolution",
+      "batch_correlation_strength",
+      "recommendation_effectiveness"
+    ],
+    "adversary_levels": [
+      {
+        "name": "external_observer",
+        "heuristics": [
+          "H1",
+          "H4",
+          "H5"
+        ],
+        "description": "Can only see L1 batch postings and L2 public state"
+      },
+      {
+        "name": "rpc_provider",
+        "heuristics": [
+          "H1",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "Sees RPC requests and can correlate IP to transactions"
+      },
+      {
+        "name": "sequencer_level",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "Full sequencer visibility including pre-confirmation ordering"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_brief": "[{heuristic_id}] {heuristic_name} ({confidence}%): {recommendation}",
+    "risk_assessment_block": "BLOCKED: {heuristic_name} detected with {confidence}% confidence. {signal_description}. L2 anonymity set is insufficient for this transaction.",
+    "summary": "Analyzed {n_txs} L2 privacy transactions. {n_risky} flagged ({pct_risky}%). Top risks: {top_risks}.",
+    "summary_clean": "All {n_txs} L2 transactions pass anonymity set checks. Pool sizes and timing are within acceptable parameters.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can run {skill_action}. This improves your anonymity set by ~{effectiveness_pct}%. {user_cost_note}",
+    "anonymity_set_report": "L2 anonymity set: {anon_set} depositors in your bracket (last 24h). L1 equivalent: {l1_anon_set}. Ratio: {ratio}x.",
+    "timing_warning": "L2 block time is {block_time}s. Your {dwell_time}s dwell spans {n_blocks} blocks -- adversary has {resolution}x more timing resolution than on L1."
+  }
+}

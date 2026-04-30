@@ -1,0 +1,525 @@
+{
+  "meta": {
+    "domain_name": "l2_bridge_linkage",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Cross-Chain Identity Linkage via Bridge Usage",
+    "crops_property": "P",
+    "description": "Detects privacy-breaking patterns in L1-to-L2 bridge usage that allow an observer to link addresses across chains, defeating the isolation that separate chains should provide",
+    "protocols": [
+      "Arbitrum Bridge",
+      "Optimism Bridge",
+      "zkSync Bridge",
+      "StarkNet Bridge",
+      "Polygon Bridge",
+      "Hop Protocol",
+      "Across Protocol",
+      "Stargate"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "full on-chain observation across L1 and multiple L2s",
+        "timing analysis on bridge deposits and withdrawals",
+        "amount correlation across chains with fee awareness",
+        "bridge contract event log monitoring",
+        "address clustering on each chain independently"
+      ],
+      "limitations": [
+        "no private key access",
+        "no access to sequencer mempool (if private)",
+        "no off-chain metadata (IP, browser fingerprint)"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_same_address_bridge": {
+      "name": "same address bridge",
+      "description": "Identical addresses used across chains for bridging transactions.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "same_address_used",
+            "description": "Identical addresses used for deposits and withdrawals across different blockchain chains.",
+            "data_needed": [
+              "sender_address",
+              "receiver_address"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "ens_name_match",
+            "description": "L1 and L2 addresses resolve to the same ENS name or are part of the same ownership graph.",
+            "data_needed": [
+              "l1_address",
+              "l2_address"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "deterministic_contract_match",
+            "description": "Smart contracts deployed at identical addresses on both chains due to deterministic deployment methods like CREATE2.",
+            "data_needed": [
+              "contract_address_l1",
+              "contract_address_l2"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "block_suspicious_addresses",
+          "description": "Block or monitor suspicious addresses identified by the heuristic.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "deploy_address_blacklist",
+          "description": "Deploy an address blacklist for known malicious addresses.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "enable_ens_monitoring",
+          "description": "Enable monitoring of ENS names to detect potential bridge activities.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": "ENS-monitor"
+        },
+        {
+          "action": "implement_address_validation",
+          "description": "Implement address validation before allowing transactions across chains.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_unique_contract_addresses",
+          "description": "Ensure unique contract addresses on each chain to avoid deterministic match issues.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": null
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test same address bridge",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_amount_correlation": {
+      "name": "amount correlation",
+      "description": "Specific or unique amounts transferred are indicative of a non-anonymous transaction.",
+      "severity": "high",
+      "incidents_matched": 5,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "withdrawal_deposit_match",
+            "description": "Identifies if the L2 withdrawal amount matches the corresponding L1 deposit minus bridge fee within a specified time window.",
+            "data_needed": [
+              "L1_deposit_amount",
+              "bridge_fee",
+              "L2_withdrawal_amount",
+              "time_window"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "unique_amount_check",
+            "description": "Detects if the transaction amount has more than four significant decimal places, indicating it may be unique and non-anonymous.",
+            "data_needed": [
+              "transaction_amount"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "infrequent_amount_match",
+            "description": "Checks for bridged amounts that do not match typical transaction patterns in the deposit pool, suggesting potential non-anonymity.",
+            "data_needed": [
+              "bridged_amount",
+              "deposit_pool_amounts"
+            ],
+            "confidence": 0.6
+          },
+          {
+            "name": "split_transaction_check",
+            "description": "Identifies if a large bridge transfer is split into multiple transactions with round numbers over different time windows, signaling non-anonymity.",
+            "data_needed": [
+              "total_transfer_amount",
+              "number_of_transfers",
+              "transfer_time_windows"
+            ],
+            "confidence": 0.7
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "round_amounts",
+          "description": "Round transaction amounts to standard denominations.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_frequent_pools",
+          "description": "Ensure transactions use common pool amounts.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "merge_transactions",
+          "description": "Combine multiple small transfers into one large transaction.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "automated_rounding_tool",
+          "description": "Use a tool to automatically round amounts before sending.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "automated_rounding"
+        },
+        {
+          "action": "constant_deposit_source",
+          "description": "Always use the same deposit source for consistent amounts.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test amount correlation",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_bridge_sequence_fingerprint": {
+      "name": "bridge sequence fingerprint",
+      "description": "Repetitive bridge patterns across multiple chains suggest the same user or entity is involved.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "bridge_sequence",
+            "description": "Identify if an address or cluster repeatedly bridges to the same ordered set of Layer 2 (L2) chains.",
+            "data_needed": [
+              "address",
+              "L2_chain_id",
+              "timestamp"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "periodic_bridging",
+            "description": "Detect if bridge events occur at regular intervals, matching known user behavior patterns.",
+            "data_needed": [
+              "address",
+              "L2_chain_id",
+              "timestamp"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "multiple_L2s_short_window",
+            "description": "Find instances where the same address or cluster appears on three or more L2 chains within a short time frame.",
+            "data_needed": [
+              "address",
+              "L2_chain_id",
+              "timestamp"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "name": "consistent_order_varying_timing",
+            "description": "Look for instances where the order of bridging to L2 chains is consistent, but the timing varies.",
+            "data_needed": [
+              "address",
+              "L2_chain_id",
+              "timestamp"
+            ],
+            "confidence": 0.65
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "block_address",
+          "description": "Block the identified address to prevent further bridging activities.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_address",
+          "description": "Manually monitor the activity of the identified address for suspicious behavior.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "implement_security_tokens",
+          "description": "Use security tokens to track and verify identities across blockchain networks.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": "blockchain_analytics_tool"
+        },
+        {
+          "action": "enhance_2fa",
+          "description": "Implement two-factor authentication for access to wallet services and transactions.",
+          "effectiveness": 0.6,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test bridge sequence fingerprint",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_gas_funding_post_bridge": {
+      "name": "gas funding post-bridge",
+      "description": "Funding of a newly bridged address from known bridge withdrawal addresses indicates non-anonymity.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "first_transfer",
+            "description": "An L2 address's first transaction is an ETH transfer.",
+            "data_needed": [
+              "L2_address",
+              "tx_hash",
+              "value"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "intermediary_funding",
+            "description": "Funding of an L2 address through a single intermediary that was previously funded by a bridge withdrawal.",
+            "data_needed": [
+              "L2_address",
+              "intermediary_address",
+              "bridge_withdrawal_address"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "timed_funding",
+            "description": "Funding of an L2 address within minutes after a bridge withdrawal completes.",
+            "data_needed": [
+              "L2_address",
+              "bridge_withdrawal_time",
+              "funding_time"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "monitor_addresses",
+          "description": "Manually monitor newly bridged addresses for suspicious transactions.",
+          "effectiveness": 0.7,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "automated_monitoring",
+          "description": "Use a tool to automatically flag and analyze newly bridged addresses.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": "blockchain_analysis_tool"
+        },
+        {
+          "action": "time_delay_policy",
+          "description": "Implement a policy requiring a delay between bridge withdrawal and L2 funding.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": null
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test gas funding post-bridge",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_nft/token_bridge_linkage": {
+      "name": "NFT/token bridge linkage",
+      "description": "Specific token transfers create identifiable links between chains, reducing anonymity.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "token_id_bridging",
+            "description": "Identifies unique token IDs across different blockchain chains.",
+            "data_needed": [
+              "token_address",
+              "unique_token_id",
+              "chain_from",
+              "chain_to"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "low_holder_erc20_bridge",
+            "description": "Detects ERC-20 token transfers from tokens with a small number of holders, indicating potential linking.",
+            "data_needed": [
+              "token_address",
+              "holder_count",
+              "transaction_amount",
+              "chain_from",
+              "chain_to"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "specific_amount_transfer",
+            "description": "Picks up on specific token amounts that may be used as identifying markers.",
+            "data_needed": [
+              "token_address",
+              "transaction_amount",
+              "chain_from",
+              "chain_to"
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "automate_token_link_detection",
+          "description": "Automatically monitor for token bridge linkages.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "security_software"
+        },
+        {
+          "action": "manual_monitoring",
+          "description": "Manually review suspicious transaction patterns.",
+          "effectiveness": 0.6,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "token_blinding",
+          "description": "Implement token blinding techniques to obscure IDs during transfers.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": "encryption_tool"
+        },
+        {
+          "action": "increase_holder_count",
+          "description": "Distribute tokens widely among holders before bridging.",
+          "effectiveness": 0.75,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_anonymity_services",
+          "description": "Utilize services designed to enhance privacy during cross-chain transfers.",
+          "effectiveness": 0.8,
+          "user_cost": "high",
+          "skill_required": "anonymization_tool"
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test NFT/token bridge linkage",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring cross-chain linkability with all heuristics applied",
+    "methodology": {
+      "step_1": "Collect bridge transaction dataset across Arbitrum, Optimism, zkSync canonical bridges (N >= 10000 pairs)",
+      "step_2": "Label ground truth linkages using known same-address bridges as positive examples",
+      "step_3": "Run all 5 heuristics against each bridge event",
+      "step_4": "Measure per-heuristic linkability rate",
+      "step_5": "Apply profile recommendations to a subset and re-measure",
+      "step_6": "Compare: linkability rate before vs after countermeasures"
+    },
+    "target": "reduce cross-chain linkability from estimated 80%+ to <15% with all recommendations applied",
+    "metrics": [
+      "per_heuristic_linkability_rate",
+      "combined_linkability_rate",
+      "false_positive_rate",
+      "user_cost_score",
+      "anonymity_set_size"
+    ],
+    "adversary_levels": [
+      {
+        "name": "basic",
+        "heuristics": [
+          "H1",
+          "H5"
+        ],
+        "description": "Address reuse + unique token linkage only"
+      },
+      {
+        "name": "intermediate",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H4",
+          "H5"
+        ],
+        "description": "Add amount correlation + gas funding"
+      },
+      {
+        "name": "advanced",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "All heuristics including behavioral fingerprinting"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Bridge transaction {tx_hash} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_block": "BLOCKED: Bridge transaction creates {heuristic_name} linkage with {confidence}% confidence. {signal_description}. This bridge would link your L1 and L2 identities.",
+    "summary": "Analyzed {n_bridges} bridge transactions. {n_linkable} create cross-chain linkages ({pct_linkable}%). Top risks: {top_risks}.",
+    "summary_clean": "All {n_bridges} bridge transactions pass privacy checks. No cross-chain linkage detected.",
+    "skill_suggestion": "To mitigate {heuristic_name}, I can {skill_action}. This reduces linkability by ~{effectiveness_pct}%. {user_cost_note}"
+  }
+}

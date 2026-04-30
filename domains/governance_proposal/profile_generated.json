@@ -1,0 +1,497 @@
+{
+  "meta": {
+    "domain_name": "governance_proposal",
+    "version": "0.1.0-generated",
+    "generated_by": "meta-framework",
+    "validation_status": "draft"
+  },
+  "risk_domain": {
+    "name": "Governance Proposal Risk Analysis",
+    "crops_property": "S",
+    "description": "Detects malicious or high-risk governance proposals before execution, covering treasury drains, parameter manipulation, proxy upgrades, timelock bypasses, and voter concentration",
+    "protocols": [
+      "Compound Governor",
+      "OpenZeppelin Governor",
+      "Aave Governance",
+      "Snapshot",
+      "Tally"
+    ],
+    "adversary_model": {
+      "capabilities": [
+        "submit governance proposals with arbitrary calldata",
+        "accumulate or borrow voting power (flash loans, token purchases)",
+        "deploy unverified implementation contracts",
+        "coordinate votes across multiple controlled addresses",
+        "front-run timelock execution with additional proposals"
+      ],
+      "limitations": [
+        "no private key access to treasury multisigs",
+        "cannot bypass on-chain timelock without a governance vote",
+        "cannot forge vote signatures"
+      ]
+    }
+  },
+  "heuristics": {
+    "H1_treasury_drain_pattern": {
+      "name": "treasury drain pattern",
+      "description": "Series of transactions that consistently target treasury balances and may indicate a coordinated attack.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "treasury_drain_large_value",
+            "description": "Transaction value exceeds a certain percentage of the current treasury balance.",
+            "data_needed": [
+              "transaction_value",
+              "current_treasury_balance"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "treasury_drain_frequent_sends",
+            "description": "Multiple transactions to a single address with no known label within a short period.",
+            "data_needed": [
+              "recipient_address",
+              "transaction_time",
+              "known_labels"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "treasury_drain_multiple_tokens",
+            "description": "Transfer of multiple token types in a single transaction, consistent with a treasury drain pattern.",
+            "data_needed": [
+              "transferred_token_types",
+              "transaction_time"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "implement_treasury_watchlist",
+          "description": "Monitor treasury balance for any unusual activity.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "automate_restricted_transfers",
+          "description": "Use smart contracts to restrict transfer permissions.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "smart_contract_developer"
+        },
+        {
+          "action": "set_alerts_for_large_transfers",
+          "description": "Configure alerts for transactions exceeding a certain threshold.",
+          "effectiveness": 0.8,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "implement_address_blacklisting",
+          "description": "Block access to treasury from suspicious addresses.",
+          "effectiveness": 0.9,
+          "user_cost": "medium",
+          "skill_required": "security_administrator"
+        }
+      ],
+      "id": "H1",
+      "benchmark_scenario": {
+        "setup": "Test treasury drain pattern",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H2_parameter_anomaly_detection": {
+      "name": "parameter anomaly detection",
+      "description": "Unusual parameter changes outside typical historical ranges or without proper simulations, potentially risky upgrades.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "parameter_outside_std_dev",
+            "description": "Proposed parameter change deviates significantly from historical average and standard deviation.",
+            "data_needed": [
+              "current_parameter_value",
+              "historical_parameter_values"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "unusual_proposal_count",
+            "description": "Number of proposed changes in a short period is unusually high or low compared to historical data.",
+            "data_needed": [
+              "proposed_changes_count",
+              "historical_change_counts"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "suspicious_recipient",
+            "description": "Recipient address has an unusual number of transactions and lacks known labels or affiliations.",
+            "data_needed": [
+              "recipient_address_transactions",
+              "known_labels"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "name": "multiple_token_types_transfer",
+            "description": "Transfer involves multiple token types, potentially indicative of sweeping treasury funds.",
+            "data_needed": [
+              "transferred_tokens",
+              "expected_single_token_transfers"
+            ],
+            "confidence": 0.7
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "ignore_outlier",
+          "description": "Manually verify the need for parameter changes.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "monitor_change_count",
+          "description": "Set up alerts for unusual proposal counts.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "label_recipients",
+          "description": "Automate the labeling of recipient addresses to avoid suspicious activity.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "automated_labeling_tool"
+        },
+        {
+          "action": "verify_token_transfers",
+          "description": "Review transfers involving multiple token types for legitimacy.",
+          "effectiveness": 0.7,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_ai_anomaly_detection",
+          "description": "Implement AI to automatically detect and mitigate parameter anomalies.",
+          "effectiveness": 0.85,
+          "user_cost": "high",
+          "skill_required": "advanced_security_tool"
+        }
+      ],
+      "id": "H2",
+      "benchmark_scenario": {
+        "setup": "Test parameter anomaly detection",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H3_proxy_upgrade_risk": {
+      "name": "proxy upgrade risk",
+      "description": "Upgrades to unverified contracts with significant risks like self-destruct or lack of review time.",
+      "severity": "high",
+      "incidents_matched": 4,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "proxy_upgrade_unverified",
+            "description": "Detected calls to unverified contracts or smart contracts with suspicious self-destruct patterns.",
+            "data_needed": [
+              "contract_verified",
+              "self_destruct"
+            ],
+            "confidence": 0.85
+          },
+          {
+            "name": "proxy_upgrade_time_window",
+            "description": "Transaction occurs shortly after contract upgrade, suggesting a rushed deployment lacking proper review time.",
+            "data_needed": [
+              "upgrade_timestamp",
+              "transaction_timestamp"
+            ],
+            "confidence": 0.75
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "verify_contract",
+          "description": "Manually verify the contract code before upgrade.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": null
+        },
+        {
+          "action": "time_review",
+          "description": "Wait for a predefined period after an upgrade before interacting with the new contract.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "use_audit_tool",
+          "description": "Automatically audit the upgraded contract using security tools like Slither or MythX.",
+          "effectiveness": 0.95,
+          "user_cost": "low",
+          "skill_required": "Slither"
+        },
+        {
+          "action": "time_window_policy",
+          "description": "Implement a policy requiring a minimum time delay between contract upgrades and usage.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H3",
+      "benchmark_scenario": {
+        "setup": "Test proxy upgrade risk",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H4_timelock_evasion": {
+      "name": "timelock evasion",
+      "description": "Attempts to bypass timelocks through changes in delays, administrators, or emergency functions.",
+      "severity": "high",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "timelock_bypass_attempt",
+            "description": "Unusual changes in timelock duration or timing patterns, especially during critical governance periods.",
+            "data_needed": [
+              "timelock_duration",
+              "transaction_timestamp",
+              "critical_period"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "alternate_admin_activation",
+            "description": "Activation of secondary admin functions or accounts outside normal operational procedures.",
+            "data_needed": [
+              "admin_account_changes",
+              "activation_time",
+              "normal_operating_hours"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "emergency_function_abuse",
+            "description": "Use of emergency functions or bypass mechanisms beyond predefined conditions.",
+            "data_needed": [
+              "emergency_function_calls",
+              "abuse_conditions"
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "log_and_monitor",
+          "description": "Set up continuous monitoring and logging for all timelock-related activities.",
+          "effectiveness": 0.9,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "audit_admin_accounts",
+          "description": "Periodically audit admin accounts to detect any unauthorized changes.",
+          "effectiveness": 0.85,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "implement_timelock_rules",
+          "description": "Enforce strict timelock rules and review them regularly.",
+          "effectiveness": 0.7,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "use_security_orchestration",
+          "description": "Deploy a security orchestration tool to automate response to timelock bypass attempts.",
+          "effectiveness": 0.95,
+          "user_cost": "high",
+          "skill_required": "SOC"
+        }
+      ],
+      "id": "H4",
+      "benchmark_scenario": {
+        "setup": "Test timelock evasion",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    },
+    "H5_voter_concentration_risk": {
+      "name": "voter concentration risk",
+      "description": "High centralization of voting power among a few entities, potentially compromising governance.",
+      "severity": "medium",
+      "incidents_matched": 3,
+      "detection": {
+        "type": "mixed",
+        "signals": [
+          {
+            "name": "voter_concentration",
+            "description": "Identify instances where a small number of entities control a disproportionately large share of voting power.",
+            "data_needed": [
+              "entity_id",
+              "voting_power",
+              "total_voting_power"
+            ],
+            "confidence": 0.8
+          },
+          {
+            "name": "voter_activity",
+            "description": "Detect entities that have recently increased their voting activity significantly, potentially signaling centralization.",
+            "data_needed": [
+              "entity_id",
+              "voting_activity_score",
+              "recent_activity_window"
+            ],
+            "confidence": 0.75
+          },
+          {
+            "name": "voting_power_drift",
+            "description": "Monitor changes in the distribution of voting power over time to identify sudden shifts that might indicate centralization.",
+            "data_needed": [
+              "entity_id",
+              "previous_voting_power",
+              "current_voting_power"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "name": "high_voter_turnout",
+            "description": "Assess if a small number of entities consistently make up the majority of votes cast, suggesting centralization.",
+            "data_needed": [
+              "voting_event_id",
+              "top_entities",
+              "total_votes"
+            ],
+            "confidence": 0.65
+          }
+        ],
+        "threshold": "any signal above 0.7"
+      },
+      "recommendations": [
+        {
+          "action": "implement_voting_thresholds",
+          "description": "Set thresholds for minimum voting power to participate in critical decisions.",
+          "effectiveness": 0.8,
+          "user_cost": "medium",
+          "skill_required": null
+        },
+        {
+          "action": "distribute_power_randomly",
+          "description": "Automatically distribute voting power randomly among users to prevent centralization.",
+          "effectiveness": 0.9,
+          "user_cost": "high",
+          "skill_required": "automation_tool"
+        },
+        {
+          "action": "rotate_voting_rights",
+          "description": "Regularly rotate which entities have the right to vote on certain issues.",
+          "effectiveness": 0.75,
+          "user_cost": "low",
+          "skill_required": null
+        },
+        {
+          "action": "audit_voter_concentration",
+          "description": "Periodically review and report voter concentration levels to ensure fairness.",
+          "effectiveness": 0.6,
+          "user_cost": "medium",
+          "skill_required": null
+        }
+      ],
+      "id": "H5",
+      "benchmark_scenario": {
+        "setup": "Test voter concentration risk",
+        "metric": "detection rate",
+        "baseline": "TBD"
+      },
+      "fundamental_limitation": "See failure analysis"
+    }
+  },
+  "skills": {},
+  "combined_benchmark": {
+    "description": "End-to-end benchmark measuring detection accuracy across all governance attack vectors",
+    "methodology": {
+      "step_1": "Collect historical governance proposals from Compound, Aave, Uniswap, Tornado Cash, Beanstalk (N >= 500)",
+      "step_2": "Label proposals as benign, suspicious, or confirmed-attack",
+      "step_3": "Run all 5 heuristics against each proposal",
+      "step_4": "Measure per-heuristic precision, recall, and F1",
+      "step_5": "Measure combined detection rate and false alarm rate",
+      "step_6": "Test recommendations by simulating countermeasure application"
+    },
+    "target": "detect 100% of known governance attacks with <5% false alarm rate on benign proposals",
+    "metrics": [
+      "per_heuristic_precision",
+      "per_heuristic_recall",
+      "combined_detection_rate",
+      "false_alarm_rate",
+      "time_to_detection_vs_vote_deadline"
+    ],
+    "adversary_levels": [
+      {
+        "name": "basic",
+        "heuristics": [
+          "H1",
+          "H5"
+        ],
+        "description": "Treasury drain + whale vote only"
+      },
+      {
+        "name": "intermediate",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H4",
+          "H5"
+        ],
+        "description": "Add parameter manipulation + timelock bypass"
+      },
+      {
+        "name": "advanced",
+        "heuristics": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "description": "All heuristics including proxy upgrade analysis"
+      }
+    ]
+  },
+  "templates": {
+    "risk_assessment": "Proposal {proposal_id} triggers {heuristic_id} ({heuristic_name}): {signal_description}. Confidence: {confidence}. Recommendation: {recommendation}.",
+    "risk_assessment_block": "BLOCKED: Proposal {proposal_id} flagged by {heuristic_name} with {confidence}% confidence. {signal_description}. This proposal poses unacceptable risk.",
+    "summary": "Analyzed {n_proposals} governance proposals. {n_risky} flagged ({pct_risky}%). Top risks: {top_risks}.",
+    "summary_clean": "All {n_proposals} proposals pass security checks. No governance attack indicators detected.",
+    "skill_suggestion": "To evaluate {heuristic_name} risk, I can {skill_action}. This provides {effectiveness_pct}% detection confidence. {user_cost_note}"
+  }
+}

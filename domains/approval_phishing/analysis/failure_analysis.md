@@ -2,14 +2,14 @@
 
 *Auto-generated. Review and refine.*
 
-1. **FALSE NEGATIVES**: 
-   - It fails to identify risks from approved spenders with limited but non-trivial amounts of tokens, which could still be exploited if the user loses control over their account.
-   - The profile does not account for approvals where the token contract itself is malicious; a contract might pass verification while still being harmful.
+1. **FALSE NEGATIVES**:
+   - **Phishing with Known Legitimate Contracts**: An attacker could use a known, verified contract for approval without triggering H2 or H3, especially if the contract has a recent history of legitimate transactions.
+   - **Custom Functionality Misuse**: A spender using custom function selectors that aren’t flagged by H4 but still pose significant risks due to their nature.
 
-2. **FALSE POSITIVES**: 
-   - It may flag as high risk transactions that approve tokens to wallet addresses recently created by a legitimate user, even if these addresses are not associated with known scams.
-   - Transactions involving newly deployed contracts that implement standard interfaces but have not yet been fully audited could be flagged incorrectly.
+2. **FALSE POSITIVES**:
+   - **Recently Deployed Legitimate Contracts**: New, yet legitimate contracts might be flagged as "unverified" for a short period until they get listed on registries, leading to unnecessary alerts.
+   - **Dormant Approvals with Recent Interactions**: A user might have approved an unlimited token limit recently and still interact frequently enough that H5 doesn’t trigger despite the high risk.
 
-3. **FUNDAMENTAL LIMITATIONS**: 
-   - Technology cannot inherently determine the intent or context of an approval; a transaction might appear suspicious due to timing alone, despite no actual malicious intent.
-   - The profile relies on heuristics that can only analyze transactions and contracts post-deployment, missing pre-deployment social engineering attacks like initial token allocations during a phishing campaign.
+3. **FUNDAMENTAL LIMITATIONS**:
+   - **Heuristics for Custom Tokens**: The profile struggles to assess risks involving custom tokens or non-fungible tokens (NFTs) that don't follow standard ERC-20/721 interfaces.
+   - **User Intent Interpretation**: Technology can’t fully understand the user’s intent behind approving a token, leading to over- or under-flagging of certain behaviors.
