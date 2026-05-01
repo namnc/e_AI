@@ -492,7 +492,7 @@ def run_examples(profile: dict):
 # ---------------------------------------------------------------------------
 
 def main():
-    profile_path = Path(__file__).parent.parent / "profiles" / "stealth_address_ops.json"
+    profile_path = Path(__file__).parent / "profile.json"
     profile = load_profile(profile_path)
 
     if "--benchmark" in sys.argv:

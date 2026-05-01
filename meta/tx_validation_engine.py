@@ -265,6 +265,8 @@ def _check_template_coverage(profile: dict) -> dict:
     """Q2: Output templates exist for risk_assessment, summary, skill_suggestion."""
     templates = profile.get("templates", {})
     expected = {"risk_assessment", "summary", "skill_suggestion"}
+    if not isinstance(templates, dict):
+        return {"verdict": "FAIL", "detail": f"templates field is not a dict ({type(templates).__name__}); cover-gen variants don't carry output templates"}
     present = set(templates.keys()) & expected
     missing = expected - present
 
