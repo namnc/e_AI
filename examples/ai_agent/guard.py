@@ -74,16 +74,32 @@ class AgentGuard:
         self.block_on_critical = block_on_critical
         self.rpc_log: list[dict] = []
 
+    # Skip set: _template + _feedback + 6 v1 sanitization variants (Part 3
+    # supporting material, not v2 production guards). Per docs/v1_variants.md.
+    _SKIP_DOMAINS = {
+        "_template",
+        "_feedback",
+        "defi",
+        "defi_14b",
+        "defi_bootstrap",
+        "defi_claude",
+        "defi_generated",
+        "defi_websearch",
+    }
+
     def _load_profiles(self, profiles_dir: str) -> dict[str, dict]:
-        """Load all profile.json files from domain directories."""
+        """Load v2 production profile.json files from domain directories."""
         profiles = {}
         base = Path(profiles_dir)
-        for domain_dir in base.iterdir():
-            if domain_dir.is_dir() and domain_dir.name != "_template":
-                profile_path = domain_dir / "profile.json"
-                if profile_path.exists():
-                    with open(profile_path) as f:
-                        profiles[domain_dir.name] = json.load(f)
+        for domain_dir in sorted(base.iterdir()):
+            if not domain_dir.is_dir():
+                continue
+            if domain_dir.name in self._SKIP_DOMAINS:
+                continue
+            profile_path = domain_dir / "profile.json"
+            if profile_path.exists():
+                with open(profile_path) as f:
+                    profiles[domain_dir.name] = json.load(f)
         return profiles
 
     def check_action(self, method: str, params: dict) -> GuardResult:
@@ -122,23 +138,80 @@ class AgentGuard:
 
         return GuardResult(action=action, alerts=alerts)
 
-    def check(self, fn: Callable) -> Callable:
-        """Decorator that checks agent tool calls before execution."""
-        def wrapper(*args, **kwargs):
-            # Try to infer the action type from function name and args
-            fn_name = fn.__name__.lower()
+    # ABI selectors for tool-intent → calldata adaptation
+    _APPROVE_SELECTOR = "0x095ea7b3"  # approve(address,uint256)
+    _MAX_UINT256_HEX = "f" * 64
 
-            # Map common agent tool names to methods
-            if any(word in fn_name for word in ["swap", "transfer", "send", "approve", "stake", "deposit"]):
-                method = "eth_sendTransaction"
-            elif any(word in fn_name for word in ["sign", "permit"]):
-                method = "eth_signTypedData_v4"
-            elif any(word in fn_name for word in ["balance", "price", "position"]):
-                method = "eth_call"
+    def _build_tool_intent(self, fn_name: str, args: tuple, kwargs: dict) -> tuple[str, dict]:
+        """Translate an agent tool call into (rpc_method, params) the guard
+        can analyze. Adapter — tool intent → RPC-shaped params.
+
+        Specifically handles:
+          - approval tools: build calldata so _check_tx sees a real
+            unlimited-approval pattern, not just function metadata
+          - balance tools: emit eth_getBalance with the queried address
+            so _check_rpc_pattern can count balance-checked addresses
+          - signing tools: pass typed-data through
+          - other transaction tools: emit eth_sendTransaction with
+            best-effort target inference
+        """
+        fn_lower = fn_name.lower()
+
+        # Approval tools: approve_token(token, spender, amount)
+        if "approve" in fn_lower and len(args) >= 2:
+            token = str(args[0]) if len(args) > 0 else kwargs.get("token", "0x")
+            spender = str(args[1]) if len(args) > 1 else kwargs.get("spender", "0x")
+            amount = args[2] if len(args) > 2 else kwargs.get("amount", "")
+            # Build calldata: selector + spender (32B left-pad) + amount (32B left-pad)
+            spender_hex = spender.lower().replace("0x", "").rjust(64, "0")
+            if isinstance(amount, str) and amount.lower() == "unlimited":
+                amount_hex = self._MAX_UINT256_HEX
             else:
-                method = "unknown"
+                try:
+                    amt_int = int(amount) if not isinstance(amount, int) else amount
+                    amount_hex = format(amt_int, "x").rjust(64, "0")
+                except (TypeError, ValueError):
+                    amount_hex = self._MAX_UINT256_HEX  # be conservative
+            data = self._APPROVE_SELECTOR + spender_hex + amount_hex
+            return "eth_sendTransaction", {"to": token, "data": data, "_tool": fn_name}
 
-            result = self.check_action(method, {"function": fn_name, "args": args, "kwargs": kwargs})
+        # Balance tools: check_balance(address) → eth_getBalance, NOT eth_call
+        # (the rpc_leakage pattern detector counts eth_getBalance specifically).
+        if any(w in fn_lower for w in ["balance", "get_balance"]):
+            address = str(args[0]) if args else kwargs.get("address", "")
+            return "eth_getBalance", [address, "latest"]
+
+        # Position / price tools → eth_call against an address
+        if any(w in fn_lower for w in ["price", "position"]):
+            target = str(args[0]) if args else kwargs.get("target", "")
+            return "eth_call", [{"to": target, "data": "0x"}, "latest"]
+
+        # Signing tools
+        if any(w in fn_lower for w in ["sign", "permit"]):
+            typed = args[0] if args and isinstance(args[0], dict) else kwargs.get("typed_data", {})
+            return "eth_signTypedData_v4", {"typed_data": typed}
+
+        # Generic transaction tools (swap/transfer/send/stake/deposit/withdraw)
+        if any(w in fn_lower for w in ["swap", "transfer", "send", "stake", "deposit", "withdraw"]):
+            target = str(args[0]) if args else kwargs.get("to", "")
+            return "eth_sendTransaction", {"to": target, "data": "0x", "_tool": fn_name}
+
+        return "unknown", {"function": fn_name, "args": args, "kwargs": kwargs}
+
+    def check(self, fn: Callable) -> Callable:
+        """Decorator that checks agent tool calls before execution.
+
+        The decorator translates tool intent into RPC-shaped params so the
+        underlying analyzers (`_check_tx`, `_check_rpc_pattern`,
+        `_check_signature`) see realistic input. Previously the wrapper
+        passed only function metadata (name + args), which silently
+        bypassed every detector.
+        """
+        def wrapper(*args, **kwargs):
+            fn_name = fn.__name__
+            method, params = self._build_tool_intent(fn_name, args, kwargs)
+
+            result = self.check_action(method, params)
 
             if result.action == "block":
                 raise RuntimeError(
@@ -202,12 +275,18 @@ class AgentGuard:
         cutoff = time.time() - 300  # 5 min window
         recent = [q for q in self.rpc_log if q["time"] > cutoff]
 
-        # Multiple balance checks
+        # Multiple balance checks. eth_getBalance can carry params as
+        # either a list ([address, block]) or a dict ({"address": ...});
+        # handle both shapes safely.
         balance_targets = set()
         for q in recent:
             if q["method"] == "eth_getBalance":
-                p = q.get("params", {})
-                addr = p.get("address", p[0] if isinstance(p, list) and p else "")
+                p = q.get("params", None)
+                addr = ""
+                if isinstance(p, dict):
+                    addr = p.get("address", "")
+                elif isinstance(p, list) and p:
+                    addr = p[0] if isinstance(p[0], str) else ""
                 if addr:
                     balance_targets.add(addr)
 

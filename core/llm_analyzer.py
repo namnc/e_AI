@@ -184,9 +184,31 @@ class LLMAnalyzer:
         }
 
     def _build_system_prompt(self) -> str:
-        """Build system prompt from profile."""
+        """Build a domain-generic system prompt from the profile.
+
+        The role / domain context / output schema are sourced from the
+        profile via `meta.llm_advisor_role` / `meta.llm_user_intent` /
+        `risk_domain.description` (with sensible generic fallbacks).
+        Previously this method hard-coded "Ethereum stealth address
+        transactions" + a stealth-specific deanon-rate, which leaked
+        across every non-stealth domain.
+        """
         meta = self.profile.get("meta", {})
+        risk_domain = self.profile.get("risk_domain", {})
         heuristics = self.profile.get("heuristics", {})
+
+        domain_name = meta.get("domain_name", "this transaction class")
+        # Profile-overridable role + user-intent description.
+        role = meta.get(
+            "llm_advisor_role",
+            f"You are a pre-submission risk advisor for the '{domain_name}' Ethereum guard.",
+        )
+        user_intent = meta.get(
+            "llm_user_intent",
+            "Your role is to analyze actions BEFORE they are submitted and flag risks "
+            "specific to this guard's threat model.",
+        )
+        domain_desc = risk_domain.get("description", "")
 
         heuristic_descriptions = []
         for hname, h in heuristics.items():
@@ -195,24 +217,37 @@ class LLMAnalyzer:
                 f"[severity: {h['severity']}]"
             )
 
-        return f"""You are a privacy advisor for Ethereum stealth address transactions.
-Your role is to analyze transactions BEFORE they are submitted and flag privacy risks.
+        # Optional source / baseline lines — only emitted if the profile
+        # supplies them (no stealth-specific defaults).
+        source_line = (
+            f"Source: {meta['source_paper']}\n" if meta.get("source_paper") else ""
+        )
+        baseline_line = ""
+        if "baseline_metric_label" in meta and "baseline_metric_value" in meta:
+            baseline_line = (
+                f"Baseline {meta['baseline_metric_label']}: "
+                f"{meta['baseline_metric_value']}\n"
+            )
 
-Domain: {meta.get('domain_name', 'stealth_address_ops')}
-Source: {meta.get('source_paper', 'arxiv 2308.01703')}
-Baseline deanonymization rate: {meta.get('baseline_deanon_rate', 0.485):.1%}
+        domain_line = f"Domain: {domain_name}\n"
+        if domain_desc:
+            domain_line += f"Description: {domain_desc}\n"
 
-You check for these deanonymization heuristics:
+        return f"""{role}
+{user_intent}
+
+{domain_line}{source_line}{baseline_line}
+You check for these heuristics defined in the guard's profile:
 {chr(10).join(heuristic_descriptions)}
 
 Rules:
-1. Be specific. Say WHAT is wrong and WHY it matters.
+1. Be specific. Say WHAT is wrong and WHY it matters for THIS guard's threat model.
 2. Give actionable recommendations. Say WHAT to do, not just "be careful."
 3. If multiple heuristics combine, explain the compound risk.
-4. Note fundamental limitations honestly (e.g., small anonymity set).
+4. Note fundamental limitations honestly.
 5. Keep responses under 200 words.
 
-Output format:
+Output format (each on its own line):
 RISK: <critical|high|medium|low>
 EXPLANATION: <what's wrong, 1-2 sentences>
 RECOMMENDATIONS: <numbered list>
@@ -224,14 +259,27 @@ BEHAVIORAL: <any patterns from history, or "none">"""
         user_history: list[dict] | None,
         rule_based_alerts: list[dict] | None,
     ) -> str:
-        """Build user prompt from transaction + context."""
-        parts = [f"Analyze this stealth address transaction:\n{json.dumps(tx, indent=2)}"]
+        """Build user prompt from action + context (domain-generic)."""
+        meta = self.profile.get("meta", {})
+        domain_name = meta.get("domain_name", "transaction")
+        # The phrasing was previously "Analyze this stealth address
+        # transaction" hard-coded; now domain-generic.
+        prompt_label = meta.get(
+            "llm_action_label",
+            f"Analyze this {domain_name} action",
+        )
+        parts = [f"{prompt_label}:\n{json.dumps(tx, indent=2)}"]
 
         if rule_based_alerts:
-            parts.append(f"\nRule-based alerts already triggered:\n{json.dumps(rule_based_alerts, indent=2)}")
+            parts.append(
+                f"\nRule-based alerts already triggered:\n{json.dumps(rule_based_alerts, indent=2)}"
+            )
 
         if user_history:
-            parts.append(f"\nUser's recent transaction history ({len(user_history)} txs):\n{json.dumps(user_history[-10:], indent=2)}")
+            parts.append(
+                f"\nUser's recent action history ({len(user_history)} entries):\n"
+                f"{json.dumps(user_history[-10:], indent=2)}"
+            )
 
         return "\n".join(parts)
 

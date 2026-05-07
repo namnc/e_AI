@@ -146,6 +146,34 @@ class RpcPatternTracker {
 
 // --- Transaction Analyzer ---
 
+// --- ABI decoding helpers ---
+
+const HEX_RE = /^0x[0-9a-fA-F]*$/;
+
+function isWellFormedCalldata(data: string, expectedBytes: number): boolean {
+  // expectedBytes counts the bytes AFTER the 4-byte selector.
+  // Total length = 2 (for "0x") + 8 (selector) + 2*expectedBytes.
+  if (!HEX_RE.test(data)) return false;
+  const expectedLen = 2 + 8 + 2 * expectedBytes;
+  return data.length === expectedLen;
+}
+
+function decodeAddress(data: string, byteOffset: number): string {
+  // Solidity ABI: address is right-aligned in a 32-byte word. The address
+  // bytes are at offset byteOffset+12 .. byteOffset+32 (skipping the 12-byte
+  // left-pad). String slice in hex: skip "0x" (2 chars) + 2*byteOffset + 24
+  // chars of left-pad = 2 + 2*byteOffset + 24, then take 40 chars (20 bytes
+  // × 2 hex chars).
+  const start = 2 + 2 * byteOffset + 24;
+  return '0x' + data.slice(start, start + 40);
+}
+
+function decodeUint256(data: string, byteOffset: number): bigint {
+  const start = 2 + 2 * byteOffset;
+  const hex = '0x' + data.slice(start, start + 64);
+  return BigInt(hex);
+}
+
 function analyzeTx(to: string, data: string, value: bigint, profiles: Profile[]): Alert[] {
   const alerts: Alert[] = [];
   if (!data || data.length < 10) return alerts;
@@ -153,33 +181,76 @@ function analyzeTx(to: string, data: string, value: bigint, profiles: Profile[])
   const selector = data.slice(0, 10);
   const known = SELECTORS[selector];
 
-  // Approval checks
+  // Approval checks: approve(address spender, uint256 amount)
+  // Calldata layout: selector (4B) + spender (32B word, right-aligned addr) + amount (32B)
   if (selector === '0x095ea7b3' || selector === '0x39509351') {
-    // approve(address spender, uint256 amount)
-    const amountHex = '0x' + data.slice(74, 138);
+    if (!isWellFormedCalldata(data, 64)) {
+      // Malformed approval calldata — fail closed with a high-severity alert
+      alerts.push({
+        profile: 'approval_phishing',
+        heuristic: 'malformed',
+        severity: 'high',
+        confidence: 0.9,
+        signal: `Malformed approve() calldata (length ${data.length}, expected 138 hex chars). Refusing to silently pass.`,
+        recommendation: 'Reject the transaction; calldata cannot be decoded. Most likely a wallet/dApp bug or spoof attempt.',
+      });
+      return alerts;
+    }
+    let spender: string;
+    let amount: bigint;
     try {
-      const amount = BigInt(amountHex);
-      if (amount >= MAX_UINT256 / BigInt(2)) {
-        alerts.push({
-          profile: 'approval_phishing',
-          heuristic: 'H1',
-          severity: 'high',
-          confidence: 0.95,
-          signal: `Unlimited token approval to ${to}`,
-          recommendation: 'Set approval to exact amount needed, not unlimited',
-        });
-      }
-    } catch {}
+      spender = decodeAddress(data, 4);
+      amount = decodeUint256(data, 4 + 32);
+    } catch (e) {
+      alerts.push({
+        profile: 'approval_phishing',
+        heuristic: 'decode_error',
+        severity: 'high',
+        confidence: 0.8,
+        signal: `Could not decode approve() calldata: ${(e as Error).message}`,
+        recommendation: 'Reject the transaction.',
+      });
+      return alerts;
+    }
+
+    if (amount >= MAX_UINT256 / BigInt(2)) {
+      alerts.push({
+        profile: 'approval_phishing',
+        heuristic: 'H1',
+        severity: 'high',
+        confidence: 0.95,
+        signal: `Unlimited approval — token=${to}, spender=${spender}`,
+        recommendation: 'Set approval to exact amount needed, not unlimited. Verify the spender address.',
+      });
+    }
   }
 
-  // setApprovalForAll
+  // setApprovalForAll(address operator, bool approved)
+  // Calldata layout: selector (4B) + operator (32B word) + approved (32B word)
   if (selector === '0xa22cb465') {
+    if (!isWellFormedCalldata(data, 64)) {
+      alerts.push({
+        profile: 'approval_phishing',
+        heuristic: 'malformed',
+        severity: 'high',
+        confidence: 0.9,
+        signal: `Malformed setApprovalForAll() calldata (length ${data.length}). Refusing to silently pass.`,
+        recommendation: 'Reject the transaction.',
+      });
+      return alerts;
+    }
+    let operator: string;
+    try {
+      operator = decodeAddress(data, 4);
+    } catch {
+      operator = '<decode-failed>';
+    }
     alerts.push({
       profile: 'approval_phishing',
       heuristic: 'H4',
       severity: 'high',
       confidence: 0.75,
-      signal: `setApprovalForAll to operator ${to}`,
+      signal: `setApprovalForAll — collection=${to}, operator=${operator}`,
       recommendation: 'Verify the operator contract is legitimate before approving all NFTs',
     });
   }
