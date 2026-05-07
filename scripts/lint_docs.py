@@ -62,8 +62,23 @@ INTERNAL_DOCS_ALLOWLIST = {
 # meta-references like "no AI_PS escapes" in publication checklist.
 INLINE_ALLOW_MARKER = "<!-- lint-allow-ai-ps -->"
 
-# Skip these directory roots when walking for *.md files.
-SKIP_DIR_NAMES = {"node_modules", "dist", ".git", "__pycache__", "build"}
+# Skip these directory roots when walking for *.md files. Codex Phase 4
+# review #R3.5 noted that the recursive scan would otherwise lint
+# generated/internal reports (.pytest_cache, analysis/, results/) which
+# are not publication artifacts and would produce noisy false positives.
+SKIP_DIR_NAMES = {
+    "node_modules", "dist", ".git", "__pycache__", "build",
+    ".pytest_cache", ".mypy_cache", ".ruff_cache", ".venv", "venv",
+    "analysis",  # per-domain analysis reports — internal
+    "results",   # generated benchmark output
+    "benchmarks",  # generated benchmark output
+}
+
+# Cap inline-allow markers — Codex Phase 4 review #R3.7 noted the
+# marker is otherwise too powerful (a contributor could neuter R3 by
+# adding it broadly). Above this cap the linter fails.
+INLINE_ALLOW_MARKER_CAP_PER_FILE = 3
+INLINE_ALLOW_MARKER_CAP_REPO = 10
 
 # Files lint applies to: every *.md in the repo, minus skipped roots.
 def _doc_files() -> list[Path]:
@@ -96,7 +111,9 @@ def count_v2_production_profiles() -> int:
 # ---------------------------------------------------------------------------
 
 COUNT_PATTERNS = [
+    # "all N (...)guards"
     re.compile(r"\ball\s+(\d{1,3})\s+(?:profile-validated\s+)?(?:prototype\s+)?guards?\b", re.I),
+    # "the N (...)guards"
     re.compile(r"\bthe\s+(\d{1,3})\s+(?:profile-validated\s+)?(?:prototype\s+)?(?:v2\s+)?guards?\b", re.I),
     re.compile(r"\bset\s+of\s+(\d{1,3})\s+guards?\b", re.I),
     re.compile(r"\bacross\s+all\s+(\d{1,3})\s+guards?\b", re.I),
@@ -104,18 +121,23 @@ COUNT_PATTERNS = [
     re.compile(r"\b(\d{1,3})\s+production\s+profiles?\b", re.I),
     re.compile(r"\b(\d{1,3})\s+production\s+domains?\b", re.I),
     re.compile(r"\b(\d{1,3})\s+v2\s+(?:production\s+)?(?:tx-analysis\s+)?guards?\b", re.I),
-    re.compile(r"\bship\s+(\d{1,3})\s+guards?\b", re.I),
+    # `ship N guards` — Codex Phase 4 review noted "we ship 8 in cluster A"
+    # would false-positive. Tighten by requiring a total-set qualifier
+    # nearby ("all", "total", or no other small number on the line).
+    re.compile(r"\bship\s+(?:all\s+)?(\d{1,3})\s+(?:total\s+)?guards?\b(?=\s*(?:[,.]|today|now|across|via|in v2))", re.I),
 ]
 
 # Word-form numerals → integer. Phase 3 review #R1.1 noted that
 # "Fifteen v2 production guards" passed silently. Limited to the band
-# we plausibly hit in this repo.
+# we plausibly hit in this repo. Codex Phase 4 review tightened the
+# pattern: now requires a "v2"/"production"/"total" qualifier so
+# "thirteen guards are rule-based" (cluster phrase) doesn't trip.
 WORD_NUMS: dict[str, int] = {
     "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
     "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
 }
 WORD_NUM_PATTERN = re.compile(
-    r"\b(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:v2\s+)?(?:production\s+)?guards?\b",
+    r"\b(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:v2|production|total)\s+(?:production\s+)?guards?\b",
     re.I,
 )
 
@@ -163,8 +185,12 @@ PROJECTS_PATH_RE = re.compile(r"projects/[a-z][a-z0-9_]+/")
 
 
 def _claim_is_hedged(line: str, prev_line: str) -> bool:
-    haystack = (line + "\n" + prev_line).lower()
-    return any(tok in haystack for tok in (HEDGE_TOKENS + THIRD_PARTY_TOKENS))
+    """Codex Phase 4 review #R2.4 + #R2 hedge-logic: same-line only.
+    Prior version checked previous line too, which let an attribution
+    or hedge phrase on the line above smuggle a real production claim
+    through. Same-line attribution is harder to abuse accidentally."""
+    line_lc = line.lower()
+    return any(tok in line_lc for tok in (HEDGE_TOKENS + THIRD_PARTY_TOKENS))
 
 
 def _is_internal_doc(rel_path: str) -> bool:
@@ -179,6 +205,7 @@ def _is_internal_doc(rel_path: str) -> bool:
 def lint() -> int:
     expected = count_v2_production_profiles()
     issues: list[str] = []
+    marker_total = 0
 
     files = _doc_files()
     if not files:
@@ -192,6 +219,17 @@ def lint() -> int:
         except UnicodeDecodeError:
             continue
         lines = text.splitlines()
+
+        # Cap inline-allow markers per file (Codex Phase 4 review #R3.7).
+        marker_count = sum(1 for ln in lines if INLINE_ALLOW_MARKER in ln)
+        marker_total += marker_count
+        if marker_count > INLINE_ALLOW_MARKER_CAP_PER_FILE:
+            issues.append(
+                f"{f.relative_to(REPO)}: too many inline allow markers "
+                f"({marker_count} > cap {INLINE_ALLOW_MARKER_CAP_PER_FILE}). "
+                "Markers neuter R3; if many opt-outs are needed, the file "
+                "probably belongs in INTERNAL_DOCS_ALLOWLIST instead."
+            )
 
         for i, line in enumerate(lines):
             line_no = i + 1
@@ -247,17 +285,30 @@ def lint() -> int:
                     f"'{line.strip()[:120]}'"
                 )
 
+    # Repo-wide marker cap (Codex Phase 4 review #R3.7).
+    if marker_total > INLINE_ALLOW_MARKER_CAP_REPO:
+        issues.append(
+            f"<repo>: too many inline allow markers across all files "
+            f"({marker_total} > cap {INLINE_ALLOW_MARKER_CAP_REPO}). "
+            "Marker is meant for narrow meta-references; broader use should "
+            "go through INTERNAL_DOCS_ALLOWLIST."
+        )
+
     if issues:
         print("Documentation drift detected:", file=sys.stderr)
         for issue in issues:
             print(f"  {issue}", file=sys.stderr)
         print(
-            f"\n{len(issues)} issue(s). v2 production profile count = {expected}.",
+            f"\n{len(issues)} issue(s). v2 production profile count = {expected}. "
+            f"Inline-allow markers in repo: {marker_total} (cap {INLINE_ALLOW_MARKER_CAP_REPO}).",
             file=sys.stderr,
         )
         return 1
 
-    print(f"OK: docs clean. v2 production profile count = {expected}.")
+    print(
+        f"OK: docs clean. v2 production profile count = {expected}. "
+        f"Inline-allow markers: {marker_total}/{INLINE_ALLOW_MARKER_CAP_REPO}."
+    )
     return 0
 
 

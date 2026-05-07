@@ -159,6 +159,19 @@ jobs:
         # and broken internal links to AI_PS-only paths.
         run: python3 scripts/lint_docs.py
 
+      - name: Documentation drift linter — unit tests
+        # Codex Phase 4 review missed-coverage: lint_docs.py rules can
+        # become too broad or too permissive without anyone noticing
+        # because the linter is only run against current repo contents.
+        # Synthetic-fixture unit tests guard against pattern drift.
+        run: python3 tests/test_lint_docs.py
+
+      - name: "Workflow shell-syntax check (bash -n on every run block)"
+        # Codex Phase 4 review #1 caught an orphan `else/fi` that
+        # yaml.safe_load accepted but bash rejected. CI couldn't catch
+        # it because no step was running bash -n. This step does.
+        run: python3 scripts/check_workflow_shell.py
+
   v2-integration-tests:
     runs-on: ubuntu-latest
     steps:
@@ -179,6 +192,11 @@ jobs:
 
       - name: Wallet EIP-1193 ABI-decoding tests
         run: python3 tests/test_wallet_eip1193.py
+
+      - name: lint_docs.py unit tests
+        # Phase 5C — Codex Phase 4 review missed-coverage: pin pattern
+        # behavior so future edits can't silently broaden / narrow R1/R2/R3.
+        run: python3 tests/test_lint_docs.py
 
       - name: AI-agent adapter unit tests
         # Codex Phase 3 review missed-coverage #9: the AI-agent CI gate
