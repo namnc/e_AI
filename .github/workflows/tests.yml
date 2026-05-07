@@ -141,15 +141,27 @@ jobs:
           # Per-domain demo smoke — advertised in README "Run a per-domain
           # demo" block. Each demo must exit 0 (LLM may be in degraded
           # mode in CI; that's fine, the demo itself must not crash).
+          # Phase 5D: per-demo timeout so a stuck I/O or hung Ollama
+          # connect can't deadlock the entire smoke step (Codex Phase 4
+          # review #8). 60s should comfortably cover any healthy demo
+          # (degraded LLM has a 5s connect; healthy LLM has a 120s call
+          # timeout but demos make at most a couple of calls).
           for d in examples/per_domain/*/demo.py; do
-            echo "::group::demo $(dirname $d)"
-            python3 "$d" || { echo "::error::demo $d failed"; exit 1; }
+            dom_name=$(dirname "$d" | xargs basename)
+            echo "::group::demo $dom_name"
+            if ! timeout 60 python3 "$d"; then
+              echo "::error::demo $d failed or timed out (>60s)"
+              exit 1
+            fi
             echo "::endgroup::"
           done
           # L2 monitor demo (advertised quickstart entry).
           if [ -f examples/l2_monitor/guard.py ]; then
             echo "::group::demo l2_monitor"
-            python3 examples/l2_monitor/guard.py || { echo "::error::l2_monitor demo failed"; exit 1; }
+            if ! timeout 60 python3 examples/l2_monitor/guard.py; then
+              echo "::error::l2_monitor demo failed or timed out (>60s)"
+              exit 1
+            fi
             echo "::endgroup::"
           fi
 

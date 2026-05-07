@@ -469,12 +469,19 @@ async function demo() {
   });
 
   console.log('=== Scenario 1: Unlimited approval ===');
+  // ABI-correct calldata: approve(spender=0xdead...beef, amount=MAX_UINT256).
+  // The previous demo had `spender` as a literal string — non-hex — so the
+  // guard fired the malformed-calldata branch instead of the H1 unlimited-
+  // approval branch the demo is supposed to illustrate. Phase 5D /
+  // Codex Phase 4 review nice-to-have #1.
   try {
     await guarded.request({
       method: 'eth_sendTransaction',
       params: [{
         to: '0x1234567890abcdef1234567890abcdef12345678',
-        data: '0x095ea7b3000000000000000000000000spender0000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+        data: '0x095ea7b3'
+          + '000000000000000000000000deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+          + 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
         value: '0x0',
       }],
     });
