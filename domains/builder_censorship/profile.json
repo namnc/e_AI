@@ -1,0 +1,312 @@
+{
+  "meta": {
+    "domain_name": "builder_censorship",
+    "version": "0.1.0",
+    "generated_by": "hand-crafted",
+    "validation_status": "draft",
+    "source_paper": "Censorship resistance via builder/relay diversity -- mev-boost relay landscape, OFAC compliance, L2 forced-inclusion, builder monoculture risk"
+  },
+
+  "risk_domain": {
+    "name": "Builder/Relay Censorship",
+    "crops_property": "CR",
+    "description": "Detects when a transaction's submission path runs through censoring builders, censoring relays, or non-circumventable centralized sequencers. Censorship resistance is a foundational Ethereum property (CROPS principle on credible neutrality + the keystone auth/ordering primitives). When all available inclusion paths gate on policy decisions of off-chain operators, users lose the ability to transact. This guard surfaces the routing risk pre-submission so the user can switch relays, route around censoring entities, or fall back to a forced-inclusion path.",
+    "protocols": ["mev-boost", "flashbots", "bloxroute", "manifold", "ultrasound", "eden", "agnostic-relay", "optimism", "arbitrum", "base", "scroll", "linea", "zksync"],
+    "adversary_model": {
+      "capabilities": [
+        "full mempool observation by builder/relay",
+        "policy-driven inclusion decisions by relay operator",
+        "OFAC compliance gating at relay level",
+        "centralized L2 sequencer with discretion over inclusion",
+        "builder monoculture (single dominant builder in recent blocks)",
+        "out-of-band identification of user via relay-side connection metadata"
+      ],
+      "limitations": [
+        "no private key access",
+        "no ability to censor txs that use a forced-inclusion path on L2 once submitted via L1 inbox",
+        "no ability to censor tx delivered directly to a non-censoring builder bypassing relays"
+      ]
+    }
+  },
+
+  "heuristics": {
+    "H1_censoring_relay_route": {
+      "id": "H1",
+      "name": "Transaction routes through a censoring relay",
+      "severity": "high",
+      "description": "The user's wallet has selected one or more relays that publicly censor transactions matching OFAC sanctions lists or other policy criteria. The transaction may be dropped silently before inclusion, leaving the user without confirmation feedback. This is a CR violation regardless of whether THIS specific transaction is on the censorship list.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "relay_in_censoring_set",
+            "description": "Selected relay matches a known censoring relay (bloXroute Regulated, Manifold, Eden Compliance variant)",
+            "data_needed": ["selected_relays", "censoring_relay_registry"],
+            "confidence": 0.95
+          },
+          {
+            "name": "all_selected_relays_censoring",
+            "description": "Every relay in the selected set is on the censoring registry; no non-censoring fallback configured",
+            "data_needed": ["selected_relays", "censoring_relay_registry"],
+            "confidence": 0.98
+          }
+        ],
+        "threshold": "any selected relay is censoring → WARN; all selected relays are censoring → BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "add_non_censoring_relay",
+          "description": "Add at least one non-censoring relay to the wallet's mev-boost configuration (Flashbots, Ultrasound, Agnostic-relay). Non-censoring relays do not screen transactions against compliance lists.",
+          "effectiveness": 0.90,
+          "user_cost": "low (one-time wallet config)",
+          "skill_required": "relay_diversity_audit"
+        },
+        {
+          "action": "use_private_mempool",
+          "description": "Submit through a private mempool service that delivers directly to non-censoring builders, bypassing the relay layer entirely.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Even with a non-censoring relay configured, the eventual block builder may itself censor. Relay diversity is necessary but not sufficient; builder diversity (H5) compounds the risk.",
+      "benchmark_scenario": {
+        "setup": "Wallet configured with bloXroute Regulated as sole relay; transaction interacts with a non-sanctioned address. Measure inclusion latency vs a wallet with Flashbots+Ultrasound+Agnostic.",
+        "metric": "Inclusion-rate delta and 95th-percentile inclusion latency",
+        "baseline": "Censoring-only configurations show ~5-15% drop rate even on benign txs during compliance updates"
+      }
+    },
+
+    "H2_sanctioned_address_interaction": {
+      "id": "H2",
+      "name": "Transaction interacts with an OFAC-listed address through a censoring path",
+      "severity": "critical",
+      "description": "The transaction calls or transfers value to an address on the OFAC SDN list (e.g., Tornado Cash router contracts, sanctioned individual EOAs). If the configured relays/builders apply OFAC compliance, the transaction will be dropped. The user should be made aware of (a) the legal exposure depending on jurisdiction, (b) that the route they selected will censor the tx, and (c) that a non-censoring path is technically available.",
+      "detection": {
+        "type": "identity",
+        "signals": [
+          {
+            "name": "destination_in_ofac_sdn",
+            "description": "Direct call/transfer target matches an entry in the OFAC SDN address list",
+            "data_needed": ["to_address", "internal_calls", "ofac_sdn_address_list"],
+            "confidence": 0.95
+          },
+          {
+            "name": "calldata_references_sanctioned_address",
+            "description": "Transaction calldata includes an address argument that matches an OFAC SDN entry (e.g., relayer arg in a privacy-tool transaction)",
+            "data_needed": ["calldata_decoded", "ofac_sdn_address_list"],
+            "confidence": 0.85
+          }
+        ],
+        "threshold": "any signal triggers WARN (jurisdictional disclosure); combined with H1 → BLOCK"
+      },
+      "recommendations": [
+        {
+          "action": "switch_to_non_censoring_relay",
+          "description": "Route this transaction through a non-censoring relay or private mempool, since censoring relays will silently drop it.",
+          "effectiveness": 0.85,
+          "user_cost": "low",
+          "skill_required": "relay_diversity_audit"
+        },
+        {
+          "action": "review_jurisdictional_exposure",
+          "description": "OFAC SDN interaction has legal implications in some jurisdictions independent of inclusion. Surface this to the user before submission.",
+          "effectiveness": 1.00,
+          "user_cost": "low (informational)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "An on-chain OFAC list is necessarily lagging; emergent sanctions may not be reflected in the local cache. Conversely, address-based gating cannot capture jurisdictional nuance (e.g., EU vs US treatment of mixer use).",
+      "benchmark_scenario": {
+        "setup": "Transaction set: 100 txs, half interact with addresses on OFAC SDN list, half do not. Measure inclusion through (a) censoring-only configuration vs (b) non-censoring-mixed configuration.",
+        "metric": "Inclusion success rate per category",
+        "baseline": "Censoring-only: ~0% inclusion for OFAC-touching, ~95% for clean. Mixed: ~80%+ inclusion for OFAC-touching."
+      }
+    },
+
+    "H3_l2_centralized_sequencer_no_forced_inclusion": {
+      "id": "H3",
+      "name": "L2 transaction has no forced-inclusion fallback",
+      "severity": "high",
+      "description": "Transaction targets an L2 whose sole inclusion path is a centralized sequencer (no working forced-inclusion via L1 inbox, or the user is not aware of the path). If the sequencer censors, the transaction has no on-chain remedy. Forced-inclusion is the keystone CR property for rollups; absence of a usable forced-inclusion path collapses CR to sequencer-policy.",
+      "detection": {
+        "type": "structural",
+        "signals": [
+          {
+            "name": "l2_without_forced_inclusion",
+            "description": "Destination chain is an L2 in a category with no forced-inclusion (or forced-inclusion is documented but not in production at the time of check)",
+            "data_needed": ["destination_chain", "forced_inclusion_status_registry"],
+            "confidence": 0.85
+          },
+          {
+            "name": "wallet_lacks_l1_inbox_path",
+            "description": "Wallet/UI does not expose an L1-inbox forced-inclusion path even when the underlying L2 supports it",
+            "data_needed": ["wallet_capabilities", "l2_inbox_address"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "either signal triggers WARN; both together raise to HIGH"
+      },
+      "recommendations": [
+        {
+          "action": "use_l1_forced_inclusion",
+          "description": "Submit the transaction via the L2's L1-inbox forced-inclusion path so it cannot be censored by the sequencer. Most production rollups expose this path even if the wallet does not.",
+          "effectiveness": 0.90,
+          "user_cost": "high (L1 gas; latency)",
+          "skill_required": "l1_inbox_submission"
+        },
+        {
+          "action": "monitor_sequencer_decentralization_roadmap",
+          "description": "Track the rollup's sequencer decentralization milestones; route critical txs through L2s that have shipped shared/distributed sequencing.",
+          "effectiveness": 0.50,
+          "user_cost": "low (informational)",
+          "skill_required": null
+        }
+      ],
+      "fundamental_limitation": "Forced-inclusion has L1 gas cost and latency that typical UX cannot absorb for routine transactions. Useful as escape hatch, not as default path.",
+      "benchmark_scenario": {
+        "setup": "Categorize all production rollups by forced-inclusion availability. For 50 hypothetical sequencer-censorship events, measure user remedy availability.",
+        "metric": "Fraction of events with on-chain remedy (forced-inclusion path)",
+        "baseline": "As of 2026-Q2, the majority of L2 TVL is on rollups with forced-inclusion in production but not exposed in mainstream wallets."
+      }
+    },
+
+    "H4_builder_monoculture": {
+      "id": "H4",
+      "name": "Recent block builder set is concentrated",
+      "severity": "medium",
+      "description": "In the recent N=100 blocks, fewer than M=10 unique builders produced blocks, or a single builder produced >40% of blocks. Builder monoculture means even with diverse relays, the censorship surface narrows to a small number of operators whose policy can drop transactions. Compounds H1/H2 risk.",
+      "detection": {
+        "type": "statistical",
+        "signals": [
+          {
+            "name": "low_builder_count_recent",
+            "description": "Fewer than 10 unique builders observed in the last 100 blocks (proxy for short-term censorship attack surface)",
+            "data_needed": ["recent_block_builders", "builder_count_window"],
+            "confidence": 0.75
+          },
+          {
+            "name": "dominant_builder_share",
+            "description": "Single builder produced >40% of recent 100 blocks; their policy effectively gates inclusion for ~half of slot space",
+            "data_needed": ["recent_block_builders", "block_count_per_builder"],
+            "confidence": 0.80
+          }
+        ],
+        "threshold": "either signal triggers WARN"
+      },
+      "recommendations": [
+        {
+          "action": "delay_non_urgent_tx",
+          "description": "For non-time-sensitive transactions, wait for builder set to broaden (typically diurnal cycle in builder activity).",
+          "effectiveness": 0.40,
+          "user_cost": "medium (delay)",
+          "skill_required": null
+        },
+        {
+          "action": "watch_builder_diversity_dashboard",
+          "description": "Subscribe to a builder-diversity dashboard (e.g., mevboost.org / relayscan) and prefer windows with diverse builder sets for sensitive transactions.",
+          "effectiveness": 0.60,
+          "user_cost": "low (informational)",
+          "skill_required": "builder_diversity_dashboard"
+        }
+      ],
+      "fundamental_limitation": "User has no direct control over which builder wins a slot; relay choice influences but does not determine builder. Mitigations are temporal (wait) or informational (be aware).",
+      "benchmark_scenario": {
+        "setup": "Sample 50 recent windows of 100 blocks each. Measure HHI of builder share. Correlate with relay-agnostic inclusion-rate variance.",
+        "metric": "Herfindahl-Hirschman Index of builder share; inclusion-rate variance",
+        "baseline": "HHI > 2500 indicates concentrated; recent average is ~3000-4000 on Ethereum mainnet."
+      }
+    },
+
+    "H5_no_circumvention_path": {
+      "id": "H5",
+      "name": "No circumvention path available end-to-end",
+      "severity": "high",
+      "description": "Combination check: H1 censoring relays selected AND (H3 no forced-inclusion OR no private-mempool fallback) AND H2 transaction would be dropped. The user is in a configuration where no available submission path will include this transaction. This is the strongest signal: do not submit; reconfigure first.",
+      "detection": {
+        "type": "compound",
+        "signals": [
+          {
+            "name": "compound_no_path",
+            "description": "All selected relays are censoring (H1.all_selected_relays_censoring), wallet has no private-mempool option configured, and either tx interacts with sanctioned address (H2) or destination L2 has no forced-inclusion (H3)",
+            "data_needed": ["H1_signals", "H2_signals", "H3_signals", "wallet_capabilities"],
+            "confidence": 0.95
+          }
+        ],
+        "threshold": "compound trigger → BLOCK; surface a guided reconfiguration"
+      },
+      "recommendations": [
+        {
+          "action": "reconfigure_before_submit",
+          "description": "Stop. Add a non-censoring relay or enable private mempool before this transaction is submitted; otherwise it will silently fail.",
+          "effectiveness": 0.95,
+          "user_cost": "low (one-time)",
+          "skill_required": "relay_diversity_audit"
+        }
+      ],
+      "fundamental_limitation": "If the user is on an L2 with no forced-inclusion and is interacting with sanctioned addresses, no remedy exists at this layer. Such cases require off-chain or alternative-network resolution.",
+      "benchmark_scenario": {
+        "setup": "Construct configurations exercising all combinations of H1+H2+H3 signals; measure expected outcome.",
+        "metric": "Fraction of compound configurations that result in non-inclusion",
+        "baseline": "Censoring-only relays + sanctioned interaction: ~0% inclusion; even forced-inclusion path has L1-side discretion in extreme cases."
+      }
+    }
+  },
+
+  "skills": {
+    "relay_diversity_audit": {
+      "id": "S1",
+      "name": "Audit configured mev-boost relay set",
+      "description": "Reads wallet's mev-boost relay configuration; cross-references against censoring-relay registry; surfaces missing non-censoring options. One-shot interactive check; does not require ongoing automation.",
+      "parameters": {
+        "wallet_relay_config": "list[str] — relay endpoints from wallet settings",
+        "censoring_relay_registry": "list[str] — known-censoring relay names (cached)"
+      }
+    },
+    "l1_inbox_submission": {
+      "id": "S2",
+      "name": "Submit via L1 forced-inclusion inbox",
+      "description": "For transactions targeting L2s with forced-inclusion paths, constructs and submits the L1 inbox transaction. Requires L1 gas and accepts higher latency. Used as escape hatch when sequencer censors.",
+      "parameters": {
+        "l2_inbox_address": "address — L1 contract that accepts forced-inclusion submissions",
+        "l2_calldata": "bytes — the L2 transaction encoded for forced submission",
+        "l1_gas_budget": "uint256 — gas the user is willing to spend on the escape hatch"
+      }
+    },
+    "builder_diversity_dashboard": {
+      "id": "S3",
+      "name": "Monitor builder diversity",
+      "description": "Polls a builder-diversity feed (mevboost.org, relayscan, etc.) and reports HHI + dominant-builder share to inform timing for non-urgent transactions.",
+      "parameters": {
+        "feed_url": "str — builder-diversity source",
+        "window_blocks": "int — sampling window (default 100)"
+      }
+    },
+    "private_mempool_routing": {
+      "id": "S4",
+      "name": "Route through private mempool",
+      "description": "Sends transaction to a private mempool service (Flashbots Protect, MEV Blocker, others) that delivers directly to non-censoring builders, bypassing relay-level filtering.",
+      "parameters": {
+        "private_mempool_endpoint": "str — RPC endpoint (e.g., https://rpc.flashbots.net)",
+        "raw_tx": "bytes — signed transaction"
+      }
+    }
+  },
+
+  "combined_benchmark": {
+    "description": "End-to-end CR-routing audit: given a user's wallet configuration, transaction, and current builder/relay landscape, produce a path-availability score and recommended reconfiguration set.",
+    "methodology": {
+      "input": "wallet relay set, current builder share, target chain, transaction calldata",
+      "process": "evaluate H1-H5; compute compound H5; produce path graph",
+      "output": "available-paths set + recommended-additions set"
+    },
+    "target": "Path-availability >0 for all transactions to non-sanctioned addresses on chains with forced-inclusion",
+    "metrics": ["available_path_count", "censorship_resistance_score", "reconfiguration_cost"]
+  },
+
+  "templates": {
+    "risk_assessment": "Transaction triggers {heuristic_id}: {signal_description}. Confidence: {confidence}.",
+    "summary": "Audited {n_txs} transactions across configured relay/builder set. {n_risky} flagged for censorship-routing risk.",
+    "skill_suggestion": "To mitigate {heuristic_name}: {skill_action}."
+  }
+}

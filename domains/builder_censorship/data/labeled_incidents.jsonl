@@ -1,0 +1,11 @@
+{"incident": "Wallet configured with bloxroute_regulated as sole relay; transaction silently dropped during a compliance update", "label": "H1_positive", "heuristic": "H1", "censored": true, "signal": "all_selected_relays_censoring"}
+{"incident": "Wallet configured with both Manifold and bloxroute_regulated, no Flashbots fallback", "label": "H1_positive", "heuristic": "H1", "censored": true, "signal": "all_selected_relays_censoring"}
+{"incident": "Wallet uses Flashbots + Ultrasound + Agnostic; transaction included normally", "label": "H1_clean", "heuristic": "H1", "censored": false}
+{"incident": "Transaction interacts with a Tornado Cash router on the OFAC SDN list; routed via censoring relay; dropped", "label": "H2_positive", "heuristic": "H2", "censored": true, "signal": "destination_in_ofac_sdn"}
+{"incident": "Calldata embeds a relayer argument matching an OFAC SDN entry; dropped at relay layer", "label": "H2_positive", "heuristic": "H2", "censored": true, "signal": "calldata_references_sanctioned_address"}
+{"incident": "Transaction targets Linea, which has no production forced-inclusion path; sequencer is the sole inclusion point", "label": "H3_positive", "heuristic": "H3", "censored": false, "signal": "l2_without_forced_inclusion"}
+{"incident": "Transaction targets Arbitrum which supports forced-inclusion, but the wallet does not expose the L1-inbox path", "label": "H3_positive", "heuristic": "H3", "censored": false, "signal": "wallet_lacks_l1_inbox_path"}
+{"incident": "Recent 100 blocks were produced by 6 unique builders; censorship surface narrow", "label": "H4_positive", "heuristic": "H4", "censored": false, "signal": "low_builder_count_recent"}
+{"incident": "Single builder produced 55% of recent 100 blocks", "label": "H4_positive", "heuristic": "H4", "censored": false, "signal": "dominant_builder_share"}
+{"incident": "User has bloxroute_regulated + Manifold only, no private mempool, transaction touches sanctioned address — no available inclusion path", "label": "H5_positive", "heuristic": "H5", "censored": true, "signal": "compound_no_path"}
+{"incident": "User has Flashbots + Ultrasound + Agnostic + Flashbots Protect private mempool — full path-availability", "label": "H5_clean", "heuristic": "H5", "censored": false}
