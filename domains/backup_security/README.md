@@ -20,9 +20,18 @@ Wallet guard that detects weak backup encryption, stale social recovery guardian
 | H4 | No coercion resistance | High | Deniable / Honey Encryption |
 | H5 | Non-deterministic secrets not backed up | High | Explicit backup or deterministic protocol |
 
+## Analyzer
+
+Rule-based analyzer at `analyzer.py` evaluates a `BackupConfig` against H1-H5
+algorithmically (password entropy + KDF strength threshold, guardian liveness
+vs threshold, ECDH-class KEM detection in encryption descriptor, deniable-layer
+flag, non-deterministic secret class enumeration). LLM augments with reasoning
+about subjective items (recovery topology, jurisdictional risk). Demo at
+`examples/per_domain/backup_security/demo.py`.
+
 ## Research sources
 
-- `AI_PS/projects/encrypted_backup_recovery/problem_list.md` -- P1 (circular dependency), P2 (coercion), P7 (guardian liveness), P9 (non-deterministic secrets), P10 (PQ backup)
+- Internal threat-model analysis (not in this public repo): axes covered include circular dependency (P1), coercion (P2), guardian liveness (P7), non-deterministic secrets (P9), PQ backup (P10).
 - False-Bottom Encryption: Ahmad, Rass, Schartner (IEEE 2023)
 - Honey Encryption: Juels-Ristenpart 2014
 - Proactive secret sharing: GoSSamer (Xing et al. 2025), CHURP
@@ -41,3 +50,11 @@ Wallet guard that detects weak backup encryption, stale social recovery guardian
 2. Add labeled backup security incidents to `data/`
 3. Track guardian liveness statistics across wallet populations
 4. See `docs/improving_a_domain.md`
+
+## Prior art
+
+**Argent guardian model** + **Safe (multisig)** docs cover *guardian configuration*. **OpenZeppelin Guardian (Miden PSM)** addresses multi-device shielded recovery. No tool composes guardian + cloud-backup + quantum axes into a unified pre-submission guard.
+
+**Where this guard differs**: Synthesis-novelty across three usually-separate axes (guardian, cloud, quantum). Thin novelty but real.
+
+Full comparison: `docs/prior_art/backup_security.md`.

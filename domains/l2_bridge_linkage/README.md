@@ -37,3 +37,11 @@ Detects privacy-breaking patterns in L1-to-L2 bridge usage that allow an observe
 ## Improving this domain
 
 See `docs/improving_a_domain.md`
+
+## Prior art ⭐
+
+**Chainalysis / Elliptic / TRM Labs** operate the offensive side commercially — cross-chain forensics for compliance and law enforcement. No defensive runtime tool exists for users.
+
+**Where this guard differs**: The asymmetry between offensive forensics (well-funded, commercial) and defensive runtime (zero shipped tools) is a clean motivation. This guard fills the user-side gap.
+
+Full comparison: `docs/prior_art/l2_bridge_linkage.md`.

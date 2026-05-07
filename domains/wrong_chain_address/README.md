@@ -26,6 +26,14 @@ Pre-submission validation to prevent irreversible fund loss from wrong-chain sen
 - **chain_checker** -- multi-chain address activity lookup
 - **contract_status_checker** -- pause status, migration, and activity analysis
 
+## Analyzer
+
+Rule-based analyzer at `analyzer.py` evaluates a `TransferIntent` against H1-H5
+algorithmically (chain-id mismatch, EIP-55 checksum, ENS resolution mismatch,
+contract receivability, lookalike-in-history poisoning detection, paused/migrated
+contract detection). LLM augments with behavioral context. Demo at
+`examples/per_domain/wrong_chain_address/demo.py`.
+
 ## What needs human effort
 
 - [ ] Build labeled dataset of confirmed address poisoning incidents
@@ -36,3 +44,11 @@ Pre-submission validation to prevent irreversible fund loss from wrong-chain sen
 ## Improving this domain
 
 See `docs/improving_a_domain.md`
+
+## Prior art
+
+Mostly solved. **Rabby Wallet** has comprehensively solved this UX. **MetaMask** network detection covers the basics. **OneKey** similar.
+
+**Where this guard differs**: Weakest novelty claim across the v2 set. Could fold into a generic "wallet hygiene" guard rather than ship as standalone. Open question for the publication: include or quietly drop?
+
+Full comparison: `docs/prior_art/wrong_chain_address.md`.

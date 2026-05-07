@@ -22,8 +22,8 @@ Wallet guard that detects quantum-vulnerable keys and cryptographic operations b
 
 ## Research sources
 
-- `AI_PS/projects/pq_stealth_address/frame_analysis.md` -- HNDL threat model, ML-KEM hybrid design, ecosystem mapping
-- `AI_PS/projects/onchain_pq_ciphertext/report.md` -- HNDL honeypot quantification ($5B+), migration complexity analysis, KEM landscape
+- Internal HNDL threat-model analysis (not in this public repo): pq stealth address frame, ML-KEM hybrid design, ecosystem mapping.
+- Internal on-chain PQ ciphertext study (not in this public repo): HNDL honeypot quantification (~$5B+ exposed), migration complexity analysis, KEM landscape.
 
 ## What needs human effort
 
@@ -39,3 +39,11 @@ Wallet guard that detects quantum-vulnerable keys and cryptographic operations b
 2. Add known ECDH-using contract addresses to vulnerable protocol registry
 3. Track PQ adoption metrics as baseline evolves
 4. See `docs/improving_a_domain.md`
+
+## Prior art
+
+**QuantumShield**, **Quantum Canary** cover *static scan* (audit static state for quantum exposure). NIST PQC standards (ML-KEM, ML-DSA, SLH-DSA) define the migration target.
+
+**Where this guard differs**: Behavioral pre-submission angle — "when to rotate", first-use exposure warnings — vs static audit. Currently small population; will grow as PQ migration becomes practical.
+
+Full comparison: `docs/prior_art/pq_readiness.md`.

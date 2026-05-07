@@ -1,0 +1,18 @@
+{
+  "tx_id": "0xdemo_l2anon_000000000000000000000000000000000000000000000bad",
+  "user_address": "0xUser000000000000000000000000000000L2PrivacyUser",
+  "l2_chain": "arbitrum",
+  "sequencer_address": "0xCentralSequencer000000000000000000Offchain",
+  "submitted_at": 1735776000,
+  "posted_to_l1_at": 1735776180,
+  "batch_index": 4242,
+  "block_number_l2": 195000000,
+  "block_number_l1": 19500000,
+  "is_privacy_tx": true,
+  "privacy_pool_address": "0xL2PrivacyPool00000000000000000000Pool42",
+  "privacy_pool_size": 17,
+  "used_forced_inclusion": true,
+  "forced_inclusion_l1_tx": "0xForceL1000000000000000000000000000000Tx01",
+  "companion_txs": ["0xCompanion000000000000000000000000Tx01", "0xCompanion000000000000000000000000Tx02"],
+  "_scenario": "Privacy-pool tx on Arbitrum where the pool has only 17 deposits (anonymity set far below the 100 threshold), the user used L1 forced inclusion (visible to anyone watching L1), and the L2 batch index plus posting timestamp expose batch-level linkage. Expect H1 (thin pool), H2 (sequencer visibility), H3 (forced inclusion deanon), H4 (timing), H5 (rollup batch linkage)."
+}

@@ -1,0 +1,21 @@
+{
+  "tx_hash": "0xdemo000000000000000000000000000000000000000000000000000000000001",
+  "user_address": "0xUser0000000000000000000000000000000000Alice",
+  "spender_address": "0xPhish00000000000000000000000000000000Drainer",
+  "token_address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  "function_selector": "0x095ea7b3",
+  "approval_amount_hex": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "is_permit": false,
+  "permit_expiry_seconds": 0,
+  "spender_verified": false,
+  "spender_creation_timestamp": 1735689600,
+  "spender_in_scam_db": false,
+  "spender_in_protocol_registry": false,
+  "spender_bytecode_match_scam": true,
+  "is_multicall_with_approval": false,
+  "nested_calls": [],
+  "last_interaction_with_spender_days": 0,
+  "exposed_value_usd": 0.0,
+  "current_timestamp": 1735776000,
+  "_scenario": "Unlimited USDC approval to a freshly-deployed unverified contract whose bytecode matches a known approval-drainer template. Expect H1 + H2 + H4 to fire."
+}

@@ -38,3 +38,11 @@ Detects privacy leakage through RPC query patterns that reveal user intent, addr
 ## Improving this domain
 
 See `docs/improving_a_domain.md`
+
+## Prior art ⭐
+
+**RPCh / Helios / Nym** handle the *transport layer* — routing queries through privacy-preserving networks. No tool detects *pattern-level* leakage at the application layer ("you've checked these 5 wallets every 6 hours for 3 weeks reveals a strategy").
+
+**Where this guard differs**: Pattern detection at the app layer, locally, with an LLM that recognizes the strategy-revealing semantics of a query sequence. Genuinely under-served niche.
+
+Full comparison: `docs/prior_art/rpc_leakage.md`.

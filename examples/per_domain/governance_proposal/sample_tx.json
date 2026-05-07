@@ -1,0 +1,61 @@
+{
+  "proposal_id": "DEMO-PROP-0001",
+  "dao_name": "ExampleDAO",
+  "proposer_address": "0xWhale000000000000000000000000000000Voter1",
+  "proposed_at": 1735689600,
+  "voting_ends_at": 1735862400,
+  "treasury_balance_usd": 50000000.0,
+  "transfers": [
+    {
+      "recipient": "0xUnknown000000000000000000000000000000Eoa01",
+      "token": "USDC",
+      "amount_wei": 8000000000000,
+      "value_usd": 8000000.0
+    },
+    {
+      "recipient": "0xUnknown000000000000000000000000000000Eoa02",
+      "token": "WETH",
+      "amount_wei": 1500000000000000000000,
+      "value_usd": 4500000.0
+    }
+  ],
+  "recipient_tx_counts": {
+    "0xUnknown000000000000000000000000000000Eoa01": 0,
+    "0xUnknown000000000000000000000000000000Eoa02": 0
+  },
+  "recipient_labels": {
+    "0xUnknown000000000000000000000000000000Eoa01": "",
+    "0xUnknown000000000000000000000000000000Eoa02": ""
+  },
+  "parameter_changes": [
+    {
+      "param_name": "collateral_factor",
+      "old_value": 0.75,
+      "new_value": 0.95,
+      "historical_mean": 0.74,
+      "historical_std": 0.02
+    }
+  ],
+  "oracle_replacements": [],
+  "parameter_dependency_compounds": [],
+  "proxy_upgrades": [
+    {
+      "proxy_address": "0xLending00000000000000000000000000000Proxy",
+      "old_implementation": "0xImpl00000000000000000000000000000000v1",
+      "new_implementation": "0xImpl00000000000000000000000000000000v2New",
+      "new_implementation_verified": false,
+      "new_implementation_deployed_timestamp": 1735776000,
+      "bytecode_diff_size": 18000,
+      "has_selfdestruct": true,
+      "has_unrestricted_delegatecall": true
+    }
+  ],
+  "current_timelock_hours": 48.0,
+  "proposed_timelock_hours": 2.0,
+  "minimum_timelock_hours": 24.0,
+  "top_voter_share": 0.62,
+  "top_voter_address": "0xWhale000000000000000000000000000000Voter1",
+  "quorum_share": 0.5,
+  "current_timestamp": 1735776000,
+  "_scenario": "Proposal drains 25% of treasury to two fresh EOAs, raises a collateral factor 10 sigma above historical mean, upgrades a proxy to an unverified implementation containing selfdestruct + unrestricted delegatecall, and slashes timelock from 48h to 2h — passed by a single 62% voter. Expect H1 (treasury drain), H2 (parameter manipulation), H3 (proxy upgrade), H4 (timelock bypass), H5 (voter concentration) — every heuristic fires."
+}

@@ -37,3 +37,11 @@ Detects malicious or high-risk governance proposals before execution. Analyzes p
 ## Improving this domain
 
 See `docs/improving_a_domain.md`
+
+## Prior art
+
+**Guardrail.xyz** + **OpenZeppelin Defender** at the *operations* side (treasury controls, multisig review). Voter-side niche exists but is under-tooled.
+
+**Where this guard differs**: Voter-side framing — surfaces risk before vote submission, not after deployment.
+
+Full comparison: `docs/prior_art/governance_proposal.md`.

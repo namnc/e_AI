@@ -1,0 +1,23 @@
+{
+  "address": "0xUser000000000000000000000000000000000PQRisk",
+  "has_stealth_meta_address": true,
+  "meta_address_has_mlkem": false,
+  "stealth_protocol_version": "ERC-5564-v1",
+  "is_smart_account": true,
+  "smart_account_has_pq_module": false,
+  "smart_account_upgradeable": true,
+  "smart_account_validation": ["ecdsa"],
+  "interacted_with_protocols": ["umbra", "fluidkey", "stealthprotocol"],
+  "recent_ecdh_ephemeral_keys_seen": 42,
+  "encrypted_blobs_without_pq_kem": 17,
+  "bls_deposit_count": 3,
+  "bls_committee_memberships": ["sync_committee_2024_q4"],
+  "bls_attestations_count": 5400,
+  "first_tx_timestamp": 1546300800,
+  "latest_tx_timestamp": 1735776000,
+  "tx_count": 980,
+  "total_value_usd": 850000.0,
+  "has_rotated_key": false,
+  "current_timestamp": 1735776000,
+  "_scenario": "Long-lived account (since 2019, 980 txs, $850K) with classical-only smart account, ECDH-only stealth meta-address, 17 unprotected encrypted blobs, active BLS validator participation, no key rotation. Expect H1 (ECDH-only stealth), H2 (classical smart account), H3 (encrypted blobs without PQ KEM), H4 (BLS participation), H5 (long-term key reuse) — full PQ exposure."
+}

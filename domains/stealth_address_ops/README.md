@@ -39,3 +39,11 @@ Real data: Script ready (`benchmarks/real_data.py`), needs RPC endpoint.
 2. Add labeled deanonymization incidents to `data/`
 3. Run analyzer: `python domains/stealth_address_ops/analyzer.py --benchmark`
 4. See `docs/improving_a_domain.md`
+
+## Prior art ⭐
+
+**Wahrstätter et al. (2023, ACM Web Conf 2024)** *named* and *measured* the problem (48.5% deanon rate on Ethereum). **ScopeLift Umbra** ships passive guidance. **Tutela** addresses an analogous problem for Tornado Cash mixers but is post-hoc auditor, not pre-submission guard.
+
+**Where this guard differs**: **First runtime, pre-submission tool turning Wahrstätter's heuristics into prevention.** Concrete benchmark question: does it reduce the 48.5% deanon rate? Strongest novelty claim across the v2 production set.
+
+Full comparison: `docs/prior_art/stealth_address_ops.md`.

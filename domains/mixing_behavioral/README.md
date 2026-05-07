@@ -46,3 +46,11 @@ Reuses from `stealth_address_ops`: `timing_delay`, `amount_normalizer`, `pool_mo
 2. Add labeled deposit-withdrawal link datasets to `data/`
 3. Adapt pool_monitor parameters per protocol
 4. See `docs/improving_a_domain.md`
+
+## Prior art ⭐
+
+**Tutela** (Tornado Cash anonymity auditor; 7 heuristics; 42.8K of 97.3K deposits compromised) operates as a *post-hoc auditor* for the operator. The 2025 cross-chain heuristics paper extends the heuristic set further. No pre-withdrawal runtime tool exists in either case.
+
+**Where this guard differs**: Pre-emptive runtime against the same heuristic family Tutela demonstrated. The user can act on the warning *before* the linkable behavior happens.
+
+Full comparison: `docs/prior_art/mixing_behavioral.md`.

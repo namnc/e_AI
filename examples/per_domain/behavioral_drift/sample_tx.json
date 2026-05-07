@@ -1,0 +1,16 @@
+{
+  "user_address": "0xUser000000000000000000000000000000Drifter",
+  "weeks_observed": 12,
+  "portfolio_share_in_top_protocol_weekly": [0.30, 0.34, 0.39, 0.45, 0.50, 0.55, 0.60, 0.66, 0.71, 0.74, 0.78, 0.82],
+  "top_protocol": "morpho",
+  "leverage_ratio_weekly": [1.10, 1.15, 1.22, 1.30, 1.40, 1.55, 1.70, 1.90, 2.10, 2.35, 2.60, 2.90],
+  "collateral_value_weekly_usd": [400000, 405000, 408000, 410000, 412000, 414000, 415000, 416000, 416500, 417000, 417500, 418000],
+  "open_unlimited_approvals": 47,
+  "approvals_added_last_30d": 18,
+  "approvals_revoked_last_30d": 0,
+  "gas_spent_weekly_usd": [120, 135, 158, 184, 210, 245, 285, 330, 380, 440, 510, 590],
+  "interaction_pattern_signature": "weekday_09:30_UTC_aave_borrow_to_uniswap_swap_to_curve_lp",
+  "pattern_repeat_rate_pct_last_60d": 0.86,
+  "current_timestamp": 1735776000,
+  "_scenario": "12-week observation showing strong concentration drift (30% -> 82% in single protocol), leverage creep (1.1x -> 2.9x with collateral nearly flat), 47 outstanding unlimited approvals with 18 added in the last 30 days and zero revoked, gas spending up nearly 5x, and a rigid weekday-09:30-UTC interaction pattern repeating at 86% of opportunities. All five heuristics should fire."
+}

@@ -1,0 +1,13 @@
+{
+  "deposit_address": "0xUser0000000000000000000000000000000Depositor",
+  "withdrawal_address": "0xUser0000000000000000000000000000000WithdrawSelf",
+  "stealth_address": "0xStealth00000000000000000000000000000000Generated",
+  "amount_eth": 1.234567,
+  "deposit_timestamp": 1735689600,
+  "spend_timestamp": 1735689660,
+  "gas_price_gwei": 87.4,
+  "gas_funding_source": "0xUser0000000000000000000000000000000Depositor",
+  "is_self_send": false,
+  "address_cluster": ["0xUser0000000000000000000000000000000Depositor", "0xUser0000000000000000000000000000000WithdrawSelf"],
+  "_scenario": "Stealth withdrawal where deposit and withdrawal addresses are in the same cluster, withdrawal happens 60 seconds after deposit, gas funded directly from the depositor address, and uses a unique non-round amount. Expect H1 (same-entity), H3 (timing), H4 (funding linkability), H6 (unique amount) to fire."
+}

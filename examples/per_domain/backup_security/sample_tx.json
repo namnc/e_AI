@@ -1,0 +1,16 @@
+{
+  "user_address": "0xUser000000000000000000000000000000Backup1",
+  "backup_method": "encrypted_seed_blob_on_arweave",
+  "backup_encryption": "ECDH(secp256k1) ephemeral + AES-GCM",
+  "encryption_factor": "password_only",
+  "password_strength_bits": 38,
+  "uses_pq_kem": false,
+  "guardian_count": 3,
+  "guardians_last_liveness_check_days": [320, 280, 240],
+  "social_recovery_threshold": "2-of-3",
+  "has_deniable_layer": false,
+  "non_deterministic_secrets_present": ["tornado_cash_deposit_notes_x4", "stealth_address_meta_secret"],
+  "non_deterministic_secrets_backed_up": false,
+  "current_timestamp": 1735776000,
+  "_scenario": "Backup encrypted with a single user-chosen password (38-bit entropy ≈ instant brute-force) using ECDH-derived AES-GCM (quantum-vulnerable, blob is permanent on Arweave), three social-recovery guardians who haven't confirmed liveness in 240+ days, no deniable layer (single password reveals real seed under coercion), and four Tornado Cash deposit notes plus a stealth-address meta secret that are NOT in the backup. All five heuristics should fire."
+}

@@ -1,0 +1,33 @@
+{
+  "user_address": "0xUser0000000000000000000000000000000RpcLeak",
+  "rpc_provider": "infura",
+  "uses_local_node": false,
+  "uses_helios_or_light_client": false,
+  "uses_query_batching": false,
+  "uses_cover_queries": false,
+  "uses_tor": false,
+  "swap_or_action_timestamp": 1735776300,
+  "queries": [
+    {"timestamp": 1735776000, "method": "eth_getBalance", "target_address": "0xAddrA0000000000000000000000000000000User1", "function_selector": "", "args_addresses": [], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776002, "method": "eth_getBalance", "target_address": "0xAddrB0000000000000000000000000000000User2", "function_selector": "", "args_addresses": [], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776004, "method": "eth_getBalance", "target_address": "0xAddrC0000000000000000000000000000000User3", "function_selector": "", "args_addresses": [], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776010, "method": "eth_getBalance", "target_address": "0xAddrD0000000000000000000000000000000User4", "function_selector": "", "args_addresses": [], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776100, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776160, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776180, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776200, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776220, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776240, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776250, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776260, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776265, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776270, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776275, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776280, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776290, "method": "eth_call", "target_address": "0xAaveV3Pool00000000000000000000000000Aave", "function_selector": "0x4be21afe", "args_addresses": ["0xLeveragePos000000000000000000000000Pos1"], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776150, "method": "eth_call", "target_address": "0xUniV2Pair00000000000000000000000000Pair1", "function_selector": "0x33d6f8d2", "args_addresses": [], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776180, "method": "eth_call", "target_address": "0xUniV2Pair00000000000000000000000000Pair2", "function_selector": "0x33d6f8d2", "args_addresses": [], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"},
+    {"timestamp": 1735776220, "method": "eth_call", "target_address": "0xChainlinkFeed000000000000000000000ETHUSD", "function_selector": "0x50d25bcd", "args_addresses": [], "block_range_size": 0, "user_originating_address": "0xUser0000000000000000000000000000000RpcLeak"}
+  ],
+  "_scenario": "User checks balances of 4 distinct addresses through Infura, monitors a single Aave position 11 times in ~3 minutes (well above 12/h threshold), and runs 3 Uniswap/Chainlink price queries in the 5-minute window before a swap. Expect H1 (balance linkage), H2 (position monitoring), H3 (pre-trade intent), H5 (price/holdings correlation)."
+}

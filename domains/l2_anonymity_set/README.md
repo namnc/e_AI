@@ -39,3 +39,11 @@ Monitors privacy degradation on Layer 2 rollups where faster block times, centra
 ## Improving this domain
 
 See `docs/improving_a_domain.md`
+
+## Prior art
+
+**Wahrstätter's empirical L2 privacy work** + **L2BEAT** data cover the analysis side. No runtime per-tx anonymity-set warning exists.
+
+**Where this guard differs**: Operationalization niche — turning empirical research into pre-submission UX. **Real-data calibration**: soispoke Dune dashboard (2026-05-07 read) shows 0xbow Privacy Pools running ~1.5 nullifier-events per pool per day across 14 pools; H1 (<20 depositors/24h → WARN) fires correctly on the live thinness it was designed to detect.
+
+Full comparison: `docs/prior_art/l2_anonymity_set.md`.

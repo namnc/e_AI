@@ -1,0 +1,22 @@
+{
+  "user_address": "0xUser000000000000000000000000000000Sender",
+  "intended_target_chain_id": 137,
+  "intended_target_chain_name": "polygon",
+  "signing_chain_id": 1,
+  "recipient_address": "0xRecipient00000000000000000000000Lookalike",
+  "recipient_lookalike_in_history": "0xRecipient00000000000000000000000Original",
+  "recipient_address_distance": "first 6 chars + last 4 chars match",
+  "recipient_tx_count_on_target_chain": 0,
+  "recipient_tx_count_on_other_chains": {"ethereum": 1284, "arbitrum": 540},
+  "recipient_is_contract": true,
+  "recipient_implements_receive": false,
+  "recipient_implements_erc20_receiver": false,
+  "recipient_last_activity_timestamp": 1640000000,
+  "recipient_last_activity_age_days": 1108,
+  "recipient_paused": true,
+  "recipient_migrated_to": "0xNewVersion000000000000000000000000000v2",
+  "token_being_sent": "USDC",
+  "amount_value_usd": 50000.0,
+  "current_timestamp": 1735776000,
+  "_scenario": "Send $50K USDC where: (a) the user signs with chain id 1 but intends Polygon (137) — chain ID mismatch; (b) the recipient address is a lookalike planted by a dust attacker (matches 6+4 chars of a real prior recipient) — address poisoning; (c) the recipient has zero activity on Polygon (active only on Ethereum/Arbitrum); (d) the recipient is a contract without receive/erc20-receiver and was paused/migrated to v2 in 2022 — deprecated. Expect every heuristic (H1-H5) to fire."
+}

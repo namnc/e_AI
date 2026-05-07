@@ -1,0 +1,49 @@
+{
+  "user_address": "0xUser000000000000000000000000000000DefiPower",
+  "total_portfolio_usd": 1500000.0,
+  "lending_positions": [
+    {
+      "protocol": "aave",
+      "collateral_asset": "stETH",
+      "collateral_value_usd": 800000.0,
+      "debt_asset": "USDC",
+      "debt_value_usd": 600000.0,
+      "health_factor": 1.18,
+      "oracle_used": "chainlink_eth_usd"
+    },
+    {
+      "protocol": "morpho",
+      "collateral_asset": "wstETH",
+      "collateral_value_usd": 500000.0,
+      "debt_asset": "DAI",
+      "debt_value_usd": 380000.0,
+      "health_factor": 1.22,
+      "oracle_used": "chainlink_eth_usd"
+    }
+  ],
+  "token_holdings": [
+    {"token": "stETH", "amount": 250.0, "value_usd": 800000.0, "protocol": "aave"},
+    {"token": "wstETH", "amount": 150.0, "value_usd": 500000.0, "protocol": "morpho"},
+    {"token": "USDC", "amount": 200000.0, "value_usd": 200000.0, "protocol": ""}
+  ],
+  "approval_chains": [
+    {
+      "token": "USDC",
+      "spender": "0xRouter000000000000000000000000000000Aggregator",
+      "spender_protocol": "1inch_router",
+      "is_unlimited": true,
+      "chain_depth": 6,
+      "chain_protocols": ["1inch_router", "uniswap_v3", "curve", "balancer", "pancakeswap", "unverified_dex"]
+    }
+  ],
+  "flash_loan_exposures": [
+    {
+      "target_protocol": "morpho",
+      "vulnerability_type": "oracle_manipulation",
+      "affected_value_usd": 500000.0,
+      "flash_loan_provider_available": true
+    }
+  ],
+  "current_timestamp": 1735776000,
+  "_scenario": "Two correlated lending positions (both ETH-collateralized, same Chainlink oracle) at low health factors, plus an unlimited USDC approval to a 6-hop aggregator chain ending in an unverified DEX, plus a flash-loanable oracle-manipulation surface on Morpho. Expect H1 (cascading liquidation), H2 (correlated oracle), H4 (approval chain), H5 (flash loan surface)."
+}

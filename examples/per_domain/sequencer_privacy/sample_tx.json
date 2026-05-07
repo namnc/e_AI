@@ -1,0 +1,29 @@
+{
+  "user_address": "0xUser000000000000000000000000000000Sequencer",
+  "l2_chain": "arbitrum",
+  "sequencer_model": "centralized",
+  "sequencer_operator": "Offchain Labs",
+  "sequencer_decentralized_roadmap_published": true,
+  "sequencer_decentralized_live": false,
+  "submitted_tx": {
+    "tx_id": "0xSequencerSubmit0000000000000000Tx01",
+    "value_usd": 18000.0,
+    "tx_kind": "privacy_pool_deposit",
+    "is_high_value": true,
+    "is_privacy_relevant": true
+  },
+  "censorship_observed": {
+    "tx_submitted_at": 1735776000,
+    "expected_inclusion_by": 1735776300,
+    "actually_included": false,
+    "valid_gas_and_nonce": true,
+    "user_flagged_as_sanctioned": true
+  },
+  "sequencer_mev_extracted_usd_30d": 1250000.0,
+  "sequencer_share_of_l2_mev_pct": 0.78,
+  "shared_sequencer_used": true,
+  "shared_sequencer_other_rollups": ["arbitrum", "optimism", "base"],
+  "preconfirmation_published_before_batch": true,
+  "preconfirmation_window_seconds": 30,
+  "_scenario": "Privacy-pool deposit on a centralized Arbitrum-class sequencer (Offchain Labs) where the user is sanctioned and the tx isn't included after 5 minutes despite valid gas, the sequencer extracted $1.25M MEV in the last 30 days (78% share), is also a shared sequencer across Arbitrum/Optimism/Base (cross-rollup linkage), and publishes 30-second preconfirmations that leak content. All five heuristics should fire."
+}

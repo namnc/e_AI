@@ -1,0 +1,35 @@
+{
+  "tx_hash": "0xdemomix000000000000000000000000000000000000000000000000000000001",
+  "user_address": "0xUser000000000000000000000000000000Mixer1",
+  "withdrawal_address": "0xWithdrawalAddrUsedTwice00000000000000",
+  "pool_id": "tornado-eth-1.0",
+  "pool_denomination": "1.0 ETH",
+  "deposit_timestamp": 1735776000,
+  "withdrawal_timestamp": 1735777800,
+  "pool_deposit_count_in_24h_window": 14,
+  "pool_concurrent_deposits_in_window": 12,
+  "deposit_amount": 1.234567,
+  "is_variable_denom_pool": true,
+  "pool_amount_distribution": [1.0, 1.0, 1.0, 0.5, 0.5, 1.0, 0.1, 0.1],
+  "user_recent_deposits_across_pools": [
+    {"pool": "pool-eth-1", "amount": 1.0, "timestamp": 1735776000},
+    {"pool": "pool-eth-0.5", "amount": 0.5, "timestamp": 1735776300},
+    {"pool": "pool-variable", "amount": 0.234567, "timestamp": 1735776600}
+  ],
+  "user_recent_withdrawals_across_pools": [
+    {"pool": "pool-eth-1", "amount": 1.0, "timestamp": 1735777200},
+    {"pool": "pool-eth-0.5", "amount": 0.5, "timestamp": 1735777500},
+    {"pool": "pool-variable", "amount": 0.234567, "timestamp": 1735777800}
+  ],
+  "expected_post_withdrawal_action": "defi_swap",
+  "expected_post_withdrawal_delay_blocks": 1,
+  "withdrawal_address_known_cluster_match": true,
+  "selected_relayer": "rare_relayer_2pct",
+  "relayer_market_share_pct": 2.0,
+  "withdrawal_address_prior_mixer_uses": 2,
+  "withdrawal_tx_gas_price_gwei": 120.0,
+  "block_gas_median_gwei": 20.0,
+  "block_gas_stddev_gwei": 5.0,
+  "user_prior_dwell_times_seconds": [1800, 1850, 1820],
+  "_scenario": "Worst-case mixer withdrawal: 30-min dwell into a pool with only 12 concurrent deposits (H1 critical); deposit amount 1.234567 ETH is uniquely-identifying in the variable-denom pool with 6 decimals (H2 high+medium); user has split 1.734567 ETH across 3 pools matching withdrawal totals exactly (H3 high x2); planned defi_swap within 1 block + known-cluster-match (H4 critical x2); rare relayer (2%) + reused withdrawal address + 20σ gas price (H5 medium+high+medium); consistent ~30min dwell across 3 prior ops (H1 medium fingerprint). Expect ~12 alerts, OVERALL CRITICAL, should_block=true."
+}

@@ -39,3 +39,11 @@ Detects compounding risks that emerge when a user holds positions across multipl
 ## Improving this domain
 
 See `docs/improving_a_domain.md`
+
+## Prior art
+
+**Gauntlet** and **Chaos Labs** operate at the *protocol-governance* level (set risk parameters for protocols). User-side composition reasoning is under-served — but the user demand signal is unclear.
+
+**Where this guard differs**: User-side, not protocol-side. Open question: does a user actually want this analysis pre-submission, or is it implicit-advisor territory?
+
+Full comparison: `docs/prior_art/cross_protocol_risk.md`.

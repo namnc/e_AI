@@ -26,6 +26,16 @@ Detects privacy risks specific to L2 sequencer architectures. RPC guard that ana
 - **decentralization_checker** -- L2 sequencer architecture tracker
 - **inclusion_timer** -- submission-to-inclusion timing and censorship detection
 
+## Analyzer
+
+Rule-based analyzer at `analyzer.py` evaluates a `SequencerSubmission` against
+H1-H5 algorithmically. Carries a `SEQUENCER_REGISTRY` mapping per-L2 to
+operator + model + encrypted-mempool flag + force-inclusion path + shared-sequencer
+status. The guard is largely informational today (mostly surfaces trust posture
+rather than blocking) — true mitigation arrives with encrypted mempools and
+sequencer decentralization. Demo at `examples/per_domain/sequencer_privacy/demo.py`.
+Production deployment must reconcile `SEQUENCER_REGISTRY` against L2Beat data.
+
 ## What needs human effort
 
 - [ ] Validate sequencer centralization data against L2Beat for top 20 L2s
@@ -36,3 +46,11 @@ Detects privacy risks specific to L2 sequencer architectures. RPC guard that ana
 ## Improving this domain
 
 See `docs/improving_a_domain.md`
+
+## Prior art
+
+Largely informational. Rollup-team docs disclose the trust-assumption; no runtime guard exists. **LUCID** and adjacent encrypted-mempool work at the protocol level (CROPS #15) is the future actionability.
+
+**Where this guard differs**: Mostly informational until encrypted mempools land at L2. Today's actionability is limited; this guard is a placeholder for the architecture that will matter post-LUCID.
+
+Full comparison: `docs/prior_art/sequencer_privacy.md`.

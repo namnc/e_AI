@@ -1,0 +1,14 @@
+{
+  "tx_hash": "0xdemobc00000000000000000000000000000000000000000000000000000001",
+  "user_address": "0xUser0000000000000000000000000000000000Carol",
+  "to_address": "0xTornadoCashRouter0000000000000000Sanctioned",
+  "selected_relays": ["bloxroute_regulated", "manifold"],
+  "has_private_mempool_configured": false,
+  "destination_chain": "ethereum",
+  "interacts_with_sanctioned_addresses": ["0xTornadoCashRouter0000000000000000Sanctioned"],
+  "recent_block_builder_count": 7,
+  "dominant_builder_share": 0.48,
+  "wallet_exposes_l1_inbox_path": false,
+  "mev_boost_enabled": true,
+  "_scenario": "User has only censoring relays configured (bloxroute_regulated + manifold), no private-mempool fallback, transaction interacts with a sanctioned router, AND the recent builder set is concentrated (7 builders, top builder 48%). Expect H1 + H2 + H4 (twice) + H5 to fire — full no-circumvention case."
+}

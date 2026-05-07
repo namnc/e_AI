@@ -32,3 +32,11 @@ Detects approval phishing patterns that led to $713M in losses in 2025. Analyzes
 1. Run: `python -m meta.tx_validation_engine domains/approval_phishing/profile.json`
 2. Add labeled phishing transactions to `data/`
 3. See `docs/improving_a_domain.md`
+
+## Prior art
+
+Mature space. Production tools: **Blockaid** (real-time pre-signature engine; integrated into MetaMask, Rainbow, Coinbase Wallet, Phantom, Zerion, OpenSea, Uniswap, World App; reported 40K+ Angelferno drainer attempts blocked in June 2024 alone), **Pocket Universe** (browser sim-first), **Scam Sniffer** (multi-layer anti-phishing), **Revoke.cash** (hygiene + revocation).
+
+**Where this guard differs**: local execution; profile-driven (heuristics + thresholds documented in JSON, not opaque); fits the v2 framework. Honest framing: *not* a novelty claim, *is* a completeness claim across the access methods.
+
+Full comparison: `docs/prior_art/approval_phishing.md` for the full per-guard comparison.

@@ -38,3 +38,11 @@ Detects phishing attacks that exploit off-chain signature mechanisms (EIP-712 ty
 ## Improving this domain
 
 See `docs/improving_a_domain.md`
+
+## Prior art
+
+Mature space. **Blockaid**, **Pocket Universe**, **Rabby Wallet** (built-in Permit2 warnings), **Veritas**, **Coinspect** all cover EIP-712 / Permit / Permit2 phishing detection.
+
+**Where this guard differs**: Local execution; profile-driven detection (heuristics in JSON); historical-context augmentation via the LLM behavioral layer. Completeness contribution, not novelty.
+
+Full comparison: `docs/prior_art/offchain_signature.md`.

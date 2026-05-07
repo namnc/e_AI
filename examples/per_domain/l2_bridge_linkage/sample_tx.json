@@ -1,0 +1,60 @@
+{
+  "user_address": "0xUser000000000000000000000000000000BridgeRisk",
+  "txs": [
+    {
+      "tx_id": "0xBridge000000000000000000000000000000Tx01",
+      "bridge_protocol": "Hop",
+      "source_chain": "ethereum",
+      "dest_chain": "arbitrum",
+      "sender_address": "0xUser000000000000000000000000000000BridgeRisk",
+      "receiver_address": "0xUser000000000000000000000000000000BridgeRisk",
+      "amount_token": "USDC",
+      "amount_value": 25000.0,
+      "amount_usd": 25000.0,
+      "timestamp": 1735776000,
+      "dest_gas_funded_from": "0xUser000000000000000000000000000000BridgeRisk",
+      "dest_gas_funding_timestamp": 1735776300,
+      "dest_gas_funding_via_paymaster": false,
+      "bundles_nft": false,
+      "nft_collection": "",
+      "nft_token_id": 0
+    },
+    {
+      "tx_id": "0xBridge000000000000000000000000000000Tx02",
+      "bridge_protocol": "Hop",
+      "source_chain": "ethereum",
+      "dest_chain": "optimism",
+      "sender_address": "0xUser000000000000000000000000000000BridgeRisk",
+      "receiver_address": "0xUser000000000000000000000000000000BridgeRisk",
+      "amount_token": "USDC",
+      "amount_value": 24987.5,
+      "amount_usd": 24987.5,
+      "timestamp": 1735776600,
+      "dest_gas_funded_from": "0xUser000000000000000000000000000000BridgeRisk",
+      "dest_gas_funding_timestamp": 1735776900,
+      "dest_gas_funding_via_paymaster": false,
+      "bundles_nft": true,
+      "nft_collection": "0xCryptoPunksClone0000000000000000Collection",
+      "nft_token_id": 4242
+    },
+    {
+      "tx_id": "0xBridge000000000000000000000000000000Tx03",
+      "bridge_protocol": "Hop",
+      "source_chain": "ethereum",
+      "dest_chain": "base",
+      "sender_address": "0xUser000000000000000000000000000000BridgeRisk",
+      "receiver_address": "0xUser000000000000000000000000000000BridgeRisk",
+      "amount_token": "USDC",
+      "amount_value": 24990.0,
+      "amount_usd": 24990.0,
+      "timestamp": 1735777200,
+      "dest_gas_funded_from": "0xUser000000000000000000000000000000BridgeRisk",
+      "dest_gas_funding_timestamp": 1735777500,
+      "dest_gas_funding_via_paymaster": false,
+      "bundles_nft": false,
+      "nft_collection": "",
+      "nft_token_id": 0
+    }
+  ],
+  "_scenario": "Three bridges from the same address via Hop with near-identical amounts (~$25K), gas pre-funded on each destination from the user's own L1 address, plus a bundled NFT on tx 2 — every linkage primitive in the playbook. Expect H1 (same address), H2 (amount correlation), H3 (sequence fingerprint), H4 (gas funding), H5 (NFT bundle linkage)."
+}
