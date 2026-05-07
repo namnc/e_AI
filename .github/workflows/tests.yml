@@ -74,7 +74,7 @@ jobs:
           for d in domains/*/test_profile.py domains/*/test_analyzer.py; do
             dom=$(dirname "$d" | xargs basename)
             case "$dom" in
-              defi|defi_14b|defi_bootstrap|defi_claude|defi_generated|defi_websearch|_template|_feedback)
+              defi|defi_*|_template|_feedback)
                 echo "::group::SKIP $dom (Part 3 variant or non-domain)"; echo "::endgroup::"; continue;;
             esac
             echo "::group::TEST $dom"
@@ -93,7 +93,7 @@ jobs:
           for d in domains/*/profile.json; do
             dom=$(dirname "$d" | xargs basename)
             case "$dom" in
-              defi|defi_14b|defi_bootstrap|defi_claude|defi_generated|defi_websearch|_template|_feedback)
+              defi|defi_*|_template|_feedback)
                 continue;;
             esac
             echo "::group::VALIDATE $dom"
@@ -118,26 +118,40 @@ jobs:
           echo "OK: validation CLI correctly exits non-zero on FAIL profile."
 
       - name: README quickstart smoke test
-        # Prove that the advertised quickstart commands still work.
-        # README points at requirements.txt (the aggregate); this is the
-        # honest smoke test of the user's first-touch experience.
+        # Per Codex Phase 3 review #2: the prior step name promised more
+        # than it delivered. Now actually exercises the README quickstart:
+        # install via the advertised aggregate file, run the advertised
+        # demos, and validate the advertised loops.
         run: |
           set -e
           pip install -r requirements.txt
-          # Run all v2 domain tests per advertised command (excluding defi_*).
+          # Tests + validation loops (exclude defi_* / _* support dirs).
           for d in domains/*/test_profile.py domains/*/test_analyzer.py; do
             case "$(dirname "$d" | xargs basename)" in
               defi|defi_*|_template|_feedback) continue;;
             esac
             python3 "$d" || exit 1
           done
-          # Schema-validate every v2 production profile.
           for d in domains/*/profile.json; do
             case "$(dirname "$d" | xargs basename)" in
               defi|defi_*|_template|_feedback) continue;;
             esac
             python3 -m meta.tx_validation_engine "$d" || exit 1
           done
+          # Per-domain demo smoke — advertised in README "Run a per-domain
+          # demo" block. Each demo must exit 0 (LLM may be in degraded
+          # mode in CI; that's fine, the demo itself must not crash).
+          for d in examples/per_domain/*/demo.py; do
+            echo "::group::demo $(dirname $d)"
+            python3 "$d" || { echo "::error::demo $d failed"; exit 1; }
+            echo "::endgroup::"
+          done
+          # L2 monitor demo (advertised quickstart entry).
+          if [ -f examples/l2_monitor/guard.py ]; then
+            echo "::group::demo l2_monitor"
+            python3 examples/l2_monitor/guard.py || { echo "::error::l2_monitor demo failed"; exit 1; }
+            echo "::endgroup::"
+          fi
 
       - name: Documentation drift linter
         # Per Codex critical review: prevent regressions on
@@ -177,13 +191,28 @@ jobs:
           echo "$out" | grep -q "WARNING for check_balance" || { echo "::error::check_balance did not warn"; exit 1; }
           echo "$out" | grep -q "Loaded 16 profiles" || { echo "::error::AI agent loaded wrong profile count"; exit 1; }
 
-      - name: TypeScript syntax check (best-effort; node 20+ required)
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Wallet EIP-1193 TypeScript parse
+        # Per Codex Phase 3 review #1: the prior gate was non-gating
+        # (||echo). Real failure mode now: node --experimental-strip-types
+        # and the import must succeed or the job fails.
         run: |
-          if command -v node >/dev/null 2>&1; then
-            node --version
-            # node >= 20 supports executing .ts files directly with --experimental-strip-types
-            # for a basic syntax/parse check. Full tsc --noEmit is queued for a future pass.
-            node --experimental-strip-types --no-warnings -e "import('./examples/wallet_eip1193/guard.ts').then(()=>console.log('parse OK')).catch((e)=>{console.error(e); process.exit(1);})" || echo "::warning::TS parse check failed (or node version <20). Full tsc --noEmit pending."
+          node --version
+          node --experimental-strip-types --no-warnings -e "import('./examples/wallet_eip1193/guard.ts').then(()=>console.log('parse OK')).catch((e)=>{console.error(e); process.exit(1);})"
+
+      - name: Kohaku integration typecheck (npm run typecheck)
+        # Per Codex Phase 3 review #3: kohaku_integration is one of the
+        # advertised integration surfaces but its package's tsc was
+        # broken (rootDir/include mismatch). Now fixed; CI must keep
+        # it that way.
+        run: |
+          cd examples/kohaku_integration
+          npm ci || npm install
+          npm run typecheck
           else
             echo "::warning::node not available; skipping TS parse check."
           fi

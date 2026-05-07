@@ -104,8 +104,13 @@ runnable, self-explanatory, and honest about the synthetic-sample caveat.
 
 If the guard should fire in a specific access method, register it in:
 
-- **RPC proxy** (`proxy/rpc_proxy.py`): add to the `--profiles` set if the
-  guard is RPC-driven
+- **RPC proxy** (`proxy/rpc_proxy.py`): the proxy is currently an
+  illustrative adapter with hard-coded detection logic for `rpc_leakage`,
+  `cross_protocol_risk`, and `l2_anonymity_set`. The `--profiles` flag is
+  parsed but is a no-op pending the canonical profile-driven runtime; if
+  your guard is RPC-driven, add a branch in `analyze_request` /
+  `analyze_response` directly until that runtime exists. (Maturity-gate
+  item, see README.)
 - **Wallet EIP-1193** (`examples/wallet_eip1193/guard.ts`): add a hook in the
   pre-submission middleware
 - **AI agent** (`examples/ai_agent/guard.py`): add to the agent's pre-action
