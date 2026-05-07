@@ -110,16 +110,16 @@ Show side-by-side:
 **Claim**: the meta-framework's core artifacts (profile schema, validation
 engine, bootstrap pipeline) carry across tasks with bounded modifications.
 
-**Evidence**: 15 v2 production tx-analysis guards built on the same engine,
-all passing the 11-check `tx_validation_engine`. Plus 1 fresh domain
-(`builder_censorship`) added in 1 week using only the documented extension
-guide.
+**Evidence**: 16 v2 production tx-analysis guards built on the same engine,
+all passing the 11-check `tx_validation_engine`. The most recent domain
+(`builder_censorship`) was added in 1 week using only the documented
+extension guide.
 
 ---
 
 ## 4. Four access methods to Ethereum
 
-The 15 v2 guards organize around how a user actually touches Ethereum.
+The 16 v2 guards organize around how a user actually touches Ethereum.
 
 ### 4.1 Wallet method (7 guards in this post + 1 hygiene-only)
 
@@ -692,10 +692,11 @@ demonstrated **domain-agnosticism within the sanitization task**.
 This post takes the next step. The same meta-framework — same profile
 schema, same validation engine, same bootstrap pipeline, same local-LLM
 analyzer pattern — generates pre-submission **transaction-analysis** guards
-across Ethereum's four access methods. Fifteen v2 production guards plus a
-fresh `builder_censorship` domain built in one week using only the
-documented extension guide. **Domain-agnosticism within the sanitization
-task** has become **task-agnosticism** of the meta-framework itself.
+across Ethereum's four access methods. Sixteen v2 production guards
+(the most recent — `builder_censorship` — built in one week using only
+the documented extension guide). **Domain-agnosticism within the
+sanitization task** has become **task-agnosticism** of the meta-framework
+itself.
 
 We are not claiming this is finished. The honest reading of the prior-art
 audit (Section 5) is that several guards live in already-occupied tooling

@@ -6,7 +6,7 @@ or post-publication step.
 
 ## Self-containment
 
-- [x] No external pointer escapes (no references to `AI_PS`, internal
+- [x] No external pointer escapes (no references to `AI_PS`, internal <!-- lint-allow-ai-ps -->
       working directories, or private analysis docs)
 - [x] All prior-art research lives in `docs/prior_art/` (16 files)
 - [x] All add-a-domain documentation lives in `docs/`
