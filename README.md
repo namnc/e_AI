@@ -99,7 +99,7 @@ pip install -r requirements.txt
 # Install Ollama + qwen2.5:7b for the local LLM layer (optional but recommended)
 # https://ollama.com — `ollama serve` then `ollama pull qwen2.5:7b`
 
-# Run a per-domain demo (16 production guards)
+# Run a per-domain demo (16 profile-validated prototype guards)
 python3 examples/per_domain/approval_phishing/demo.py
 python3 examples/per_domain/stealth_address_ops/demo.py
 python3 examples/per_domain/builder_censorship/demo.py
@@ -108,46 +108,86 @@ python3 examples/per_domain/builder_censorship/demo.py
 python3 examples/ai_agent/guard.py
 python3 examples/l2_monitor/guard.py
 
-# Run all v2 domain tests
+# Run all v2 domain tests (schema + structural)
 for d in domains/*/test_profile.py; do python3 $d; done
 
-# Validate every profile against the 11-check engine
+# Schema-validate every profile against the 11-check engine
 for d in domains/*/profile.json; do python3 -m meta.tx_validation_engine $d; done
 ```
 
-CI runs all v2 domain tests + validation on every push to `v2`. See
-[`.github/workflows/tests.yml`](.github/workflows/tests.yml).
+CI runs all v2 domain tests + schema validation on every push to `v2`.
+See [`.github/workflows/tests.yml`](.github/workflows/tests.yml). Note:
+the validation engine performs **schema validation** (presence + shape +
+calibration of fields), not **detector validation** (true-positive /
+false-positive rates against real incidents). Detector-validation
+fixtures are queued as a maturity gate; see
+[`docs/publication_checklist.md`](docs/publication_checklist.md).
 
-## What's available
+## What's available — 16 profile-validated prototype guards
 
-### v2 production guards (15)
+These are **prototypes**: each has a profile that passes the 11-check
+schema validation, a `test_profile.py` covering structure, a runnable
+per-domain demo, and a rule-based `analyzer.py`. They are *not* yet
+production-grade in the sense of being calibrated against real-incident
+corpora or having been battle-tested in a wallet integration. Production
+readiness varies by domain; per-guard readiness is captured in the
+matrix below.
 
-All profile-validated 11/11; all `test_profile.py` passing; all have a
-runnable per-domain demo.
+### Per-guard readiness matrix
 
-**Wallet method (7 + 1 hygiene-only):**
-- `approval_phishing`, `backup_security`, `behavioral_drift`,
-  `mev_vulnerability`, `offchain_signature`, `pq_readiness`,
-  `stealth_address_ops` ⭐
-- Plus `wrong_chain_address` (hygiene-completeness; Rabby Wallet has
-  solved this UX — included for unified-set completeness, not novelty)
+| Guard | Schema | Tests | Rule analyzer | Per-domain demo | Real-incident fixtures | Live registry / data integration | Externally reviewed | Production candidate |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `approval_phishing` | ✓ | ✓ | ✓ | ✓ | ✗ (synthetic) | ✗ (scam-DB hard-coded) | partial (Codex) | no |
+| `backup_security` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
+| `behavioral_drift` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
+| `builder_censorship` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ (relay set hard-coded) | partial (Codex) | no |
+| `cross_protocol_risk` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
+| `governance_proposal` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
+| `l2_anonymity_set` | ✓ | ✓ | ✓ | ✓ | partial (soispoke 0xbow) | ✗ | partial (Codex) | no |
+| `l2_bridge_linkage` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS WITH HEDGE (Codex) | no |
+| `mev_vulnerability` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
+| `mixing_behavioral` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | PARTIALLY HOLDS (Codex) | no |
+| `offchain_signature` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
+| `pq_readiness` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
+| `rpc_leakage` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS WITH HEDGE (Codex) | no |
+| `sequencer_privacy` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ (registry hard-coded) | partial (Codex) | no |
+| `stealth_address_ops` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | PARTIALLY HOLDS (Codex) | no |
+| `wrong_chain_address` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
 
-**Application method (3):**
-- `cross_protocol_risk`, `governance_proposal`, `mixing_behavioral` ⭐
+**Schema** = 11-check `tx_validation_engine` PASS · **Tests** = `test_profile.py`
+PASS · **Rule analyzer** = `analyzer.py` covering profile heuristics
+algorithmically · **Per-domain demo** = `examples/per_domain/<name>/demo.py`
+runs end-to-end with rule-based + LLM analysis · **Real-incident fixtures**
+= calibrated against captured-incident corpora (not synthetic samples) ·
+**Live registry / data integration** = production data feeds wired (not
+hard-coded in analyzer source) · **Externally reviewed** = a substantive
+external pushback round (Codex's adversarial review at
+`projects/e_ai_v2/review/codex_strong_novelty_review.md` covers the four
+strong-novelty guards in depth) · **Production candidate** = no item ships
+with this column ✓ today; closing the prior columns is the path there.
 
-**AI method (1):**
-- `rpc_leakage` ⭐
+⭐ = strong-novelty cluster.
 
-**L2 method (3 + 1 fresh):**
-- `l2_anonymity_set`, `l2_bridge_linkage` ⭐, `sequencer_privacy`
-- Plus `builder_censorship` — fresh CR-aligned domain demonstrating the
-  extension framework. Built in one week using only
-  [`docs/adding_a_domain.md`](docs/adding_a_domain.md).
+### Cluster overview
 
-⭐ = strong-novelty cluster (see [`docs/prior_art/`](docs/prior_art/) per-guard
-prior-art research for honest positioning).
+**Wallet method (7 + 1 hygiene-only):** `approval_phishing`,
+`backup_security`, `behavioral_drift`, `mev_vulnerability`,
+`offchain_signature`, `pq_readiness`, `stealth_address_ops` ⭐. Plus
+`wrong_chain_address` (Rabby Wallet has solved this UX; included for
+unified-set completeness, not novelty).
 
-### Integration demos
+**Application method (3):** `cross_protocol_risk`, `governance_proposal`,
+`mixing_behavioral` ⭐.
+
+**AI method (1):** `rpc_leakage` ⭐.
+
+**L2 method (3 + 1 fresh):** `l2_anonymity_set`, `l2_bridge_linkage` ⭐,
+`sequencer_privacy`. Plus `builder_censorship` — fresh CR-aligned domain
+demonstrating the extension framework (built using only
+[`docs/adding_a_domain.md`](docs/adding_a_domain.md), with substrate
+work already in place; first-time contributors should expect longer).
+
+### Integration demos (status: illustrative adapters)
 
 Five access-method integration surfaces under `examples/`:
 - `ai_agent/guard.py` — agent guard for AI-agent flows
@@ -155,7 +195,18 @@ Five access-method integration surfaces under `examples/`:
 - `kohaku_integration/` — Kohaku middleware (TypeScript)
 - `l2_monitor/guard.py` — L2-specific monitor
 - `wallet_eip1193/guard.ts` — wallet provider wrapper
-- `proxy/rpc_proxy.py` — local RPC proxy with profile-driven analysis
+- `proxy/rpc_proxy.py` — local RPC proxy
+
+**Honest framing**: the per-domain demos under `examples/per_domain/`
+**are profile-driven** — they load the profile, run the analyzer, and
+report alerts. The five access-method integration surfaces above are
+**illustrative adapters**: they accept profile inputs but several
+(notably `wallet_eip1193/guard.ts` and `proxy/rpc_proxy.py`) currently
+hard-code domain-specific logic in source rather than dispatching from
+profile semantics. Making one canonical profile runtime + thin adapters
+is queued as a maturity item; the current adapters are runnable
+illustrations of the per-access-method integration pattern, not
+canonical profile runtimes.
 
 ### Per-domain demos
 
