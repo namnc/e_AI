@@ -19,8 +19,11 @@ Usage:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any
+
+log = logging.getLogger("e_ai.llm_analyzer")
 
 
 class LLMAnalyzer:
@@ -36,6 +39,12 @@ class LLMAnalyzer:
         self.backend = backend
         self.model = model or self._default_model(backend)
         self._client = None
+        self.available = False
+        self.unavailable_reason: str | None = None
+
+    def is_available(self) -> bool:
+        """Whether the LLM backend is reachable. Returns False after a failed connect()."""
+        return self.available
 
     def _default_model(self, backend: str) -> str:
         if backend == "ollama":
@@ -45,30 +54,62 @@ class LLMAnalyzer:
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-    def connect(self):
-        """Initialize the LLM backend connection."""
+    def connect(self, raise_on_failure: bool = False) -> bool:
+        """Initialize the LLM backend connection.
+
+        Returns True on success, False on graceful degradation. With
+        raise_on_failure=True, retains pre-2026-05-07 behavior of raising
+        RuntimeError. Default is graceful: callers check is_available() and
+        analyze() falls back to a rule-based-only result.
+        """
         if self.backend == "ollama":
             import httpx
             try:
                 resp = httpx.get("http://localhost:11434/api/tags", timeout=5)
                 resp.raise_for_status()
-                available = [m["name"] for m in resp.json().get("models", [])]
-                found = any(self.model in name for name in available)
-                if not found:
-                    print(f"WARNING: Model '{self.model}' not found. Available: {available}")
-                    print(f"  Try: ollama pull {self.model}")
-            except Exception:
-                raise RuntimeError("Cannot connect to Ollama. Try: ollama serve")
+                available_models = [m["name"] for m in resp.json().get("models", [])]
+            except (httpx.HTTPError, OSError) as e:
+                # Network / daemon unreachable.
+                msg = f"Cannot reach Ollama at localhost:11434 ({e}). Try: ollama serve"
+                log.warning(msg)
+                self.unavailable_reason = msg
+                if raise_on_failure:
+                    raise RuntimeError(msg)
+                return False
+
+            if not any(self.model in name for name in available_models):
+                msg = f"Model '{self.model}' not found in Ollama. Available: {available_models}. Try: ollama pull {self.model}"
+                log.warning(msg)
+                self.unavailable_reason = msg
+                if raise_on_failure:
+                    raise RuntimeError(msg)
+                return False
+
             self._client = httpx.Client(timeout=120)
 
         elif self.backend == "anthropic":
-            import anthropic
-            api_key = os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
-                raise RuntimeError("Set ANTHROPIC_API_KEY")
-            self._client = anthropic.Anthropic(api_key=api_key)
+            try:
+                import anthropic
+                api_key = os.environ.get("ANTHROPIC_API_KEY")
+                if not api_key:
+                    msg = "ANTHROPIC_API_KEY not set"
+                    log.warning(msg)
+                    self.unavailable_reason = msg
+                    if raise_on_failure:
+                        raise RuntimeError(msg)
+                    return False
+                self._client = anthropic.Anthropic(api_key=api_key)
+            except ImportError as e:
+                msg = f"anthropic SDK not installed ({e})"
+                log.warning(msg)
+                self.unavailable_reason = msg
+                if raise_on_failure:
+                    raise RuntimeError(msg)
+                return False
 
-        print(f"LLM backend: {self.backend} | Model: {self.model}")
+        self.available = True
+        log.info(f"LLM backend: {self.backend} | Model: {self.model}")
+        return True
 
     def analyze(
         self,
@@ -84,14 +125,63 @@ class LLMAnalyzer:
             rule_based_alerts: Optional alerts from the rule-based analyzer
 
         Returns:
-            Dict with: risk_level, explanation, recommendations, behavioral_notes
+            Dict with: risk_level, explanation, recommendations, behavioral_notes,
+            and degraded_mode (True if LLM unavailable; result is rule-based-only).
         """
+        if not self.available:
+            return self._degraded_result(rule_based_alerts)
+
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(tx, user_history, rule_based_alerts)
 
-        response = self._call_llm(system_prompt, user_prompt)
+        try:
+            response = self._call_llm(system_prompt, user_prompt)
+        except Exception as e:
+            log.warning(f"LLM call failed mid-flight ({e}); returning degraded result")
+            self.available = False
+            self.unavailable_reason = str(e)
+            return self._degraded_result(rule_based_alerts)
 
-        return self._parse_response(response)
+        result = self._parse_response(response)
+        result["degraded_mode"] = False
+        return result
+
+    def _degraded_result(self, rule_based_alerts: list[dict] | None) -> dict:
+        """Synthesize a result from rule-based alerts when LLM is unavailable.
+
+        The contract is preserved (same keys); the caller can detect degraded
+        mode via the degraded_mode key. risk_level is the highest severity from
+        the rule-based alerts; recommendations are pulled directly.
+        """
+        severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+        risk = "unknown"
+        recs: list[str] = []
+        explanation = "LLM analysis unavailable; showing rule-based detection only."
+
+        if rule_based_alerts:
+            top = max(
+                rule_based_alerts,
+                key=lambda a: severity_order.get(a.get("severity", "").lower(), 0),
+                default=None,
+            )
+            if top is not None:
+                risk = top.get("severity", "unknown").lower()
+            for a in rule_based_alerts:
+                rec = a.get("recommendation")
+                if rec and rec not in recs:
+                    recs.append(rec)
+            if recs:
+                explanation = f"Rule-based detection found {len(rule_based_alerts)} alert(s); LLM behavioral analysis unavailable."
+
+        return {
+            "risk_level": risk,
+            "explanation": explanation,
+            "recommendations": recs,
+            "behavioral_notes": "skipped (LLM unavailable)",
+            "raw_response": "",
+            "degraded_mode": True,
+            "degraded_reason": self.unavailable_reason or "LLM backend not available",
+        }
 
     def _build_system_prompt(self) -> str:
         """Build system prompt from profile."""

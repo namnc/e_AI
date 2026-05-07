@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, v2]
   pull_request:
-    branches: [main]
+    branches: [main, v2]
 
 jobs:
   sanitizer-tests:
@@ -53,3 +53,52 @@ jobs:
 
       - name: Generate classifier data and train
         run: python3 classifier_validation.py run --n-sets 500 --epochs 5
+
+  v2-domain-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run v2 domain profile tests
+        # v2 production guards only; defi_* variants belong to Part 3 (excluded from v2 CI)
+        run: |
+          set -e
+          fail=0
+          for d in domains/*/test_profile.py domains/*/test_analyzer.py; do
+            dom=$(dirname "$d" | xargs basename)
+            case "$dom" in
+              defi|defi_14b|defi_bootstrap|defi_claude|defi_generated|defi_websearch|_template|_feedback)
+                echo "::group::SKIP $dom (Part 3 variant or non-domain)"; echo "::endgroup::"; continue;;
+            esac
+            echo "::group::TEST $dom"
+            if ! python3 "$d"; then
+              echo "::error file=$d::Test failed for $dom"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
+
+      - name: Run validation engine on all v2 production profiles
+        run: |
+          set -e
+          fail=0
+          for d in domains/*/profile.json; do
+            dom=$(dirname "$d" | xargs basename)
+            case "$dom" in
+              defi|defi_14b|defi_bootstrap|defi_claude|defi_generated|defi_websearch|_template|_feedback)
+                continue;;
+            esac
+            echo "::group::VALIDATE $dom"
+            if ! python3 -m meta.tx_validation_engine "$d"; then
+              echo "::error file=$d::Validation failed for $dom"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
