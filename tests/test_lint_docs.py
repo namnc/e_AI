@@ -147,6 +147,45 @@ class TestR1NumericClaims(unittest.TestCase):
         self.assertEqual(hits, [],
                          "non-ship cluster phrase must not trip ship pattern")
 
+    # ---------- Phase 7F: remaining R1 variants (Codex Phase 6 review) ----
+
+    def test_numeric_ship_by_today_fires(self):
+        """Phase 7F: 'we ship 18 guards by today' must trip."""
+        line = "we ship 18 guards by today"
+        self.assertIn(18, self._matches(line, self.EXPECTED))
+
+    def test_numeric_ship_paren_as_of_today_fires(self):
+        """Phase 7F: 'we ship 18 guards (as of today)' must trip — paren
+        between guards and 'as of today' previously broke the lookahead."""
+        line = "we ship 18 guards (as of today)"
+        self.assertIn(18, self._matches(line, self.EXPECTED))
+
+    def test_past_tense_shipped_numeric_fires(self):
+        """Phase 7F: past tense 'we shipped 18 guards as of today' must trip."""
+        line = "we shipped 18 guards as of today"
+        self.assertIn(18, self._matches(line, self.EXPECTED))
+
+    def test_past_tense_shipped_word_form_fires(self):
+        """Phase 7F: 'we shipped fifteen guards as of today' must trip via
+        the WORD_NUM_SHIP_PATTERN (now also matches past tense)."""
+        line = "we shipped fifteen guards as of today"
+        hits = [
+            lint_docs.WORD_NUMS[m.group(1).lower()]
+            for m in lint_docs.WORD_NUM_SHIP_PATTERN.finditer(line)
+            if lint_docs.WORD_NUMS[m.group(1).lower()] != self.EXPECTED
+        ]
+        self.assertEqual(hits, [15])
+
+    def test_word_form_ship_by_today_fires(self):
+        """Phase 7F: 'we ship sixteen guards by today' for word form."""
+        line = "we ship fifteen guards by today"
+        hits = [
+            lint_docs.WORD_NUMS[m.group(1).lower()]
+            for m in lint_docs.WORD_NUM_SHIP_PATTERN.finditer(line)
+            if lint_docs.WORD_NUMS[m.group(1).lower()] != self.EXPECTED
+        ]
+        self.assertEqual(hits, [15])
+
 
 # ---------------------------------------------------------------------------
 # R2 — production claim hedging

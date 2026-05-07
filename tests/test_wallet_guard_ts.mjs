@@ -11,7 +11,12 @@
 // Wired into CI in v2-integration-tests.
 
 import { strict as assert } from "node:assert";
-import { withEIP1193Guard, validateProfileSeverities } from "../examples/wallet_eip1193/guard.ts";
+import {
+  withEIP1193Guard,
+  validateProfileSeverities,
+  isKnownSeverity,
+  coerceAlertSeverities,
+} from "../examples/wallet_eip1193/guard.ts";
 
 const ZERO_ADDR = "0x" + "00".repeat(20);
 const MAX_UINT256 = "f".repeat(64);
@@ -225,24 +230,101 @@ async function main() {
     }
   }
 
-  // ---- Unknown severity at runtime: coerce to 'critical' for safety (Phase 6D) ----
+  // ---- validateProfileSeverities does NOT crash on malformed inputs (Phase 7E) ----
   {
-    // Inject a profile-like alert with unknown severity by hijacking onAlert
-    // through the existing dispatch path. The cleanest way: build a custom
-    // mock provider whose hand-rolled selector triggers an alert in the
-    // analyzer with a typo'd severity. Easier: the runtime coercion fires
-    // when an alert with severity='critcal' reaches dispatch — we test the
-    // coercion observable: the alert ends up with severity='critical' by
-    // the time onAlert sees it (because dispatch mutates).
-    //
-    // We simulate by constructing a guard that observes alerts via onAlert
-    // and pushing a synthetic alerts list through the dispatch flow.
-    // Since the dispatch flow lives inside withEIP1193Guard.request, we
-    // round-trip via captureAlerts on a normal trigger and then assert
-    // that no alert has an unknown severity reaching the user.
-    //
-    // We assert the observable invariant: every alert that reaches onAlert
-    // carries a severity in the closed set, even if upstream produced a typo.
+    try {
+      // Phase 7E (Codex Phase 6 review #5): null entry, undefined entry,
+      // primitive entry, and missing-heuristics-dict must all surface as
+      // offenders rather than throwing.
+      const offenders = validateProfileSeverities([
+        null,
+        undefined,
+        "not-a-profile",
+        42,
+        { meta: { domain_name: "ok-but-no-heuristics" } },
+        { meta: { domain_name: "wrong-heuristics-shape" }, heuristics: ["array", "not", "dict"] },
+        {
+          meta: { domain_name: "with-bad-heuristic" },
+          heuristics: {
+            H1: null,
+            H2: "string-not-object",
+            H3: { id: "H3", severity: "high" },
+          },
+        },
+      ]);
+      // Each malformed top-level entry → one offender. Plus offenders for
+      // bad heuristic entries (H1 null, H2 string).
+      assert.ok(offenders.length >= 6,
+                `expected >=6 offenders, got ${offenders.length}: ${JSON.stringify(offenders)}`);
+      const sevs = offenders.map((o) => o.severity);
+      assert.ok(sevs.includes("<null>"), "null profile must surface <null>");
+      assert.ok(sevs.includes("<undefined>"), "undefined profile must surface <undefined>");
+      assert.ok(sevs.includes("<string>"), "string-as-profile must surface <string>");
+      assert.ok(sevs.includes("<number>"), "number-as-profile must surface <number>");
+      assert.ok(sevs.includes("<missing>"), "no-heuristics must surface <missing>");
+      assert.ok(sevs.includes("<array>"), "heuristics-as-array must surface <array>");
+      console.log("OK: validateProfileSeverities defensive on malformed inputs");
+    } catch (e) {
+      console.error("FAIL: validateProfileSeverities malformed inputs", e.message);
+      failed++;
+    }
+  }
+
+  // ---- coerceAlertSeverities directly exercises the typo path (Phase 7H) ----
+  {
+    // Phase 7H (Codex Phase 6 review): the prior "vacuous" invariant test
+    // only proved that hard-coded built-in alerts have known severities.
+    // It did NOT prove the coercion path runs. Phase 7H exposes
+    // coerceAlertSeverities() so we can build typoed alerts directly,
+    // pass them through, and verify the mutation + coercion count.
+    try {
+      // Spy on console.warn so we can assert it fired.
+      const origWarn = console.warn;
+      const warnCalls = [];
+      console.warn = (...args) => warnCalls.push(args.join(" "));
+
+      const synthetic = [
+        { profile: "test", heuristic: "T1", severity: "high", confidence: 0.9, signal: "s", recommendation: "r" },
+        { profile: "test", heuristic: "T2", severity: "critcal", confidence: 0.9, signal: "s", recommendation: "r" }, // typo
+        { profile: "test", heuristic: "T3", severity: "debug", confidence: 0.9, signal: "s", recommendation: "r" }, // unknown
+        { profile: "test", heuristic: "T4", severity: "info", confidence: 0.9, signal: "s", recommendation: "r" },
+      ];
+      const coerced = coerceAlertSeverities(synthetic);
+
+      console.warn = origWarn;
+
+      assert.equal(coerced, 2, "must coerce two unknown-severity alerts");
+      assert.equal(synthetic[0].severity, "high", "known severity preserved");
+      assert.equal(synthetic[1].severity, "critical", "'critcal' typo coerced to critical");
+      assert.equal(synthetic[2].severity, "critical", "'debug' coerced to critical");
+      assert.equal(synthetic[3].severity, "info", "'info' preserved");
+      assert.equal(warnCalls.length, 2, "console.warn fires once per coerced alert");
+      assert.ok(warnCalls[0].includes("critcal"), "warn message names the bad value");
+      console.log("OK: coerceAlertSeverities mutates + warns on unknown severity");
+    } catch (e) {
+      console.error("FAIL: coerceAlertSeverities", e.message);
+      failed++;
+    }
+  }
+
+  // ---- isKnownSeverity is a precise enum check (Phase 7H) ----
+  {
+    try {
+      for (const sev of ["critical", "high", "medium", "low", "info"]) {
+        assert.ok(isKnownSeverity(sev), `${sev} must be known`);
+      }
+      for (const sev of ["", "Critical", "CRITICAL", "warn", "debug", "critcal", "0", "  high"]) {
+        assert.ok(!isKnownSeverity(sev), `${sev} must NOT be known`);
+      }
+      console.log("OK: isKnownSeverity is case-sensitive enum check");
+    } catch (e) {
+      console.error("FAIL: isKnownSeverity", e.message);
+      failed++;
+    }
+  }
+
+  // ---- End-to-end: dispatched alerts only carry known severities (preserved invariant) ----
+  {
     const { alerts } = await captureAlerts("eth_sendTransaction", [
       { to: "0xtoken", data: "0x095ea7b3" + "00".repeat(32), value: "0x0" },
     ]);

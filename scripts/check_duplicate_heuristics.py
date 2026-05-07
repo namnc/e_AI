@@ -5,17 +5,23 @@ Scan every `domains/*/profile.json` and surface heuristics that look duplicated
 across domains. Two layers:
 
 1. Exact-key duplicates: same heuristic key (e.g., "H1_unlimited_approval")
-   appearing in >1 domain. Probably benign, but worth knowing.
+   appearing in >1 domain. Treated as a real bug — fails CI.
 2. Name overlap: distinct heuristic keys but identical (or near-identical)
-   `name` fields. Often the actual cross-domain duplication risk.
+   `name` fields. Treated as ADVISORY by default (different domains may
+   legitimately analyze the same concept under different keys, e.g.
+   'Timing correlation' in mixing_behavioral H1 and stealth_address_ops H3).
 
 Soft heuristic for "near-identical": case-folded normalized name match.
 
 Usage:
-    python3 scripts/check_duplicate_heuristics.py
-    python3 scripts/check_duplicate_heuristics.py --json   # machine-readable
+    python3 scripts/check_duplicate_heuristics.py            # text output
+    python3 scripts/check_duplicate_heuristics.py --json     # machine-readable
+    python3 scripts/check_duplicate_heuristics.py --strict   # name-overlap fails CI too
 
-Exit code 0 if no flags, 1 if duplicates found (CI-friendly).
+Exit code (Phase 6 + Phase 7G clarification):
+  - 0 if exact-key clean (default; name-overlap is advisory)
+  - 1 if exact-key duplicates exist (always)
+  - 1 if --strict AND any name-overlap exists
 """
 
 from __future__ import annotations

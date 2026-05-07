@@ -224,13 +224,6 @@ jobs:
         # extraction shapes so future edits can't regress.
         run: python3 -m unittest tests.test_check_workflow_shell -v
 
-      - name: DApp frontend guard smoke test
-        # Phase 6H (Codex Phase 5 review #4): README advertised
-        # examples/dapp_frontend/guard.js as a tested integration
-        # surface, but no CI step exercised it. Smoke-runs the demo and
-        # asserts on each scenario's expected alerts.
-        run: python3 tests/test_dapp_frontend_guard.py
-
       - name: AI-agent demo emits expected warnings
         # Per Codex critical review (additional finding D): the demo's
         # advertised risky scenarios MUST emit warnings. Was previously
@@ -243,9 +236,22 @@ jobs:
           echo "$out" | grep -q "Loaded 16 profiles" || { echo "::error::AI agent loaded wrong profile count"; exit 1; }
 
       - name: Set up Node 20
+        # Phase 7D (Codex Phase 6 review #4): setup-node MUST run before
+        # any test that depends on `node`. Otherwise the
+        # @skipUnless(shutil.which("node")) decorator on
+        # test_dapp_frontend_guard.py silently skips the suite on runners
+        # without ambient Node, leaving the gate weaker than claimed.
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: DApp frontend guard smoke test
+        # Phase 6H (Codex Phase 5 review #4): README advertised
+        # examples/dapp_frontend/guard.js as a tested integration
+        # surface, but no CI step exercised it. Smoke-runs the demo and
+        # asserts on each scenario's expected alerts. Now placed AFTER
+        # setup-node so node is guaranteed on PATH (Phase 7D).
+        run: python3 tests/test_dapp_frontend_guard.py
 
       - name: Wallet EIP-1193 TypeScript parse
         # Per Codex Phase 3 review #1: the prior gate was non-gating

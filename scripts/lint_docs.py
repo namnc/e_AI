@@ -125,10 +125,15 @@ COUNT_PATTERNS = [
     # would false-positive. Tighten by requiring a total-set qualifier
     # after `guards`. Phase 5 #R1 / Phase 6F: the prior lookahead missed
     # "as of today" / "as of now" because it required the qualifier
-    # IMMEDIATELY after `guards`. Allow optional "as of"/" as of " too.
+    # IMMEDIATELY after `guards`. Allow "as of today/now/this" too.
+    # Phase 7F (Codex Phase 6 review): also catch "by today" tail and
+    # "(as of today)" parenthetical, plus past-tense "shipped".
     re.compile(
-        r"\bship\s+(?:all\s+)?(\d{1,3})\s+(?:total\s+)?guards?\b"
-        r"(?=\s*(?:[,.]|today|now|across|via|in v2|as\s+of\s+(?:today|now|this)))",
+        r"\bship(?:ped|s)?\s+(?:all\s+)?(\d{1,3})\s+(?:total\s+)?guards?\b"
+        r"(?=\s*[\.\,\(]?\s*"
+        r"(?:today|now|across|via|in v2"
+        r"|as\s+of\s+(?:today|now|this)"
+        r"|by\s+today))",
         re.I,
     ),
 ]
@@ -152,8 +157,12 @@ WORD_NUM_PATTERN = re.compile(
 # WORD_NUM_PATTERN because the verb "ship" + total-set tail is itself the
 # total-claim signal — no inner v2/production qualifier required.
 WORD_NUM_SHIP_PATTERN = re.compile(
-    r"\bship\s+(?:all\s+)?(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:total\s+)?guards?\b"
-    r"(?=\s*(?:[,.]|today|now|across|via|in v2|as\s+of\s+(?:today|now|this)))",
+    # Phase 7F: also catch past-tense "shipped" and parenthetical/by-today tails.
+    r"\bship(?:ped|s)?\s+(?:all\s+)?(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:total\s+)?guards?\b"
+    r"(?=\s*[\.\,\(]?\s*"
+    r"(?:today|now|across|via|in v2"
+    r"|as\s+of\s+(?:today|now|this)"
+    r"|by\s+today))",
     re.I,
 )
 

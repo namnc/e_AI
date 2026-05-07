@@ -130,6 +130,22 @@ class ProxyState:
 # Profile-based analysis
 # ---------------------------------------------------------------------------
 
+def is_valid_jsonrpc_id(x: Any) -> bool:
+    """JSON-RPC 2.0: id MUST be String, Number, or NULL. Booleans, arrays,
+    and objects are invalid. We exclude booleans even though Python `bool`
+    is a subclass of `int` (so `Counter` would happily key on them) — bool
+    ids are spec-bad and we reject for hygiene. Phase 7B per Codex review."""
+    if x is None:
+        return True
+    if isinstance(x, bool):
+        return False  # bool is int subclass; reject explicitly
+    if isinstance(x, (int, float)):
+        return True
+    if isinstance(x, str):
+        return True
+    return False
+
+
 def analyze_request(method: str, params: list, state: ProxyState) -> list[Alert]:
     """Analyze an RPC request against loaded profiles."""
     alerts = []
@@ -269,6 +285,14 @@ def analyze_response(method: str, params: list, result: Any, state: ProxyState) 
 # Hardening defaults (overridable at run_proxy() time).
 MAX_BODY_BYTES = 4 * 1024 * 1024  # 4 MB cap on request body
 
+# Phase 7C: bounded best-effort timeout on the notification upstream POST.
+# The proxy uses a single-threaded HTTPServer, so a slow upstream cannot
+# be allowed to hold a notification request for the client's default
+# timeout (30s) — that would also stall every other in-flight request.
+# 3s is enough for a healthy local node and short enough that the wallet
+# UX doesn't perceive a stall. Override at run_proxy() if needed.
+NOTIFICATION_FORWARD_TIMEOUT_S = 3.0
+
 
 class RPCProxyHandler(BaseHTTPRequestHandler):
     upstream: str = "http://localhost:8545"
@@ -391,18 +415,25 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
             })
             return
 
-        # JSON-RPC notification on the normal path: forward fire-and-forget,
+        # JSON-RPC notification on the normal path: forward best-effort,
         # do NOT parse the upstream response. Real upstreams may return 204 /
         # empty body for notifications, which previously caused the proxy to
         # 502 (Codex Phase 5 review #1). Acknowledge to the caller with HTTP
-        # 204; pre-analysis already ran. Any post-response analysis is
-        # impossible (no response) and skipped.
+        # 204; pre-analysis already ran.
+        #
+        # Phase 7C (Codex Phase 6 review #3): use a short timeout so a slow
+        # upstream cannot block the proxy thread for the full client default
+        # (30s) before the caller sees its 204. The proxy uses a single-
+        # threaded HTTPServer, so a long forward stalls every other request.
+        # The contract is now "best-effort short forward" — not full
+        # asynchronous fire-and-forget, but bounded latency.
         if is_notification:
             try:
                 self.http_client.post(
                     self.upstream,
                     content=body,
                     headers={"Content-Type": "application/json"},
+                    timeout=NOTIFICATION_FORWARD_TIMEOUT_S,
                 )
             except httpx.HTTPError as e:
                 # Notification is fire-and-forget at the JSON-RPC layer; we
@@ -462,25 +493,52 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
             self._send_error(400, "Empty batch")
             return
 
-        # First pass: detect duplicate id-bearing entries. Any id appearing
-        # in >1 entry is rejected for ALL occurrences (Phase 5 review #3).
-        # Notifications are not in this set ("id" not in r).
-        from collections import Counter as _Counter
-        id_counts = _Counter(
-            r.get("id") for r in requests
-            if isinstance(r, dict) and "id" in r
-        )
-        dup_ids = {k for k, v in id_counts.items() if v > 1}
-
         n = len(requests)
         plan: list[str] = ["forward"] * n
         prebuilt: list[dict | None] = [None] * n
+
+        # Phase 7B: pre-validate ids BEFORE the duplicate-id Counter pass.
+        # JSON-RPC 2.0 ids must be String, Number, or NULL. An array/object
+        # id would crash Counter with TypeError (unhashable). A boolean id
+        # is spec-bad and we reject for hygiene. We mark these slots as
+        # "invalid" up front and exclude them from the duplicate scan.
+        invalid_id_slots: set[int] = set()
+        for i, r in enumerate(requests):
+            if not isinstance(r, dict):
+                # Non-dict entries get -32600 below in the main loop.
+                continue
+            if "id" in r and not is_valid_jsonrpc_id(r["id"]):
+                invalid_id_slots.add(i)
+                plan[i] = "invalid"
+                prebuilt[i] = {
+                    "jsonrpc": "2.0", "id": None,
+                    "error": {
+                        "code": -32600,
+                        "message": (
+                            f"Invalid id type in batch: "
+                            f"{type(r['id']).__name__}; must be string, number, or null"
+                        ),
+                    },
+                }
+
+        # First pass: detect duplicate id-bearing entries. Any valid id
+        # appearing in >1 entry is rejected for ALL occurrences (Phase 5
+        # review #3). Notifications and invalid-id slots are excluded.
+        from collections import Counter as _Counter
+        id_counts = _Counter(
+            r["id"] for i, r in enumerate(requests)
+            if isinstance(r, dict) and "id" in r and i not in invalid_id_slots
+        )
+        dup_ids = {k for k, v in id_counts.items() if v > 1}
+
         # For forward slots, map id → slot index for the merge step.
         id_to_slot: dict[Any, int] = {}
         # Forward items to actually send upstream (id-bearing only).
         forward_payload: list[dict] = []
 
         for i, r in enumerate(requests):
+            if i in invalid_id_slots:
+                continue  # already handled above
             if not isinstance(r, dict):
                 plan[i] = "invalid"
                 prebuilt[i] = {
@@ -578,10 +636,30 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
 
         # Merge by id — notifications generate no upstream response, so the
         # response list is permitted to be shorter than forward_payload.
+        # Phase 7A (Codex Phase 6 review #1): require "id" in r_out
+        # explicitly, NOT r_out.get("id"), so a malformed upstream response
+        # with no id field cannot be matched against an explicit id:null
+        # request. Without this check, both yield None and collide.
         for r_out in upstream_responses:
             if not isinstance(r_out, dict):
                 continue
-            r_id = r_out.get("id")
+            if "id" not in r_out:
+                log.warning(
+                    "Upstream response missing 'id' field; dropping (cannot "
+                    "be matched to a request slot — distinct from explicit "
+                    "id:null which has the key present)"
+                )
+                continue
+            r_id = r_out["id"]
+            # Defensive: malformed upstream id (array/object/etc) can't be
+            # used as a dict key in id_to_slot. Treat as unknown rather
+            # than crashing.
+            if not is_valid_jsonrpc_id(r_id):
+                log.warning(
+                    f"Upstream returned response with invalid id type "
+                    f"{type(r_id).__name__}; dropping"
+                )
+                continue
             slot = id_to_slot.get(r_id)
             if slot is None:
                 # Unknown id — log and drop. JSON-RPC servers should not

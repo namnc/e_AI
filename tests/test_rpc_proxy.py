@@ -663,6 +663,167 @@ class TestProxyHTTP(unittest.TestCase):
         self.assertEqual(body[0]["id"], 1)
         self.assertEqual(body[0]["result"], "0xdeadbeef")
 
+    # ---- Phase 7A: id:null vs missing upstream id distinction (Codex Phase 6 #1) ----
+
+    def test_batch_id_null_does_not_collide_with_missing_upstream_id(self):
+        """Phase 7A: prior code used r_out.get('id') which returned None for
+        BOTH explicit id:null AND missing-id. A malformed upstream response
+        with no id field would satisfy an explicit-null request slot. Phase 7A
+        requires 'id' in r_out — missing-id responses are dropped + logged."""
+        batch = [
+            {"jsonrpc": "2.0", "id": None, "method": "eth_chainId", "params": []},
+        ]
+        # Upstream sends a malformed response with NO id field
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "result": "0xMALFORMED_NO_ID"},
+        ]).encode()
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(len(body), 1)
+        # The id:null request slot must NOT be filled with the malformed
+        # upstream response — it must surface -32603 instead.
+        self.assertNotIn("result", body[0])
+        self.assertIn("error", body[0])
+        self.assertEqual(body[0]["error"]["code"], -32603)
+
+    def test_batch_id_null_matched_by_explicit_null_upstream(self):
+        """Phase 7A: explicit `id:null` upstream response (key present, value
+        null) DOES match the id:null request slot."""
+        batch = [
+            {"jsonrpc": "2.0", "id": None, "method": "eth_chainId", "params": []},
+        ]
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "id": None, "result": "0xnullok"},
+        ]).encode()
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(len(body), 1)
+        self.assertEqual(body[0].get("result"), "0xnullok")
+
+    # ---- Phase 7B: invalid id types rejected before Counter (Codex Phase 6 #2) ----
+
+    def test_batch_array_id_rejected_with_invalid_request(self):
+        """Phase 7B: id:[] is unhashable; prior Counter() crashed. Must reject
+        as -32600 instead of crashing the handler."""
+        batch = [
+            {"jsonrpc": "2.0", "id": [], "method": "eth_chainId", "params": []},
+            {"jsonrpc": "2.0", "id": 7, "method": "eth_blockNumber", "params": []},
+        ]
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "id": 7, "result": "0xff"},
+        ]).encode()
+        resp = self._post(json.dumps(batch))
+        self.assertEqual(resp.status_code, 200,
+                         "handler must not crash on unhashable id")
+        body = resp.json()
+        self.assertEqual(len(body), 2)
+        # First slot: -32600 invalid; id is None (we can't echo the bad id).
+        self.assertIn("error", body[0])
+        self.assertEqual(body[0]["error"]["code"], -32600)
+        self.assertIn("Invalid id type", body[0]["error"]["message"])
+        # Second slot: forwarded normally.
+        by_id = {item["id"]: item for item in body if item.get("id") is not None}
+        self.assertEqual(by_id[7]["result"], "0xff")
+
+    def test_batch_object_id_rejected(self):
+        """Phase 7B: id:{} is also invalid + unhashable."""
+        batch = [{"jsonrpc": "2.0", "id": {"x": 1}, "method": "eth_chainId", "params": []}]
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(body[0]["error"]["code"], -32600)
+
+    def test_batch_boolean_id_rejected(self):
+        """Phase 7B: bool ids are spec-bad (JSON-RPC 2.0 says String/Number/null)."""
+        batch = [{"jsonrpc": "2.0", "id": True, "method": "eth_chainId", "params": []}]
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(body[0]["error"]["code"], -32600)
+
+    def test_batch_duplicate_id_2_succeeds_via_upstream(self):
+        """Phase 7H (Codex Phase 6 coverage gap): the prior dup-id test only
+        asserted that both id=1 entries were rejected. It never asserted
+        that the OTHER (non-duplicate) id=2 entry actually succeeded via
+        upstream. Pin that here."""
+        batch = [
+            {"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []},
+            {"jsonrpc": "2.0", "id": 2, "method": "eth_blockNumber", "params": []},
+            {"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []},
+        ]
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "id": 2, "result": "0xPASSED_THROUGH"},
+        ]).encode()
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(len(body), 3)
+        # id=2 must have a result, not -32600
+        slot_2 = next(item for item in body if item["id"] == 2)
+        self.assertEqual(slot_2.get("result"), "0xPASSED_THROUGH",
+                         "non-duplicate id=2 must succeed via upstream")
+        self.assertNotIn("error", slot_2)
+
+    # ---- Phase 7C: notification fire-and-forget bounded timeout (Codex Phase 6 #3) ----
+
+    def test_single_notification_returns_204_promptly_when_upstream_slow(self):
+        """Phase 7C: prior `_handle_single` used the client's 30s default
+        timeout for notification forwards, blocking the proxy thread on a
+        slow upstream. Phase 7C uses NOTIFICATION_FORWARD_TIMEOUT_S=3.0.
+        We start a deliberately slow upstream and assert the caller sees
+        204 within a bound that's well under the old 30s default."""
+        # Replace the canned response with a slow handler. The recording
+        # upstream sleeps 5 seconds before responding.
+        slow_called = threading.Event()
+        slow_unblock = threading.Event()
+
+        class _SlowUpstream(BaseHTTPRequestHandler):
+            def do_POST(self):
+                slow_called.set()
+                # Block until the test releases (or notification timeout fires)
+                slow_unblock.wait(timeout=10)
+                # The proxy almost certainly closed the connection by now
+                # (the notification timeout is 3s, the test waits up to 6s).
+                # Sending a response on a closed socket raises BrokenPipeError;
+                # swallow it — that's the whole point of "fire-and-forget".
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"jsonrpc":"2.0","id":1,"result":"0x1"}')
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass
+            def log_message(self, *a, **kw):
+                pass
+            def handle_one_request(self):
+                # Suppress the default error logging from the broken-pipe path
+                try:
+                    super().handle_one_request()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass
+
+        # Start the slow upstream on its own port, point a fresh handler at it.
+        slow_port = _free_port()
+        slow_server = _start_server(_SlowUpstream, slow_port)
+        # Save original config; swap to the slow upstream just for this test.
+        orig_upstream = RPCProxyHandler.upstream
+        RPCProxyHandler.upstream = f"http://127.0.0.1:{slow_port}"
+        try:
+            body = json.dumps({"jsonrpc": "2.0", "method": "eth_chainId", "params": []})
+            t0 = time.time()
+            resp = self._post(body)
+            elapsed = time.time() - t0
+            # Phase 7C: bounded best-effort timeout (3s default). Caller must
+            # see 204 well under the old client default of 30s. Allow a
+            # generous 6s margin to absorb scheduling jitter on slow CI
+            # runners (the timeout itself is 3s).
+            self.assertEqual(resp.status_code, 204)
+            self.assertLess(elapsed, 6.0,
+                            f"notification path blocked too long: {elapsed:.2f}s "
+                            "(NOTIFICATION_FORWARD_TIMEOUT_S=3.0)")
+        finally:
+            slow_unblock.set()
+            slow_server.shutdown()
+            slow_server.server_close()
+            RPCProxyHandler.upstream = orig_upstream
+
     # ---- Auth token ----
 
     def test_auth_token_required_when_set(self):

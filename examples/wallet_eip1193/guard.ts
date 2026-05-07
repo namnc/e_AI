@@ -54,8 +54,37 @@ const ALERT_SEVERITIES: ReadonlySet<AlertSeverity> = new Set([
   'critical', 'high', 'medium', 'low', 'info',
 ] as const);
 
-function isKnownSeverity(s: string): s is AlertSeverity {
+export function isKnownSeverity(s: string): s is AlertSeverity {
   return (ALERT_SEVERITIES as ReadonlySet<string>).has(s);
+}
+
+/**
+ * Phase 7H: coerce alert severities in-place. Any alert with a severity
+ * outside the closed enum (typo, profile bug) gets coerced to 'critical'
+ * for fail-closed dispatch behavior, and a warning is logged. Returns
+ * the count of coerced alerts so tests can assert on it without needing
+ * to spy on console.warn.
+ *
+ * Exposed so tests can exercise the coercion path directly with a typoed
+ * alert — the analyzeTx-built alerts in this file are TypeScript literals
+ * and cannot carry a typo without breaking the type check.
+ */
+export function coerceAlertSeverities(
+  alerts: { severity: string; profile?: string; heuristic?: string }[],
+): number {
+  let coerced = 0;
+  for (const a of alerts) {
+    if (!isKnownSeverity(a.severity)) {
+      console.warn(
+        `[e_AI Guard] Unknown severity ${JSON.stringify(a.severity)} ` +
+        `on ${a.profile ?? '?'}/${a.heuristic ?? '?'}; coercing to ` +
+        `'critical' for safety`,
+      );
+      a.severity = 'critical';
+      coerced++;
+    }
+  }
+  return coerced;
 }
 
 interface Heuristic {
@@ -389,19 +418,55 @@ function analyzeSignature(typedData: unknown): Alert[] {
  * tuples. Phase 6D: surfaces profile-authoring bugs at config time rather
  * than at first dispatch.
  *
- * Caller decides whether to throw or log+continue. The default `withEIP1193Guard`
- * call logs a warning per offender; callers who want strict mode can throw
- * on a non-empty list.
+ * Phase 7E (Codex Phase 6 review #5): hardened against malformed input.
+ * Accepts unknown[] and defensively checks each entry's shape. null /
+ * non-object profile entries surface as offenders rather than crashing.
+ * Profiles without a `heuristics` dict surface a single
+ * "<no-heuristics>" offender.
+ *
+ * Caller decides whether to throw or log+continue. The default
+ * `withEIP1193Guard` call logs a warning per offender; callers who want
+ * strict mode can throw on a non-empty list.
  */
 export function validateProfileSeverities(
-  profiles: Profile[],
+  profiles: unknown[],
 ): { profile: string; heuristic: string; severity: string }[] {
   const offenders: { profile: string; heuristic: string; severity: string }[] = [];
+  if (!Array.isArray(profiles)) {
+    offenders.push({ profile: '<unknown>', heuristic: '<input>', severity: '<not-array>' });
+    return offenders;
+  }
   for (const p of profiles) {
-    const dom = p?.meta?.domain_name ?? '<unknown>';
-    const heur = (p as { heuristics?: Record<string, { severity?: string }> }).heuristics ?? {};
-    for (const [hkey, hval] of Object.entries(heur)) {
-      const sev = hval?.severity ?? '<missing>';
+    if (p === null || typeof p !== 'object') {
+      offenders.push({
+        profile: '<unknown>', heuristic: '<profile>',
+        severity: p === null ? '<null>' : `<${typeof p}>`,
+      });
+      continue;
+    }
+    const obj = p as { meta?: { domain_name?: unknown }; heuristics?: unknown };
+    const dom = (typeof obj.meta?.domain_name === 'string' && obj.meta.domain_name) || '<unknown>';
+    const heur = obj.heuristics;
+    if (heur === undefined || heur === null) {
+      offenders.push({ profile: dom, heuristic: '<no-heuristics>', severity: '<missing>' });
+      continue;
+    }
+    if (typeof heur !== 'object' || Array.isArray(heur)) {
+      offenders.push({
+        profile: dom, heuristic: '<no-heuristics>',
+        severity: Array.isArray(heur) ? '<array>' : `<${typeof heur}>`,
+      });
+      continue;
+    }
+    for (const [hkey, hval] of Object.entries(heur as Record<string, unknown>)) {
+      if (hval === null || typeof hval !== 'object') {
+        offenders.push({
+          profile: dom, heuristic: hkey,
+          severity: hval === null ? '<null>' : `<${typeof hval}>`,
+        });
+        continue;
+      }
+      const sev = (hval as { severity?: unknown }).severity ?? '<missing>';
       if (typeof sev !== 'string' || !isKnownSeverity(sev)) {
         offenders.push({ profile: dom, heuristic: hkey, severity: String(sev) });
       }
@@ -471,21 +536,15 @@ export function withEIP1193Guard(
       // user-facing 'warn' action. They are observability events, not
       // friction. Only alerts at severity ≥ low contribute to 'warn'.
       //
-      // Phase 5 review #6 / Phase 6D: any alert with an unknown severity
-      // (typo'd 'critcal', new value 'debug', etc.) is fail-closed —
-      // coerced to 'critical' for dispatch decisions so it BLOCKS rather
-      // than silently passing or warning. The unknown value is also
-      // surfaced to onAlert so the profile/alert-construction bug is
-      // observable.
-      for (const a of alerts) {
-        if (!isKnownSeverity(a.severity)) {
-          console.warn(
-            `[e_AI Guard] Unknown severity ${JSON.stringify(a.severity)} ` +
-            `on ${a.profile}/${a.heuristic}; coercing to 'critical' for safety`,
-          );
-          a.severity = 'critical';
-        }
-      }
+      // Phase 5 review #6 / Phase 6D / Phase 7H: any alert with an unknown
+      // severity (typo'd 'critcal', new value 'debug', etc.) is fail-
+      // closed — coerced to 'critical' for dispatch decisions so it
+      // BLOCKS rather than silently passing or warning. The unknown value
+      // is also surfaced to onAlert so the profile/alert-construction
+      // bug is observable. Coercion logic factored into
+      // `coerceAlertSeverities` so tests can exercise it directly
+      // (Phase 7H).
+      coerceAlertSeverities(alerts);
       const userVisible = alerts.filter(a => a.severity !== 'info');
       if (alerts.length > 0) {
         const hasCritical = alerts.some(a => a.severity === 'critical' && a.confidence > 0.8);
