@@ -10,14 +10,24 @@ RPC-pattern monitoring could integrate, not as the canonical RPC
 runtime. See README "Integration demos (status: illustrative
 adapters)" section.
 
-ADDITIONAL CAVEATS (per Codex 2026-05-07 review):
-  - The CORS policy is permissive (`Access-Control-Allow-Origin: *`).
-    Hardening (origin allowlist + bearer token + body cap + batch
-    handling + state-pruning + shared httpx.Client lifecycle) is
-    queued. Do not run this proxy on a public network or as a
-    browser-accessible local-RPC surface today.
-  - Documented `--profiles` flag is not actually accepted by the CLI
-    parser; will be addressed in the same hardening pass.
+HARDENING (Phase 2, applied 2026-05-07 per Codex review):
+  - CORS DISABLED by default. To allow a browser origin, pass
+    --allow-origin <url> (repeatable). Non-allowlisted origins receive
+    no Access-Control-Allow-Origin header and OPTIONS preflight returns
+    403.
+  - Optional bearer-token auth via --auth-token <secret>; when set,
+    requests must carry `Authorization: Bearer <secret>` or get 401.
+  - 4 MB request-body cap (MAX_BODY_BYTES) enforced before parsing JSON;
+    oversize → 413.
+  - JSON-RPC batch handling (list payload → list response).
+  - State-pruning to a 5-minute window across ALL time-keyed maps
+    (balance_address_seen, call_target_log, known_position_log,
+    pool_queries — not just query_log).
+  - Shared httpx.Client created at startup, closed cleanly on shutdown.
+  - --dry-run does NOT forward to upstream; returns synthetic
+    acknowledgment with _e_ai_dry_run flag and any pre-alerts.
+  - --profiles flag accepted (no-op today; reserved for the future
+    profile-driven runtime).
 
 HTTP JSON-RPC proxy that sits between wallet and local node.
 Forwards all requests while running pattern-based analysis on

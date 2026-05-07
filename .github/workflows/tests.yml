@@ -102,3 +102,82 @@ jobs:
             echo "::endgroup::"
           done
           exit $fail
+
+      - name: Validation engine fail-gate test (CI must reject FAIL profiles)
+        # Per Codex critical review: validation CLI must exit non-zero on
+        # Overall: FAIL. _template/profile.json has only 1 heuristic and
+        # F4_confidence_calibration produces FAIL — perfect failing fixture.
+        # If this step succeeds, CI is silently passing FAIL profiles.
+        run: |
+          if python3 -m meta.tx_validation_engine domains/_template/profile.json >/dev/null 2>&1; then
+            echo "::error::Validation engine should have exited non-zero on _template profile (Overall: FAIL)"
+            exit 1
+          fi
+          echo "OK: validation CLI correctly exits non-zero on FAIL profile."
+
+      - name: README quickstart smoke test
+        # Prove that the advertised quickstart commands still work.
+        run: |
+          set -e
+          pip install -r requirements.txt
+          # Run all v2 domain tests per advertised command (excluding defi_*).
+          for d in domains/*/test_profile.py domains/*/test_analyzer.py; do
+            case "$(dirname "$d" | xargs basename)" in
+              defi|defi_*|_template|_feedback) continue;;
+            esac
+            python3 "$d" || exit 1
+          done
+          # Schema-validate every v2 production profile.
+          for d in domains/*/profile.json; do
+            case "$(dirname "$d" | xargs basename)" in
+              defi|defi_*|_template|_feedback) continue;;
+            esac
+            python3 -m meta.tx_validation_engine "$d" || exit 1
+          done
+
+      - name: Documentation drift linter
+        # Per Codex critical review: prevent regressions on
+        # production-vs-prototype wording, count drift (15 vs 16),
+        # and broken internal links to AI_PS-only paths.
+        run: python3 scripts/lint_docs.py
+
+  v2-integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: RPC proxy unit tests (CORS, batch, body-cap, state-pruning, dry-run)
+        run: python3 -m unittest tests.test_rpc_proxy -v
+
+      - name: Wallet EIP-1193 ABI-decoding tests
+        run: python3 tests/test_wallet_eip1193.py
+
+      - name: AI-agent demo emits expected warnings
+        # Per Codex critical review (additional finding D): the demo's
+        # advertised risky scenarios MUST emit warnings. Was previously
+        # silent; this gate prevents regression.
+        run: |
+          out=$(python3 examples/ai_agent/guard.py)
+          echo "$out"
+          echo "$out" | grep -q "WARNING for approve_token" || { echo "::error::approve_token did not warn"; exit 1; }
+          echo "$out" | grep -q "WARNING for check_balance" || { echo "::error::check_balance did not warn"; exit 1; }
+          echo "$out" | grep -q "Loaded 16 profiles" || { echo "::error::AI agent loaded wrong profile count"; exit 1; }
+
+      - name: TypeScript syntax check (best-effort; node 20+ required)
+        run: |
+          if command -v node >/dev/null 2>&1; then
+            node --version
+            # node >= 20 supports executing .ts files directly with --experimental-strip-types
+            # for a basic syntax/parse check. Full tsc --noEmit is queued for a future pass.
+            node --experimental-strip-types --no-warnings -e "import('./examples/wallet_eip1193/guard.ts').then(()=>console.log('parse OK')).catch((e)=>{console.error(e); process.exit(1);})" || echo "::warning::TS parse check failed (or node version <20). Full tsc --noEmit pending."
+          else
+            echo "::warning::node not available; skipping TS parse check."
+          fi
