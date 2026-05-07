@@ -23,6 +23,7 @@ import unittest
 HEX_RE = re.compile(r"^0x[0-9a-fA-F]*$")
 MAX_UINT256 = (1 << 256) - 1
 ERC20_APPROVE_SELECTOR = "0x095ea7b3"
+ERC20_INCREASE_ALLOWANCE_SELECTOR = "0x39509351"
 ERC721_SETAPPROVALFORALL_SELECTOR = "0xa22cb465"
 
 
@@ -58,6 +59,11 @@ def decode_uint256(data: str, byte_offset: int) -> int:
     if len(hex_word) != 64:
         raise ValueError(f"decode_uint256: short read at offset {byte_offset}")
     return int(hex_word, 16)
+
+
+def decode_bool(data: str, byte_offset: int) -> bool:
+    """Match guard.ts decodeBool exactly. Non-zero word = true."""
+    return decode_uint256(data, byte_offset) != 0
 
 
 def _build_approve_calldata(spender: str, amount: int) -> str:
@@ -152,6 +158,51 @@ class TestSetApprovalForAll(unittest.TestCase):
         cd = ERC721_SETAPPROVALFORALL_SELECTOR + operator_word + approved_word
         self.assertTrue(is_well_formed_calldata(cd, 64))
         self.assertEqual(decode_address(cd, 4).lower(), operator.lower())
+
+    def test_decode_bool_true(self):
+        """Codex Phase 3 review missed-coverage #2: must distinguish
+        approved=true from approved=false. Previously the guard fired the
+        same high-severity alert for both."""
+        operator_word = "0" * 24 + "ab" * 20
+        approved_word = "0" * 63 + "1"
+        cd = ERC721_SETAPPROVALFORALL_SELECTOR + operator_word + approved_word
+        self.assertTrue(decode_bool(cd, 4 + 32))
+
+    def test_decode_bool_false_revocation(self):
+        """approved=false is a REVOCATION; the helper must distinguish it
+        from a grant. The TS guard now emits low-severity H4_revoke for
+        this case (see guard.ts setApprovalForAll branch)."""
+        operator_word = "0" * 24 + "ab" * 20
+        approved_word = "0" * 64
+        cd = ERC721_SETAPPROVALFORALL_SELECTOR + operator_word + approved_word
+        self.assertTrue(is_well_formed_calldata(cd, 64))
+        self.assertFalse(decode_bool(cd, 4 + 32))
+
+
+class TestIncreaseAllowance(unittest.TestCase):
+    """Calldata layout: selector + spender (32B) + addedValue (32B), same shape
+    as approve(). Codex Phase 3 review missed-coverage #3: increaseAllowance
+    is in the selector table but was never tested."""
+
+    def _build_increase_allowance_calldata(self, spender: str, added: int) -> str:
+        spender_word = "0" * 24 + spender.lower().replace("0x", "")
+        amount_word = f"{added:064x}"
+        return ERC20_INCREASE_ALLOWANCE_SELECTOR + spender_word + amount_word
+
+    def test_well_formed(self):
+        cd = self._build_increase_allowance_calldata("0x" + "11" * 20, 100)
+        self.assertTrue(is_well_formed_calldata(cd, 64))
+
+    def test_decodes_spender_and_value(self):
+        spender = "0x" + "ee" * 20
+        added = 1234567
+        cd = self._build_increase_allowance_calldata(spender, added)
+        self.assertEqual(decode_address(cd, 4).lower(), spender.lower())
+        self.assertEqual(decode_uint256(cd, 4 + 32), added)
+
+    def test_unlimited_increase_triggers_threshold(self):
+        cd = self._build_increase_allowance_calldata("0x" + "00" * 20, MAX_UINT256)
+        self.assertGreaterEqual(decode_uint256(cd, 4 + 32), MAX_UINT256 // 2)
 
 
 # ---------------------------------------------------------------------------

@@ -174,6 +174,12 @@ function decodeUint256(data: string, byteOffset: number): bigint {
   return BigInt(hex);
 }
 
+function decodeBool(data: string, byteOffset: number): boolean {
+  // Solidity ABI: bool is encoded in a 32-byte word; non-zero word = true.
+  // We read as uint256 and compare against zero.
+  return decodeUint256(data, byteOffset) !== BigInt(0);
+}
+
 function analyzeTx(to: string, data: string, value: bigint, profiles: Profile[]): Alert[] {
   const alerts: Alert[] = [];
   if (!data || data.length < 10) return alerts;
@@ -240,19 +246,37 @@ function analyzeTx(to: string, data: string, value: bigint, profiles: Profile[])
       return alerts;
     }
     let operator: string;
+    let approved: boolean;
     try {
       operator = decodeAddress(data, 4);
+      approved = decodeBool(data, 4 + 32);
     } catch {
       operator = '<decode-failed>';
+      approved = true;  // fail closed: alert if we can't tell
     }
-    alerts.push({
-      profile: 'approval_phishing',
-      heuristic: 'H4',
-      severity: 'high',
-      confidence: 0.75,
-      signal: `setApprovalForAll — collection=${to}, operator=${operator}`,
-      recommendation: 'Verify the operator contract is legitimate before approving all NFTs',
-    });
+
+    // Codex Phase 3 review missed-coverage #2: setApprovalForAll(false) is
+    // a REVOCATION, not a grant — emit an info-level note rather than the
+    // high-severity grant alert. Previously fired the same alert for both.
+    if (!approved) {
+      alerts.push({
+        profile: 'approval_phishing',
+        heuristic: 'H4_revoke',
+        severity: 'low',
+        confidence: 0.9,
+        signal: `setApprovalForAll(false) — REVOKING operator approval, collection=${to}, operator=${operator}`,
+        recommendation: 'No action needed; revocation is a defensive operation.',
+      });
+    } else {
+      alerts.push({
+        profile: 'approval_phishing',
+        heuristic: 'H4',
+        severity: 'high',
+        confidence: 0.75,
+        signal: `setApprovalForAll(true) — collection=${to}, operator=${operator}`,
+        recommendation: 'Verify the operator contract is legitimate before approving all NFTs',
+      });
+    }
   }
 
   return alerts;
