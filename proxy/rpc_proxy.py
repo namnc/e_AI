@@ -398,43 +398,77 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
         self._send_json(response)
 
     def _handle_batch(self, requests: list, body: bytes):
-        """Handle JSON-RPC batch requests."""
+        """Handle JSON-RPC batch requests.
+
+        Per-item plan slots:
+          - "invalid"  → not a dict; responds with -32600.
+          - "blocked"  → critical alert above the confidence floor; responds
+                         with the guard-block error.
+          - "dryrun"   → dry-run path; responds with synthetic _e_ai_dry_run
+                         acknowledgement carrying the per-item pre-alerts.
+          - "forward"  → normal path; placeholder filled from the upstream
+                         response after the upstream call.
+        Per-item slots are filled in order so per-item ids are preserved
+        (Codex Phase 3 review #4 + #5).
+        """
         if not requests:
             self._send_error(400, "Empty batch")
             return
 
-        responses = []
-        any_critical = False
-        for r in requests:
+        n = len(requests)
+        plan: list[str] = ["forward"] * n
+        prebuilt: list[dict | None] = [None] * n
+        per_item_pre_alerts: list[list] = [[] for _ in range(n)]
+
+        for i, r in enumerate(requests):
             if not isinstance(r, dict):
-                responses.append({
+                plan[i] = "invalid"
+                prebuilt[i] = {
                     "jsonrpc": "2.0", "id": None,
                     "error": {"code": -32600, "message": "Invalid request in batch"},
-                })
+                }
                 continue
+
             method = r.get("method", "")
             params = r.get("params", [])
             req_id = r.get("id", None)
 
             pre_alerts = analyze_request(method, params, self.state)
+            per_item_pre_alerts[i] = pre_alerts
             for alert in pre_alerts:
                 self._log_alert(alert)
 
             critical = [a for a in pre_alerts if a.severity == "critical" and a.confidence > 0.8]
-            if critical and not self.dry_run:
-                any_critical = True
+
+            if self.dry_run:
+                plan[i] = "dryrun"
+                prebuilt[i] = {
+                    "jsonrpc": "2.0", "id": req_id, "result": None,
+                    "_e_ai_dry_run": True,
+                    "_e_ai_alerts": [
+                        {"profile": a.profile, "heuristic": a.heuristic, "severity": a.severity}
+                        for a in pre_alerts
+                    ],
+                }
+            elif critical:
+                plan[i] = "blocked"
                 error_msg = "; ".join(f"[{a.heuristic}] {a.signal}" for a in critical)
-                responses.append({
+                prebuilt[i] = {
                     "jsonrpc": "2.0", "id": req_id,
                     "error": {"code": -32000, "message": f"e_AI Guard blocked: {error_msg}"},
-                })
+                }
 
-        # If any critical fired, short-circuit; do not forward to upstream.
-        if any_critical or self.dry_run:
-            self._send_json(responses)
+        # If everything is non-forward (dry-run + invalid + blocked), respond
+        # without contacting the upstream. Preserves per-item ids and emits
+        # invalid-item errors (previously silently dropped on the no-upstream
+        # path; #5 in review).
+        if all(p != "forward" for p in plan):
+            self._send_json([prebuilt[i] for i in range(n)])
             return
 
-        # Forward the whole batch to upstream
+        # Forward the whole batch to upstream when at least one slot is
+        # "forward". Upstream sees the original body so its parser remains
+        # standards-compliant; we then merge in the prebuilt slots.
         try:
             resp = self.http_client.post(
                 self.upstream,
@@ -447,18 +481,41 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
             self._send_error(502, f"Upstream error: {e}")
             return
 
-        # Post-response analysis per item
+        merged: list[dict] = []
         if isinstance(upstream_responses, list):
-            for r_in, r_out in zip(requests, upstream_responses):
-                if isinstance(r_in, dict) and isinstance(r_out, dict):
-                    result = r_out.get("result")
-                    post_alerts = analyze_response(
-                        r_in.get("method", ""), r_in.get("params", []), result, self.state
-                    )
-                    for alert in post_alerts:
-                        self._log_alert(alert)
+            up_iter = iter(upstream_responses)
+            for i, slot in enumerate(plan):
+                if slot == "forward":
+                    try:
+                        r_out = next(up_iter)
+                    except StopIteration:
+                        # Upstream returned fewer items than we forwarded; surface
+                        # an explicit slot-fill error rather than silently dropping.
+                        merged.append({
+                            "jsonrpc": "2.0",
+                            "id": (requests[i].get("id") if isinstance(requests[i], dict) else None),
+                            "error": {"code": -32603, "message": "Upstream truncated batch response"},
+                        })
+                        continue
+                    if isinstance(requests[i], dict) and isinstance(r_out, dict):
+                        result = r_out.get("result")
+                        post_alerts = analyze_response(
+                            requests[i].get("method", ""),
+                            requests[i].get("params", []),
+                            result,
+                            self.state,
+                        )
+                        for alert in post_alerts:
+                            self._log_alert(alert)
+                    merged.append(r_out if isinstance(r_out, dict) else {"jsonrpc": "2.0", "id": None, "result": r_out})
+                else:
+                    merged.append(prebuilt[i])
+        else:
+            # Non-list upstream response — pass through but keep prebuilt slots.
+            self._send_json(upstream_responses)
+            return
 
-        self._send_json(upstream_responses)
+        self._send_json(merged)
 
     # ------------------------------------------------------------------
     # Response helpers

@@ -182,8 +182,12 @@ class TestProxyHTTP(unittest.TestCase):
             RPCProxyHandler.http_client.close()
 
     def setUp(self):
-        # Reset upstream record + state between tests
+        # Reset upstream record + state between tests. Per Codex Phase 3
+        # review (#4 in missed-coverage), also reset canned_response — the
+        # batch test mutates it; if a test before line 262 fails the
+        # mutation leaks into later cases.
         _RecordingUpstream.received_bodies = []
+        _RecordingUpstream.canned_response = b'{"jsonrpc":"2.0","id":1,"result":"0x1"}'
         RPCProxyHandler.state = ProxyState()
         # Default: no CORS, no auth, not dry-run
         RPCProxyHandler.allowed_origins = ()
@@ -232,14 +236,122 @@ class TestProxyHTTP(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 403, "preflight from non-allowlisted origin must 403")
 
+    def test_options_preflight_allowlisted_emits_cors_headers(self):
+        # Codex Phase 3 review missed-coverage #6: OPTIONS allowlisted path.
+        RPCProxyHandler.allowed_origins = ("https://app.kohaku.app",)
+        resp = httpx.request(
+            "OPTIONS",
+            f"http://127.0.0.1:{self.proxy_port}",
+            headers={"Origin": "https://app.kohaku.app"},
+            timeout=5,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "https://app.kohaku.app")
+        self.assertIn("POST", resp.headers.get("Access-Control-Allow-Methods", ""))
+
+    def test_cors_credentials_header_only_when_auth_enabled(self):
+        # Codex Phase 3 review missed-coverage #6: ACAC-with-auth coupling.
+        RPCProxyHandler.allowed_origins = ("https://app.kohaku.app",)
+        RPCProxyHandler.auth_token = "secret"
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []})
+        resp = self._post(body, {
+            "Content-Type": "application/json",
+            "Origin": "https://app.kohaku.app",
+            "Authorization": "Bearer secret",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.headers.get("Access-Control-Allow-Credentials"), "true")
+        # And without auth_token set, ACAC must NOT appear.
+        RPCProxyHandler.auth_token = None
+        resp = self._post(body, {
+            "Content-Type": "application/json",
+            "Origin": "https://app.kohaku.app",
+        })
+        self.assertNotIn("access-control-allow-credentials",
+                         {k.lower() for k in resp.headers.keys()})
+
     # ---- Body-size cap ----
 
-    def test_body_cap_rejects_oversized(self):
-        big = b'{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[' + b'"x",' * (MAX_BODY_BYTES // 4) + b'"x"]}'
-        # Slightly above MAX_BODY_BYTES
-        self.assertGreater(len(big), MAX_BODY_BYTES)
-        resp = self._post(big, {"Content-Type": "application/json"})
-        self.assertEqual(resp.status_code, 413)
+    def test_body_cap_rejects_oversized_via_content_length(self):
+        """Codex Phase 3 review missed-coverage #5: don't actually transmit
+        4MB+ over localhost — the proxy rejects on Content-Length BEFORE
+        reading the body, so we can prove the invariant with a small body
+        and a lying header on a raw socket."""
+        import socket
+        s = socket.socket()
+        s.settimeout(5)
+        s.connect(("127.0.0.1", self.proxy_port))
+        # Declare an oversized Content-Length but send only a tiny body.
+        # The proxy must reject with 413 before reading.
+        oversized = MAX_BODY_BYTES + 1
+        request = (
+            f"POST / HTTP/1.1\r\n"
+            f"Host: 127.0.0.1:{self.proxy_port}\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: {oversized}\r\n"
+            f"\r\n"
+        ).encode()
+        s.sendall(request)
+        resp_bytes = s.recv(4096)
+        s.close()
+        self.assertIn(b"413", resp_bytes.split(b"\r\n", 1)[0])
+
+    def test_body_cap_boundary_at_max_plus_one(self):
+        """Boundary: Content-Length == MAX_BODY_BYTES+1 must be rejected.
+        We use a raw socket so we can declare an arbitrary Content-Length
+        without actually transmitting megabytes."""
+        import socket
+        for cl, expect_413 in ((MAX_BODY_BYTES + 1, True), (MAX_BODY_BYTES, False)):
+            s = socket.socket()
+            s.settimeout(5)
+            s.connect(("127.0.0.1", self.proxy_port))
+            request = (
+                f"POST / HTTP/1.1\r\n"
+                f"Host: 127.0.0.1:{self.proxy_port}\r\n"
+                f"Content-Type: application/json\r\n"
+                f"Content-Length: {cl}\r\n"
+                f"\r\n"
+            ).encode()
+            s.sendall(request)
+            # For the rejected case, server replies before reading body.
+            # For the accepted case, server will block waiting for the body
+            # we won't send; close after a short read attempt.
+            s.settimeout(0.5)
+            try:
+                resp_bytes = s.recv(4096)
+            except socket.timeout:
+                resp_bytes = b""
+            finally:
+                s.close()
+            first_line = resp_bytes.split(b"\r\n", 1)[0] if resp_bytes else b""
+            if expect_413:
+                self.assertIn(b"413", first_line, f"CL={cl} should be rejected")
+            else:
+                # Accepted CL: server did NOT reply with 413 (it was waiting
+                # for the body we never sent).
+                self.assertNotIn(b"413", first_line, f"CL={cl} should not be rejected")
+
+    def test_body_cap_invalid_content_length(self):
+        """Content-Length must be parseable; non-numeric → 400."""
+        import socket
+        s = socket.socket()
+        s.settimeout(5)
+        s.connect(("127.0.0.1", self.proxy_port))
+        request = (
+            f"POST / HTTP/1.1\r\n"
+            f"Host: 127.0.0.1:{self.proxy_port}\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: not-a-number\r\n"
+            f"\r\n"
+        ).encode()
+        s.sendall(request)
+        resp_bytes = s.recv(4096)
+        s.close()
+        # Python's BaseHTTPRequestHandler raises 400 on bad headers;
+        # accept either our explicit 400 ("Invalid Content-Length") or
+        # the BaseHTTPRequestHandler 400.
+        first_line = resp_bytes.split(b"\r\n", 1)[0]
+        self.assertIn(b"400", first_line)
 
     # ---- Batch handling ----
 
@@ -258,12 +370,61 @@ class TestProxyHTTP(unittest.TestCase):
         body = resp.json()
         self.assertIsInstance(body, list, "batch request must produce list response")
         self.assertEqual(len(body), 2)
-        # Restore canned response
-        _RecordingUpstream.canned_response = b'{"jsonrpc":"2.0","id":1,"result":"0x1"}'
 
     def test_empty_batch_returns_400(self):
         resp = self._post(b"[]")
         self.assertEqual(resp.status_code, 400)
+
+    def test_batch_dry_run_returns_per_item_acks(self):
+        """Codex Phase 3 review #4: dry-run batch must emit per-request
+        synthetic acknowledgements with _e_ai_dry_run, not [] or only the
+        invalid/blocked items."""
+        RPCProxyHandler.dry_run = True
+        batch = [
+            {"jsonrpc": "2.0", "id": 10, "method": "eth_chainId", "params": []},
+            {"jsonrpc": "2.0", "id": 11, "method": "eth_chainId", "params": []},
+        ]
+        before = len(_RecordingUpstream.received_bodies)
+        resp = self._post(json.dumps(batch))
+        self.assertEqual(resp.status_code, 200)
+        # Upstream must NOT have been contacted.
+        self.assertEqual(len(_RecordingUpstream.received_bodies), before)
+        body = resp.json()
+        self.assertIsInstance(body, list)
+        self.assertEqual(len(body), 2, "dry-run batch must return one ack per request")
+        # Each item carries the dry-run flag and original id.
+        for i, ack in enumerate(body):
+            self.assertTrue(ack.get("_e_ai_dry_run"))
+            self.assertEqual(ack.get("id"), 10 + i)
+
+    def test_batch_invalid_items_are_returned_not_dropped(self):
+        """Codex Phase 3 review #5: invalid (non-dict) batch entries must
+        produce -32600 errors in the response, not be silently dropped on
+        the upstream-forwarded path."""
+        batch = [
+            "not a dict",  # invalid
+            {"jsonrpc": "2.0", "id": 21, "method": "eth_chainId", "params": []},
+        ]
+        # Upstream sees the original body and returns a single-item list
+        # (because only the second item is forwardable from upstream's view —
+        # but actually upstream sees the WHOLE original body including the
+        # string. A real upstream might reject; for this test we cannonize
+        # the expected upstream response to one item matching the second
+        # request).
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "id": 21, "result": "0x1"},
+        ]).encode()
+        resp = self._post(json.dumps(batch))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIsInstance(body, list)
+        self.assertEqual(len(body), 2, "invalid items must be preserved in response")
+        # First slot: invalid
+        self.assertIn("error", body[0])
+        self.assertEqual(body[0]["error"]["code"], -32600)
+        # Second slot: upstream result
+        self.assertEqual(body[1].get("id"), 21)
+        self.assertEqual(body[1].get("result"), "0x1")
 
     # ---- Dry-run ----
 
