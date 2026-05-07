@@ -180,6 +180,14 @@ jobs:
       - name: Wallet EIP-1193 ABI-decoding tests
         run: python3 tests/test_wallet_eip1193.py
 
+      - name: AI-agent adapter unit tests
+        # Codex Phase 3 review missed-coverage #9: the AI-agent CI gate
+        # is otherwise just stdout grep. These tests pin the
+        # _build_tool_intent contract: approve_token builds correct
+        # ERC-20 calldata, check_balance emits eth_getBalance (not
+        # eth_call), and other tool routes go to the right RPC method.
+        run: python3 tests/test_ai_agent_adapter.py
+
       - name: AI-agent demo emits expected warnings
         # Per Codex critical review (additional finding D): the demo's
         # advertised risky scenarios MUST emit warnings. Was previously
@@ -203,6 +211,13 @@ jobs:
         run: |
           node --version
           node --experimental-strip-types --no-warnings -e "import('./examples/wallet_eip1193/guard.ts').then(()=>console.log('parse OK')).catch((e)=>{console.error(e); process.exit(1);})"
+
+      - name: Wallet guard.ts execution golden tests
+        # Codex Phase 3 review missed-coverage #1 + #2: actually run the
+        # TS code (not just parse it) and assert on alert shape, including
+        # the Phase 4B regression that setApprovalForAll(false) emits the
+        # low-severity revoke alert and NOT the high-severity grant alert.
+        run: node --experimental-strip-types --no-warnings tests/test_wallet_guard_ts.mjs
 
       - name: Kohaku integration typecheck (npm run typecheck)
         # Per Codex Phase 3 review #3: kohaku_integration is one of the
