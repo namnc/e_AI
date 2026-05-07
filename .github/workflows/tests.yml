@@ -49,7 +49,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install classifier dependencies
-        run: pip install -r requirements.txt
+        # ML stack only — torch, transformers, scikit, numpy, datasets.
+        # No need for the LLM SDKs in this job.
+        run: pip install -r requirements-ml.txt
 
       - name: Generate classifier data and train
         run: python3 classifier_validation.py run --n-sets 500 --epochs 5
@@ -117,6 +119,8 @@ jobs:
 
       - name: README quickstart smoke test
         # Prove that the advertised quickstart commands still work.
+        # README points at requirements.txt (the aggregate); this is the
+        # honest smoke test of the user's first-touch experience.
         run: |
           set -e
           pip install -r requirements.txt
@@ -152,7 +156,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        # base = httpx only; sufficient for proxy + wallet + AI-agent demo +
+        # all v2 domain tests. Skips ML/LLM extras to keep this job fast.
+        run: pip install -r requirements-base.txt
 
       - name: RPC proxy unit tests (CORS, batch, body-cap, state-pruning, dry-run)
         run: python3 -m unittest tests.test_rpc_proxy -v

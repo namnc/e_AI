@@ -1,0 +1,6 @@
+# Developer / CI tooling. Currently nothing beyond the base + ML
+# combination, but kept as a stable surface so future dev-only
+# additions (linters, fixtures) don't bloat the runtime extras.
+-r requirements-base.txt
+-r requirements-llm.txt
+-r requirements-ml.txt

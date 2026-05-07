@@ -1,0 +1,5 @@
+# e_AI v2 base dependencies — needed for the proxy, validation engine,
+# wallet/AI-agent demos, and v2 domain tests. Lightweight; sufficient
+# for everything in CI except the classifier-validation job and the
+# WildChat-corpus extractor.
+httpx==0.28.1

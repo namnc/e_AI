@@ -1,12 +1,7 @@
-# Core benchmarks (A, B, C, D, E, F)
-anthropic==0.89.0
-httpx==0.28.1
-
-# External classifier validation (classifier_validation.py)
-torch==2.11.0
-transformers==5.5.0
-scikit-learn==1.8.0
-numpy==2.4.4
-
-# Dataset extraction (optional — data/extract_wildchat_defi.py)
-datasets==4.8.4
+# Aggregate requirements for back-compat with `pip install -r requirements.txt`
+# advertised in the README quickstart. Splits live in:
+#   requirements-base.txt  — proxy, demos, v2 domain tests, integration
+#   requirements-llm.txt   — adds Anthropic (optional cloud backend)
+#   requirements-ml.txt    — adds torch / transformers / scikit / numpy / datasets
+#   requirements-dev.txt   — base + llm + ml (CI-style "everything")
+-r requirements-dev.txt

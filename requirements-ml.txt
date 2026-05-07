@@ -1,0 +1,9 @@
+# Heavyweight ML stack — only needed for classifier_validation.py and
+# the WildChat corpus extractor. Pulled in by the
+# classifier-validation CI job; not by domain tests or v2-integration.
+-r requirements-base.txt
+torch==2.11.0
+transformers==5.5.0
+scikit-learn==1.8.0
+numpy==2.4.4
+datasets==4.8.4

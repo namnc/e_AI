@@ -1,0 +1,5 @@
+# Cloud LLM backends (optional — Ollama is the default and reaches the
+# local daemon over HTTP via httpx in requirements-base.txt). Install
+# only if you want the Anthropic backend in core/llm_analyzer.py.
+-r requirements-base.txt
+anthropic==0.89.0
