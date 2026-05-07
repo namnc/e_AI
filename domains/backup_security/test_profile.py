@@ -131,6 +131,64 @@ def test_labeled_data_exists():
     assert len(lines) >= 5, f"Only {len(lines)} incidents"
 
 
+def test_analyzer_worst_case_fires():
+    """Rule-based analyzer fires alerts on a maximally insecure backup config."""
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from domains.backup_security.analyzer import BackupConfig, analyze_backup
+    profile = load_profile()
+    bad = BackupConfig(
+        user_address="0xUser",
+        backup_method="encrypted_seed_blob_on_arweave",
+        backup_encryption="ECDH(secp256k1) + AES-GCM",
+        encryption_factor="password_only",
+        password_strength_bits=38,
+        kdf_algorithm="pbkdf2",
+        kdf_iterations=10000,
+        guardian_count=3,
+        recovery_threshold=2,
+        guardians_last_liveness_check_days=[300, 280, 240],
+        uses_pq_kem=False,
+        kem_scheme="ecdh-secp256k1",
+        backup_is_permanent_onchain=True,
+        non_deterministic_secrets_present=["tornado_cash_deposit_notes"],
+        non_deterministic_secrets_backed_up=False,
+    )
+    res = analyze_backup(bad, profile)
+    assert res.alerts, "Worst-case scenario produced no alerts"
+    assert res.should_block, "Worst-case scenario should block"
+    assert res.overall_risk == "critical"
+
+
+def test_analyzer_healthy_clean():
+    """Rule-based analyzer is silent on a strong backup config."""
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from domains.backup_security.analyzer import BackupConfig, analyze_backup
+    profile = load_profile()
+    good = BackupConfig(
+        user_address="0xUser",
+        backup_method="threshold_2of3_with_hardware",
+        backup_encryption="AES-256-GCM",
+        encryption_factor="threshold",
+        password_strength_bits=128,
+        kdf_algorithm="argon2id",
+        kdf_memory_mb=512,
+        kdf_iterations=4,
+        has_hardware_factor=True,
+        guardian_count=5,
+        recovery_threshold=3,
+        guardians_last_liveness_check_days=[10, 12, 8, 30, 5],
+        uses_pq_kem=True,
+        kem_scheme="ml-kem-768+ecdh",
+        backup_is_permanent_onchain=False,
+        has_deniable_layer=True,
+        non_deterministic_secrets_present=[],
+        non_deterministic_secrets_backed_up=True,
+    )
+    res = analyze_backup(good, profile)
+    assert not res.alerts, f"Healthy scenario produced alerts: {[a.heuristic_id for a in res.alerts]}"
+    assert not res.should_block
+
+
 if __name__ == "__main__":
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     passed = failed = 0

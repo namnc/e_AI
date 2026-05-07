@@ -131,6 +131,67 @@ def test_labeled_data_exists():
     assert len(lines) >= 5, f"Only {len(lines)} incidents"
 
 
+def test_analyzer_worst_case_fires():
+    """Rule-based analyzer fires alerts on a maximally drifty wallet snapshot."""
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from domains.behavioral_drift.analyzer import BehavioralSnapshot, analyze_snapshot
+    profile = load_profile()
+    bad = BehavioralSnapshot(
+        user_address="0xUser",
+        weeks_observed=12,
+        top_protocol="morpho",
+        portfolio_share_in_top_protocol_weekly=[0.30, 0.40, 0.55, 0.70, 0.82] + [0.82] * 7,
+        chain_count_active=1,
+        leverage_ratio_weekly=[1.0, 1.3, 1.7, 2.0, 2.5] + [2.9] * 7,
+        collateral_value_weekly_usd=[400000] * 12,
+        aggregate_health_factor=1.05,
+        open_unlimited_approvals=47,
+        approvals_added_last_30d=18,
+        approvals_revoked_last_30d=0,
+        stale_approvals_count=12,
+        approvals_to_known_vulnerable=2,
+        gas_spent_weekly_usd=[100, 150, 200, 300, 400] + [500] * 7,
+        avg_gas_to_value_ratio=0.08,
+        interaction_pattern_signature="weekday_09:30_UTC_loop",
+        pattern_repeat_rate_pct_last_60d=0.86,
+        temporal_variance_hours=0.5,
+    )
+    res = analyze_snapshot(bad, profile)
+    assert res.alerts, "Worst-case scenario produced no alerts"
+    assert res.should_block, "Worst-case scenario should block"
+    assert res.overall_risk == "critical"
+
+
+def test_analyzer_healthy_clean():
+    """Rule-based analyzer is silent on a stable wallet snapshot."""
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from domains.behavioral_drift.analyzer import BehavioralSnapshot, analyze_snapshot
+    profile = load_profile()
+    good = BehavioralSnapshot(
+        user_address="0xUser",
+        weeks_observed=12,
+        top_protocol="aave",
+        portfolio_share_in_top_protocol_weekly=[0.20, 0.22, 0.21, 0.23, 0.20, 0.22, 0.21, 0.20, 0.22, 0.21, 0.23, 0.22],
+        chain_count_active=3,
+        leverage_ratio_weekly=[1.10, 1.12, 1.10, 1.11, 1.10, 1.12, 1.11, 1.10, 1.12, 1.10, 1.11, 1.10],
+        collateral_value_weekly_usd=[100000] * 12,
+        aggregate_health_factor=3.5,
+        open_unlimited_approvals=4,
+        approvals_added_last_30d=1,
+        approvals_revoked_last_30d=2,
+        stale_approvals_count=0,
+        approvals_to_known_vulnerable=0,
+        gas_spent_weekly_usd=[80, 90, 85, 88, 92, 87, 90, 85, 88, 90, 92, 88],
+        avg_gas_to_value_ratio=0.01,
+        interaction_pattern_signature="varied",
+        pattern_repeat_rate_pct_last_60d=0.20,
+        temporal_variance_hours=8.0,
+    )
+    res = analyze_snapshot(good, profile)
+    assert not res.alerts, f"Healthy scenario produced alerts: {[a.heuristic_id for a in res.alerts]}"
+    assert not res.should_block
+
+
 if __name__ == "__main__":
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     passed = failed = 0

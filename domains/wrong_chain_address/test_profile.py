@@ -131,6 +131,57 @@ def test_labeled_data_exists():
     assert len(lines) >= 5, f"Only {len(lines)} incidents"
 
 
+def test_analyzer_worst_case_fires():
+    """Rule-based analyzer fires alerts on a maximally bad transfer."""
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from domains.wrong_chain_address.analyzer import TransferIntent, analyze_transfer
+    profile = load_profile()
+    bad = TransferIntent(
+        tx_hash="0xtest_bad",
+        user_address="0xUser",
+        recipient_address="0xRecipient00000000000000000000000Lookalike",
+        intended_target_chain_id=137,
+        intended_target_chain_name="polygon",
+        signing_chain_id=1,
+        recipient_tx_count_on_target_chain=0,
+        recipient_tx_count_on_other_chains={"ethereum": 1284},
+        recipient_is_contract=True,
+        recipient_implements_receive=False,
+        recipient_implements_erc20_receiver=False,
+        recipient_lookalike_in_history="0xRecipient00000000000000000000000Original",
+        recipient_address_distance="prefix+suffix match",
+        recent_dust_from_lookalike=True,
+        recipient_paused=True,
+        recipient_migrated_to="0xNewVersion",
+        recipient_last_activity_age_days=900,
+    )
+    res = analyze_transfer(bad, profile)
+    assert res.alerts, "Worst-case scenario produced no alerts"
+    assert res.should_block, "Worst-case scenario should block"
+    assert res.overall_risk in ("high", "critical")
+
+
+def test_analyzer_healthy_clean():
+    """Rule-based analyzer is silent on a clean transfer."""
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from domains.wrong_chain_address.analyzer import TransferIntent, analyze_transfer
+    profile = load_profile()
+    good = TransferIntent(
+        tx_hash="0xtest_good",
+        user_address="0xUser",
+        recipient_address="0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+        intended_target_chain_id=1,
+        intended_target_chain_name="ethereum",
+        signing_chain_id=1,
+        recipient_tx_count_on_target_chain=420,
+        recipient_tx_count_on_other_chains={},
+        recipient_is_contract=False,
+    )
+    res = analyze_transfer(good, profile)
+    assert not res.alerts, f"Healthy scenario produced alerts: {[a.heuristic_id for a in res.alerts]}"
+    assert not res.should_block
+
+
 if __name__ == "__main__":
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     passed = failed = 0
