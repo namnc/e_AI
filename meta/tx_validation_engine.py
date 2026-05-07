@@ -318,3 +318,4 @@ if __name__ == "__main__":
 
     results = validate_profile(profile)
     print_report(results)
+    sys.exit(0 if results["overall"] == "PASS" else 1)

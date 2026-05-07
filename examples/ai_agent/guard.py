@@ -1,6 +1,20 @@
 """
 e_AI v2 AI Agent Guard — intercepts agent tool calls before execution.
 
+STATUS: ILLUSTRATIVE ADAPTER, NOT a profile-driven runtime.
+Per Codex 2026-05-07 review, the demo's two advertised risky
+scenarios ("Agent approves unlimited tokens" and "Agent checks 5
+wallet balances") currently DO NOT emit warnings — the decorator
+maps approval-tool intent to `eth_sendTransaction` but only passes
+function metadata, not calldata; balance-check tool maps to
+`eth_call` but the rpc_leakage detector counts only `eth_getBalance`.
+Plus the loader globs `domains/*/profile.json` indiscriminately,
+including v1 variants (loads 22 profiles, not 16). Hardening + tool-
+intent adapter wiring is queued. Treat this file as a pattern
+reference for how an agent guard would integrate, not as the
+canonical agent runtime. See README "Integration demos (status:
+illustrative adapters)" section.
+
 Works with any agent framework (LangChain, OpenAI function calling,
 custom agents). Wraps tool execution with profile-based risk analysis.
 

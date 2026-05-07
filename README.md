@@ -108,11 +108,22 @@ python3 examples/per_domain/builder_censorship/demo.py
 python3 examples/ai_agent/guard.py
 python3 examples/l2_monitor/guard.py
 
-# Run all v2 domain tests (schema + structural)
-for d in domains/*/test_profile.py; do python3 $d; done
+# Run all v2 domain tests (schema + structural). Excludes _template +
+# defi_* (Part 3 supporting variants; see docs/v1_variants.md).
+for d in domains/*/test_profile.py domains/*/test_analyzer.py; do
+  case "$(dirname "$d" | xargs basename)" in
+    defi|defi_*|_template|_feedback) continue;;
+  esac
+  python3 "$d" || echo "FAIL: $d"
+done
 
-# Schema-validate every profile against the 11-check engine
-for d in domains/*/profile.json; do python3 -m meta.tx_validation_engine $d; done
+# Schema-validate every v2 production profile against the 11-check engine.
+for d in domains/*/profile.json; do
+  case "$(dirname "$d" | xargs basename)" in
+    defi|defi_*|_template|_feedback) continue;;
+  esac
+  python3 -m meta.tx_validation_engine "$d" || echo "FAIL: $d"
+done
 ```
 
 CI runs all v2 domain tests + schema validation on every push to `v2`.
@@ -161,9 +172,9 @@ runs end-to-end with rule-based + LLM analysis · **Real-incident fixtures**
 = calibrated against captured-incident corpora (not synthetic samples) ·
 **Live registry / data integration** = production data feeds wired (not
 hard-coded in analyzer source) · **Externally reviewed** = a substantive
-external pushback round (Codex's adversarial review at
-`projects/e_ai_v2/review/codex_strong_novelty_review.md` covers the four
-strong-novelty guards in depth) · **Production candidate** = no item ships
+external pushback round has been done (Codex adversarial review on the
+four strong-novelty guards is the most recent; lives in the maintainers'
+internal pipeline, not in this public repo) · **Production candidate** = no item ships
 with this column ✓ today; closing the prior columns is the path there.
 
 ⭐ = strong-novelty cluster.

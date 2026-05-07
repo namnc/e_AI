@@ -13,7 +13,7 @@ This is a DEMO / preliminary implementation. Production version would:
 
 Usage:
     python analyzer.py                     # run example scenarios
-    python analyzer.py --benchmark         # run full benchmark simulation
+    python analyzer.py --synthetic-smoke   # run synthetic smoke benchmark (NOT real-world TPR/FPR)
 """
 
 from __future__ import annotations
@@ -471,11 +471,22 @@ def generate_synthetic_dataset(n: int = 100, seed: int = 42) -> list[ApprovalTx]
     return txs
 
 
-def run_benchmark(profile: dict, n: int = 1000) -> dict:
-    """Run benchmark: TP rate (catch phishing) vs FP rate (false alarm on legit)."""
+def run_synthetic_smoke_benchmark(profile: dict, n: int = 1000) -> dict:
+    """Synthetic smoke benchmark — NOT a real TPR/FPR claim.
+
+    The "ground truth" labels are derived from the SAME fields the
+    detector itself reads (scam-DB hit, scam bytecode, multicall-with-
+    approval, recent unverified deployment). This is structural smoke
+    testing — it shows the analyzer correctly fires on cases it
+    structurally should fire on; it does NOT measure performance on
+    captured real-incident transactions. Real TPR/FPR claims require
+    real-labeled corpora; the meta-framework's bootstrap is designed
+    to ingest exactly that. See docs/publication_checklist.md.
+    """
     txs = generate_synthetic_dataset(n)
 
-    # Heuristic ground truth: a tx is "phishing" if any of these are true
+    # Heuristic ground truth uses the same fields the detector reads —
+    # this benchmark is CIRCULAR. Useful only as a structural smoke test.
     def is_phishing(tx: ApprovalTx) -> bool:
         return (
             tx.spender_in_scam_db
@@ -620,9 +631,14 @@ def main():
     profile_path = Path(__file__).parent / "profile.json"
     profile = load_profile(profile_path)
 
-    if "--benchmark" in sys.argv:
-        print("Running approval phishing benchmark (1000 synthetic transactions)...")
-        results = run_benchmark(profile)
+    if "--synthetic-smoke" in sys.argv or "--benchmark" in sys.argv:
+        if "--benchmark" in sys.argv:
+            print("Note: --benchmark renamed to --synthetic-smoke for honesty about what this measures.")
+        print("Running approval_phishing SYNTHETIC SMOKE benchmark (1000 synthetic transactions).")
+        print("WARNING: this is a CIRCULAR test — ground-truth labels share fields with the detector.")
+        print("This is NOT real-world TPR/FPR. See run_synthetic_smoke_benchmark docstring.")
+        results = run_synthetic_smoke_benchmark(profile)
+        results["benchmark_class"] = "synthetic_smoke"  # distinguish from future real_labeled
         print(json.dumps(results, indent=2))
     else:
         print(f"Approval Phishing Analyzer v{profile['meta']['version']}")

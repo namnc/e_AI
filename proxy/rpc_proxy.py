@@ -1,11 +1,29 @@
 """
 e_AI v2 Local RPC Proxy
 
+STATUS: ILLUSTRATIVE ADAPTER, NOT a profile-driven runtime. The proxy
+hard-codes detection logic for `rpc_leakage`, `cross_protocol_risk`,
+and `l2_anonymity_set` directly in source — it does NOT dispatch from
+profile semantics. A canonical profile-driven runtime is queued as a
+maturity-gate item. Treat this file as a pattern reference for how
+RPC-pattern monitoring could integrate, not as the canonical RPC
+runtime. See README "Integration demos (status: illustrative
+adapters)" section.
+
+ADDITIONAL CAVEATS (per Codex 2026-05-07 review):
+  - The CORS policy is permissive (`Access-Control-Allow-Origin: *`).
+    Hardening (origin allowlist + bearer token + body cap + batch
+    handling + state-pruning + shared httpx.Client lifecycle) is
+    queued. Do not run this proxy on a public network or as a
+    browser-accessible local-RPC surface today.
+  - Documented `--profiles` flag is not actually accepted by the CLI
+    parser; will be addressed in the same hardening pass.
+
 HTTP JSON-RPC proxy that sits between wallet and local node.
-Forwards all requests while running profile-based analysis on
+Forwards all requests while running pattern-based analysis on
 accumulated state.
 
-Profiles active:
+Pattern-detectors active (hard-coded):
   - rpc_leakage: detects query patterns that reveal strategy
   - cross_protocol_risk: accumulates portfolio state from reads
   - l2_anonymity_set: tracks pool sizes from log queries
@@ -16,9 +34,6 @@ Usage:
 
     # Point wallet to proxy
     # MetaMask → Settings → Networks → RPC URL: http://localhost:8546
-
-    # With all profiles:
-    python -m proxy.rpc_proxy --upstream http://localhost:8545 --profiles domains/
 
     # Dry run (log only, don't block):
     python -m proxy.rpc_proxy --upstream http://localhost:8545 --dry-run

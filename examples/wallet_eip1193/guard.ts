@@ -1,6 +1,16 @@
 /**
  * e_AI v2 Wallet Guard — EIP-1193 provider wrapper.
  *
+ * STATUS: ILLUSTRATIVE ADAPTER, NOT a profile-driven runtime. The
+ * `profiles` parameter is accepted but the alert logic in `analyzeTx` /
+ * `analyzeSignature` currently uses hard-coded selectors, thresholds,
+ * and alert metadata — it does NOT dispatch from profile semantics.
+ * A canonical profile-driven runtime is queued as a maturity-gate
+ * item; until then, treat this file as a pattern reference for how a
+ * wallet wrapper would integrate, not as the canonical wallet
+ * runtime. See README "What's available — Integration demos (status:
+ * illustrative adapters)" section.
+ *
  * Works with ANY wallet that implements EIP-1193 (MetaMask, Rabby, Frame,
  * WalletConnect, injected providers, etc.)
  *
