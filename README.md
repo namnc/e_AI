@@ -1,375 +1,256 @@
-# The Private Query Problem: Privacy-Preserving AI Query Orchestration for DeFi
+# e_AI — Privacy and Safety Guards for End Users on Ethereum
 
-## Overview
+**Pre-submission guards** that catch the kinds of operational mistakes that
+have cost Ethereum users hundreds of millions of dollars — before the
+transaction is signed. Local-first, profile-driven, runnable today.
 
-When DeFi users consult cloud LLMs before transacting, they leak intent, strategy, portfolio context, and reasoning to the provider — two steps earlier than RPC reads, with orders of magnitude richer information. We call this the **Private Query Problem**.
+## Why this matters — measured incidents, not hypotheticals
 
-We propose a **tiered architecture**: a regex sanitizer (browser extension, $0) strips numerically-formatted private parameters from queries before they reach the cloud. Under a constrained synthetic threat model, this removes the data most directly exploitable for MEV — but the sanitizer only covers patterns it recognizes, and has not been tested on real user queries. Adding topic hiding via cover queries requires a local LLM ($200-500/yr) and strong transport assumptions that are achievable but operationally non-trivial.
+| Threat class | Reported impact | e_AI guard |
+|---|---|---|
+| Stealth-address deanonymization | **48.5%** of Umbra users on Ethereum (Wahrstätter et al., [arXiv 2308.01703](https://arxiv.org/abs/2308.01703), ACM Web Conf 2024) | [`stealth_address_ops`](domains/stealth_address_ops/) ⭐ |
+| Approval phishing / wallet drainers | **~$494M** in 2024 alone across 332K wallet addresses ([ScamSniffer 2024 annual report](https://drops.scamsniffer.io/scam-sniffer-2024-web3-phishing-attacks-wallet-drainers-drain-494-million/)), 85% on Ethereum; [Blockaid](https://www.blockaid.io/blog/putting-inferno-drainer-group-out-of-business) reports blocking 40K+ Angelferno drainer attempts in June 2025 alone | [`approval_phishing`](domains/approval_phishing/) |
+| Sandwich / MEV in public mempool | One bot ([jaredfromsubway.eth](https://etherscan.io/address/0x1f2f10d1c40777ae1da742455c65828ff36df387)) ran ~238K attacks against ~106K victims in 3 months of 2023, taking ~$40.65M revenue / ~$6.3M net profit per [The Block](https://www.theblock.co/post/230218/jaredfromsubway-mev-bot) (figures from EigenPhi analysis; some MEV experts dispute the net-profit estimate) | [`mev_vulnerability`](domains/mev_vulnerability/) |
+| Post-mixer behavioral linkage | **42,852 of 97,331** Tornado Cash deposits compromised by Tutela's seven heuristics ([Tutela](https://github.com/pareto-xyz/tutela-app)) | [`mixing_behavioral`](domains/mixing_behavioral/) ⭐ |
+| Builder/relay censorship | Tornado Cash transactions silently dropped at compliance-regulated relays post-OFAC; per [soispoke's Dune dashboard](https://dune.com/soispoke/privacy-pools-nullifier-state-growth) the protocol still saw ~10,781 active txs in the most recent 90-day window | [`builder_censorship`](domains/builder_censorship/) |
+| AI / RPC query leakage | [404 Media documented 130K+ AI-chat conversations](https://www.404media.co/more-than-130-000-claude-grok-chatgpt-and-other-llm-chats-readable-on-archive-org/) (Claude, Grok, ChatGPT, others) archived on the Wayback Machine; [Cyberhaven](https://www.cyberhaven.com/blog/4-2-of-workers-have-pasted-company-data-into-chatgpt) reports ~4.7% of enterprise users pasted confidential data into AI chat tools | [`rpc_leakage`](domains/rpc_leakage/) ⭐ |
 
-### At a Glance
+⭐ = strong-novelty cluster — to our knowledge, no production pre-submission
+tool fully covers these niches today. For the full set of 16 guards across
+all 4 access methods, see [*What's available*](#whats-available) below or
+[`docs/scenarios.md`](docs/scenarios.md) for concrete walkthroughs.
 
-| Tier | What | Hardware | Cost/yr | Privacy | Assumptions |
-|---|---|---|---|---|---|
-| **0: Sanitize** | Regex strips params + input normalization | Browser extension | **$0** | Format-matchable params removed | Regex covers the param format; no semantic/NL coverage |
-| **1: Full pipeline** | + LLM decompose + genericize + covers | Mac Mini 14B+ | **$200-500** | + topic hiding (40% detection, n=20) | + per-set Tor unlinkability; small-sample result |
+## Pick your path
 
-This repository contains:
-- **`ethresearch_post.md`** — the main ethresear.ch post (Part 1: the private query problem)
-- **`companion_post_active_adversary.md`** — Part 2: active adversaries, verifiable inference, cryptoeconomic accountability
-- **`ethresearch_meta_framework_draft.md`** — Part 3 (draft): domain-agnostic meta-framework for auto-generating privacy protection
-- Benchmark suite (A-F), DistilBERT classifier, cover generator, sanitizer tests
-- **Meta-framework** for auto-generating privacy pipelines from any dataset
-
-**Walkthroughs:**
-- **[Hand-crafted pipeline](docs/walkthrough_handcrafted.md)** — how the DeFi privacy pipeline works, step by step (Alice example, Tier 0 + Tier 1)
-- **[Meta-framework](docs/walkthrough_meta_framework.md)** — how the auto-generation pipeline works (input validation → analysis → generation → refinement → validation → feedback)
-- **[Deployment guide](docs/deployment_guide.md)** — dataset privacy model, runtime tiers, quality tradeoffs, benchmarking generated profiles
-
-## Key Finding
-
-Cover query indistinguishability depends critically on the generation strategy. We identified four independent signals an adversary can exploit, and fixed them iteratively:
-
-| Version | Strategy | Detection Rate | vs Random (25%) | Signal Eliminated |
-|---------|----------|---------------|-----------------|-------------------|
-| v1 | Naive covers (different tone) | **95%** | 3.8x above | — |
-| v2 | Tone-matched | **60%** | 2.4x above | Actionability |
-| v3 | Template-matched | **10%** | Below random | Template structure |
-| v4 | Template-matched, stronger adversary | **60%** | 2.4x above | (Domain prior re-emerged) |
-| v5 | Template + top-4 equiprobable domains | **0%** | Below random | Domain prior |
-
-**Root cause of failure**: Not a fundamental impossibility, but an engineering problem. Naive covers leak an "actionability" signal — real queries sound like "someone about to do something" while covers sound "educational." A stronger adversary can also exploit domain frequency priors (lending queries are more common than governance queries). When all four signals are eliminated via template + distribution matching, the adversary is reduced to random guessing.
-
-## Repository Structure
-
-```
-├── ethresearch_post.md          # Main ethresear.ch post
-├── README.md
-├── requirements.txt
-├── run_benchmarks.py            # Benchmark runner (Claude API or Ollama)
-├── classifier_validation.py     # External DistilBERT classifier validation
-├── cover_generator.py           # v5 cover algorithm — reads from domain profile
-├── llm_backend.py               # Backend abstraction (Anthropic API + Ollama)
-├── dataset.py                   # Test vectors and session scenarios
-├── rewrite_strategies.py        # Sub-query rewriting (Approach A/B/C comparison)
-├── test_sanitizer.py            # Unit tests for regex sanitizer (47 tests)
-├── test_sanitizer_audit.py      # Completeness audit (2,600 synthetic params)
-├── test_sanitizer_fuzz.py       # Adversarial fuzz test (Unicode tricks, format mutations)
-├── test_benchmarks.py           # Benchmark regression tests (24 tests)
-├── .github/workflows/tests.yml  # CI pipeline (runs on every PR)
-├── Dockerfile                   # Reproducible test environment
-├── run_all.sh                   # One-click full benchmark run
-│
-│── core/                        # Profile-based architecture
-│   ├── domain_profile.py        # DomainProfile schema (TypedDict)
-│   └── profile_loader.py        # Load, validate, and cache profiles from JSON
-│
-├── domains/                     # Domain profile instances
-│   ├── defi/
-│   │   └── profile.json         # Hand-crafted DeFi profile (extracted from v5 constants)
-│   ├── defi_generated/
-│   │   └── profile.json         # Auto-generated by Qwen 7B (round-trip test)
-│   ├── defi_14b/
-│   │   └── profile.json         # Auto-generated by Qwen 14B (improved round-trip)
-│   └── _feedback/               # Cross-domain diagnostics for feedback loop
-│
-├── meta/                        # Meta-framework: auto-generate profiles from datasets
-│   ├── analyzer.py              # Phase 1: LLM analyzes dataset (sensitivity, clustering, vocabulary, templates)
-│   ├── pattern_generator.py     # Phase 2a: generates regex patterns + entity lists from spans
-│   ├── refiner.py               # Phase 2c: iterative repair loop (validate → fix → re-validate)
-│   ├── input_validator.py        # Pre-flight dataset validation (6 checks)
-│   ├── data_enrichment.py       # Dataset enrichment (web search + LLM synthesis + refinement loop)
-│   ├── feedback.py              # Diagnostics, acceptance thresholds, cross-domain feedback loop
-│   ├── validation_engine.py     # 13 property checks (6 functional + 5 security + 2 quality)
-│   ├── profile_sanitizer.py      # Genericize profiles for safe cloud review
-│   ├── util.py                  # Shared utilities (extract_json)
-│   ├── web_enrichment.py        # Web search integration (ontology, threat model, false positives)
-│   └── prompts.py               # All LLM prompts for the meta pipeline
-│
-├── generate_profile.py          # CLI: dataset → analyze → generate → refine → validate → profile.json
-├── compare_profiles.py          # Compare hand-crafted vs generated profiles
-│
-├── docs/
-│   ├── walkthrough_handcrafted.md  # Step-by-step: how the DeFi pipeline works
-│   ├── walkthrough_meta_framework.md # Step-by-step: how auto-generation works
-│   ├── deployment_guide.md      # Dataset privacy, runtime tiers, quality tradeoffs
-│   ├── adversary_prompt.md      # All LLM prompts used in benchmarks
-│   ├── scoring_rubric.md        # Benchmark D quality scoring rubric
-│   ├── transport_assumptions.md # Tor circuit pool, mixnet, timing mitigations
-│   ├── latency_projections.md   # Per-hardware latency estimates (M1→M4 Max)
-│   ├── sanitizer_gaps.md        # What's caught, what leaks, recommended NLP filters
-│   ├── staking_mechanism.md     # On-chain staking interface (Solidity), slashing tiers
-│   ├── research_directions.md   # 10 open problems with approaches and priority ranking
-│   └── research_solutions.md    # Analytical solutions: formal proof, optimal k, Shannon capacity, collusion analysis
-├── data/
-│   ├── benchmark_dataset.jsonl  # Unified dataset: 216 queries (JSONL, reusable)
-│   ├── build_dataset.py         # Dataset builder (merges sources, adds borderline cases)
-│   ├── real_queries.json        # Rich metadata source (category, damage, exploitability)
-│   └── sources.md               # Data provenance and methodology
-├── results/
-│   ├── benchmark_a_results.md   # Sensitivity classification (97% F1 at n=100)
-│   ├── benchmark_b_results.md   # Decomposition quality (0% leakage)
-│   ├── benchmark_c_results.md   # Cover indistinguishability v1 (95% — FAIL)
-│   ├── benchmark_c_detection.md # v1 adversarial detection detail
-│   ├── benchmark_c_v2.md        # v2 tone-matched (60% — FAIL)
-│   ├── benchmark_c_v3.md        # v3 template-matched (10% — PASS)
-│   ├── benchmark_c_v4.md        # v4 multi-strategy adversary (60% — FAIL)
-│   ├── benchmark_c_v5.md        # v5 top-4 equiprobable (0% — PASS)
-│   ├── results.json             # Benchmark F damage simulation data
-│   └── classifier_results.json  # External classifier validation results
-└── analysis/
-    ├── failure_analysis.md      # Why v1/v2 failed, is indistinguishability hard?
-    └── cover_strategies.md      # Systematic cover generation algorithm design
+**If you're an end user** → [`docs/scenarios.md`](docs/scenarios.md) walks
+through six real incidents and what e_AI does at each. Then run a demo
+matching your situation:
+```sh
+python3 examples/per_domain/<guard>/demo.py
 ```
 
-## Meta-Framework: Domain-Agnostic Profile Generation
+**If you're a wallet / agent / DApp integrator** →
+[`docs/composition.md`](docs/composition.md) shows how the 16 guards compose
+across a transaction's full lifecycle (intent → wallet → submission →
+inclusion → post-execution) and which of the five integration surfaces
+(`examples/ai_agent/`, `examples/wallet_eip1193/`, `examples/dapp_frontend/`,
+`examples/l2_monitor/`, `examples/kohaku_integration/`) fits your product.
 
-The privacy protection pipeline is now **domain-agnostic**. All domain-specific constants (ontology, sanitizer patterns, templates, entity names) are loaded from a `profile.json` file. The DeFi pipeline is the first instance; the meta-framework can generate profiles for any domain.
+**If you're a researcher or contributor** → [`CONTRIBUTING.md`](CONTRIBUTING.md)
++ [`docs/adding_a_domain.md`](docs/adding_a_domain.md). The extension
+walkthrough is documented end-to-end; the `builder_censorship` guard was
+built in one week using only that walkthrough (with the substrate work
+already in place — first-time contributors should expect longer).
 
-### Architecture
+**If you want the architecture context** →
+[`docs/access_layer_context.md`](docs/access_layer_context.md) places e_AI
+within the broader 2026 Ethereum privacy roadmap (EIP-8141 frame
+transactions, FOCIL forced-inclusion, encrypted frame transactions, 2D
+nonces / restricted storage) and maps which problems are
+protocol-handled vs access-layer-handled. Cites primary sources from
+Vitalik, soispoke, and Nero_eth.
 
-```
-Dataset (JSONL)  ──┐
-                   ▼
-            ┌─────────────┐     ┌──────────────┐
-            │  Domain      │────>│  Tool         │──┐
-            │  Analyzer    │     │  Generator    │  │
-            │  (local LLM) │     │  (local LLM)  │  │
-            └─────────────┘     └──────────────┘  │
-                   ▲                               │
-                   │ web search                    ▼
-                   │ (enrichment)         ┌──────────────┐
-                   │                      │  Domain       │
-                   │                      │  Profile      │
-                   │                      │  (JSON)       │
-                   │                      └──────┬───────┘
-                   │                             │
-            ┌──────┴──────┐              ┌───────▼───────┐
-            │  Validation  │◄────────────│  Protection   │
-            │  Engine      │  refine     │  Runtime      │
-            └─────────────┘              └───────────────┘
-```
+## How we built it — the journey
 
-### Generating a Profile
+The repo maintains **two long-running branches**:
 
-```bash
-# Generate from any JSONL dataset (local LLM, privacy-preserving)
-python generate_profile.py \
-  --dataset data/benchmark_dataset.jsonl \
-  --domain defi \
-  --backend ollama --model qwen2.5:14b \
-  --output domains/defi/profile.json
+- `main` — Parts 1, 2, 3 (DeFi query-sanitization track; published /
+  draft posts in the repo root)
+- `v2` — this substrate (pre-submission transaction-analysis track;
+  active development)
 
-# With web search to enrich vocabulary and threat model
-python generate_profile.py \
-  --dataset data/medical_queries.jsonl \
-  --domain medical \
-  --backend ollama \
-  --web-search \
-  --output domains/medical/profile.json
+Both branches are CI-tested on every push. The journey:
 
-# Validate an existing profile against a dataset
-python generate_profile.py \
-  --validate-only domains/defi/profile.json \
-  --dataset data/benchmark_dataset.jsonl
-```
+1. **The Private Query Problem** ([`ethresearch_post.md`](ethresearch_post.md))
+   — DeFi-specific tiered sanitization pipeline for cloud-LLM queries.
+2. **Active Adversaries and Verifiable Inference**
+   ([`companion_post_active_adversary.md`](companion_post_active_adversary.md))
+   — extensions for stronger threat models.
+3. **A Meta-Framework for Domain-Agnostic Privacy Protection**
+   ([`ethresearch_meta_framework_draft.md`](ethresearch_meta_framework_draft.md))
+   — auto-generation across text-query domains; validated on DeFi via six
+   generation strategies.
+4. **From DeFi Sanitization to Pre-Submission Transaction Guards**
+   ([`ethresearch_v2_guards_draft.md`](ethresearch_v2_guards_draft.md))
+   — same meta-framework applied to a *different task*: pre-submission
+   transaction analysis. This substrate.
 
-### Dataset Format
+The Part 4 post is in draft; we're maturing the substrate (real-incident
+calibration, registry-pull hardening, external-reviewer sanity-check)
+before posting on ethresear.ch. See
+[`docs/publication_checklist.md`](docs/publication_checklist.md) for the
+maturity gates.
 
-Input datasets are JSONL with one query per line:
-```json
-{"text": "My Aave V3 position has 500 ETH collateral...", "label": "sensitive"}
-{"text": "What is impermanent loss?", "label": "non_sensitive"}
-```
+The substrate is offered as a **potential tooling direction**, not a
+shipped product. Several guards live in already-occupied space (Blockaid,
+Pocket Universe, Flashbots Protect, MEV Watch — see
+[`docs/prior_art/`](docs/prior_art/) per-guard); four sit in genuinely
+under-served niches; the framework + extension docs are designed for others
+to extend.
 
-Minimum fields: `text`, `label` (`sensitive` | `non_sensitive` | `borderline`).
-Optional: `category`, `private_params`, `difficulty`, `exploitable_by`, `estimated_damage_usd`.
+## Quick start
 
-### Profile Schema
+```sh
+git clone <this repo>
+cd e_AI
+git checkout v2
+pip install -r requirements.txt
 
-A `profile.json` contains all domain-specific constants:
+# Install Ollama + qwen2.5:7b for the local LLM layer (optional but recommended)
+# https://ollama.com — `ollama serve` then `ollama pull qwen2.5:7b`
 
-| Section | Contents | Replaces |
-|---------|----------|----------|
-| `meta` | Domain name, version, generation model, validation status | — |
-| `domain_distribution` | Subdomain frequency weights | `DOMAIN_DISTRIBUTION` |
-| `top_domains` | Most frequent subdomains | `TOP_DOMAINS` |
-| `subdomains` | Vocabulary per subdomain (entities, mechanisms, operations, triggers, metrics, actors, risk_concepts, generic_refs) | `DOMAIN_ONTOLOGY` |
-| `sensitive_patterns` | Regex patterns, entity names, emotional/timing/qualitative word lists, false positives | All `_AMOUNT_PATTERNS_*`, `_ADDRESS_PATTERNS`, etc. |
-| `templates` | Question templates with `{SLOT}` placeholders | `TEMPLATES` |
-| `template_slots` | Maps slot names to ontology categories | Hardcoded in `_fill()` |
-| `domain_heuristics` | LLM-discovered sensitivity patterns (amounts, timing, emotional) | Used by check 10 for domain-agnostic validation |
+# Run a per-domain demo (16 production guards)
+python3 examples/per_domain/approval_phishing/demo.py
+python3 examples/per_domain/stealth_address_ops/demo.py
+python3 examples/per_domain/builder_censorship/demo.py
 
-### Formal Properties
+# Run an access-method integration demo
+python3 examples/ai_agent/guard.py
+python3 examples/l2_monitor/guard.py
 
-The validation engine checks 13 properties (6 functional + 5 anti-malicious-LLM guardrails + 2 quality):
+# Run all v2 domain tests
+for d in domains/*/test_profile.py; do python3 $d; done
 
-| Property | Definition | Threshold | Test |
-|----------|-----------|-----------|------|
-| Parameter Hiding | No labeled sensitive span survives sanitization | 0% FN | Sanitizer audit |
-| False Positive Rate | Non-sensitive queries not over-stripped | <5% words removed | Run on non-sensitive set |
-| Profile Completeness | Dataset queries map to subdomains | >=95% coverage | Domain classifier |
-| Template Coverage | Dataset queries match templates | >=60% match rate | Template matching |
-| Vocabulary Depth | Each subdomain has sufficient vocabulary | >=3 items per slot | Schema check |
-| k-Indistinguishability | Adversary detection rate on cover sets | <=40% (vs 25% random) | Quick classifier |
-| Entity Completeness | Dataset entities covered by entity_names | >=70% coverage | Anti-omission guardrail |
-| Held-Out Sanitizer | Independent test data not from generating LLM | 0% param leakage | Anti-self-certification |
-| Ontology Balance | Subdomain vocabulary sizes balanced | >=0.40 min/max ratio | Anti-fingerprinting |
-| Sensitivity Labels | Heuristic regex detects categories LLM may omit | >=50% per category | Anti-self-certification |
-| Vocabulary Diversity | Edit-distance dedup catches near-duplicate fills | <=10 duplicates | Anti-inflation |
-| Tier 1 Pipeline | End-to-end decompose→genericize→answer→synthesize | >=70% quality retained | Blinded A/B vs direct |
-| Tier 0 Usability | Sanitized queries still coherent and answerable | >=2.0/5 avg, no destroyed | LLM-as-judge |
-
-### Experimental Results (DeFi, 216-Query Benchmark)
-
-Six generation strategies tested, all validated by the same 13 programmatic checks:
-
-| Profile | Subdomains | Templates | Entities | Cover Detection | Acceptance |
-|---------|:-:|:-:|:-:|:-:|:-:|
-| **Hand-crafted** | 7 | 20 | 96 | **20%** | **ACCEPTED** |
-| Local 7B | 31 | 20 | 191 | 50% | REJECTED |
-| Local 14B | 7 | 12 | 45 | 66% | REJECTED |
-| **Local 14B+web** | **5** | **18** | **56** | **32%** | **ACCEPTED** |
-| Cloud Claude | 9 | 20 | 102 | **22%** | NEEDS_WORK |
-| Bootstrap (cloud+local) | 9 | 20 | 102 | **22%** | NEEDS_WORK |
-
-Tier 1 pipeline quality (blinded A/B, local judge):
-
-| Profile | Pipeline Score | Quality Retained |
-|---------|:-:|:-:|
-| **Cloud Claude** | **3.8/5** | **87%** |
-| Hand-crafted | 3.25/5 | 81% |
-| Bootstrap | 3.2/5 | 78% |
-
-**Key findings**: Local 14B+web is the best private-data-safe option (ACCEPTED). Cloud Claude produces the best Tier 1 quality (3.8/5, outperforms hand-crafted). See [deployment guide](docs/deployment_guide.md) for full analysis and configuration options.
-
-## Benchmark Results
-
-| Benchmark | What It Tests | Target | Result | Verdict |
-|---|---|---|---|---|
-| **A** | Sensitivity classification | >90% F1 | **97% F1** (n=100, Qwen 7B) | PASS |
-| **B** | Decomposition quality (string-match only) | >85% coverage, 0% leakage | **100%/0%** (frontier), **70%/30%** (7B) | PASS/MARGINAL |
-| **C** | Template indistinguishability | Near 25% random | **20%** (LLM, n=20), **AUC 0.507** (DistilBERT) | PASS |
-| **C2** | Genericized-static detectability (NOT full pipeline — uses curated SANITIZED_QUERIES, not decomposition output) | Near 25% random | **40%** (genericized sub-queries, n=20) | MARGINAL (+15pp above random) |
-| **D** | Answer quality (template rewrite only) | >80% scoring >=4/5 | **20%** (avg 2.3/5, n=15) | **FAIL** |
-| **D2** | Utility only: genericized-direct query (NO covers, blinded A/B, same-model judge) | >80% quality retained | **3.8/5** (capped at 100% vs direct, n=5) | PASS |
-| **E** | Session composition (simulation) | <40% recovery at 5 queries | **20-60% with covers** vs **100% without** | MARGINAL |
-| **F** | Economic damage model (illustrative) | — | Sanitization → ~$0 for param-dependent attacks | Illustrative |
-
-## Reproducing Results
-
-### Option 1: With Claude API
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-python run_benchmarks.py --benchmark all
-python run_benchmarks.py --benchmark C --cover-version v1  # compare naive vs v5
-python run_benchmarks.py --benchmark C --cover-version v5 --samples 50
-python run_benchmarks.py --benchmark E  # session composition
+# Validate every profile against the 11-check engine
+for d in domains/*/profile.json; do python3 -m meta.tx_validation_engine $d; done
 ```
 
-### Option 2: With Ollama (local, free)
-```bash
-ollama pull qwen2.5:32b
-python run_benchmarks.py --benchmark all --backend ollama --model qwen2.5:32b
+CI runs all v2 domain tests + validation on every push to `v2`. See
+[`.github/workflows/tests.yml`](.github/workflows/tests.yml).
+
+## What's available
+
+### v2 production guards (15)
+
+All profile-validated 11/11; all `test_profile.py` passing; all have a
+runnable per-domain demo.
+
+**Wallet method (7 + 1 hygiene-only):**
+- `approval_phishing`, `backup_security`, `behavioral_drift`,
+  `mev_vulnerability`, `offchain_signature`, `pq_readiness`,
+  `stealth_address_ops` ⭐
+- Plus `wrong_chain_address` (hygiene-completeness; Rabby Wallet has
+  solved this UX — included for unified-set completeness, not novelty)
+
+**Application method (3):**
+- `cross_protocol_risk`, `governance_proposal`, `mixing_behavioral` ⭐
+
+**AI method (1):**
+- `rpc_leakage` ⭐
+
+**L2 method (3 + 1 fresh):**
+- `l2_anonymity_set`, `l2_bridge_linkage` ⭐, `sequencer_privacy`
+- Plus `builder_censorship` — fresh CR-aligned domain demonstrating the
+  extension framework. Built in one week using only
+  [`docs/adding_a_domain.md`](docs/adding_a_domain.md).
+
+⭐ = strong-novelty cluster (see [`docs/prior_art/`](docs/prior_art/) per-guard
+prior-art research for honest positioning).
+
+### Integration demos
+
+Five access-method integration surfaces under `examples/`:
+- `ai_agent/guard.py` — agent guard for AI-agent flows
+- `dapp_frontend/guard.js` — DApp frontend SDK
+- `kohaku_integration/` — Kohaku middleware (TypeScript)
+- `l2_monitor/guard.py` — L2-specific monitor
+- `wallet_eip1193/guard.ts` — wallet provider wrapper
+- `proxy/rpc_proxy.py` — local RPC proxy with profile-driven analysis
+
+### Per-domain demos
+
+`examples/per_domain/<name>/` — for each guard: `demo.py`, `sample_tx.json`,
+`README.md`. Each demo loads the profile, runs the rule-based analyzer
+(where applicable), and adds LLM behavioral context with **graceful
+Ollama degradation** (the demo still produces a useful result if Ollama is
+offline).
+
+### Documentation
+
+End-user reading path:
+- [`docs/scenarios.md`](docs/scenarios.md) — six concrete real-incident
+  scenarios with what e_AI catches and how to run the demo
+- [`docs/composition.md`](docs/composition.md) — how the 16 guards compose
+  across a transaction's lifecycle (intent → wallet → submission →
+  inclusion → post-execution)
+- [`docs/access_layer_context.md`](docs/access_layer_context.md) — where
+  e_AI fits in the broader 2026 Ethereum privacy roadmap (EIP-8141, FOCIL,
+  encrypted frame transactions, restricted-storage); cites Vitalik,
+  soispoke, and Nero_eth primary sources
+
+Contributor / R&D reading path:
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — entry point for adding a guard
+- [`docs/adding_a_domain.md`](docs/adding_a_domain.md) — 11-step walkthrough
+- [`docs/profile_schema.md`](docs/profile_schema.md) — formal schema reference
+- [`docs/prior_art/<name>.md`](docs/prior_art/) — per-guard prior-art
+  research (16 files)
+- [`docs/deployment_guide.md`](docs/deployment_guide.md) — six privacy-safe
+  deployment configurations
+- [`docs/v1_variants.md`](docs/v1_variants.md) — disposition for the
+  `defi*/` directories (v1 query-sanitization variants from the
+  meta-framework paper; not v2 production guards)
+- [`docs/publication_checklist.md`](docs/publication_checklist.md) — release
+  gate
+
+## Repository structure
+
+```
+core/                 # Profile schemas, LLM analyzer (with graceful degradation)
+domains/              # 16 v2 production guards + 6 v1 sanitization variants (defi*/)
+                      #   + _template (boilerplate) + _feedback (Part 3 cross-domain feedback)
+meta/                 # Meta-framework: validation engine, bootstrapper, refiner
+proxy/                # Local RPC proxy (transaction-analysis aware)
+examples/             # Five integration demos for the four access methods
+  per_domain/         # 16 per-guard demos (one folder each)
+docs/                 # Adding-a-domain, profile schema, prior-art, deployment, walkthroughs
+.github/workflows/    # CI: sanitizer tests + classifier validation + v2 domain tests
 ```
 
-### Option 3: External classifier validation (no API needed for data gen)
-```bash
-pip install torch transformers scikit-learn numpy
-python classifier_validation.py run --n-sets 1000
-```
+The `domains/defi*/` directories are v1 query-sanitization comparison
+variants for the meta-framework paper, **not** v2 production guards. See
+[`docs/v1_variants.md`](docs/v1_variants.md).
 
-### Option 4: One-click full run
-```bash
-./run_all.sh ollama qwen2.5:7b    # runs everything (NOTE: 7B leaks params 30% — use 14B+ for production)
-./run_all.sh                       # runs only non-LLM benchmarks (F, classifier, sanitizer tests)
-```
+## Trust transparency
 
-### Previous results
-The `results/*.md` files contain earlier in-conversation results generated with Claude acting as both generator and adversarial detector. See `analysis/failure_analysis.md` for methodology.
+This substrate trusts:
+- **Local machine** for all cryptographic and LLM operations by default
+- **Ollama** at `localhost:11434` (default LLM backend; gracefully degrades
+  if down — the rule-based analyzer still runs)
+- **Block-explorer verification status** (input to `approval_phishing`)
+- **External registries** (OFAC SDN list, scam DBs, builder-diversity
+  feeds) — **if** wired live; otherwise sample data is hard-coded for the
+  demo. Each guard's README documents its specific trust set.
 
-## What This Repo Does NOT Prove
+No protocol-grade trust assumptions. The substrate operates at the access
+layer between protocol and user; it does not change protocol behavior.
 
-- **NOT a general privacy guarantee.** The sanitizer removes patterns it recognizes. Novel formats, natural-language quantities ("three quarters of my portfolio"), semantic leakage ("near liquidation"), and implicit intent signals ("What's a good health factor?") are not caught.
-- **NOT tested on real user queries.** All evaluation uses synthetic data. Real DeFi queries are inherently private and unavailable at scale (0.004% hit rate in 1M WildChat conversations).
-- **NOT robust against adversarial formatting.** Input normalization handles known Unicode/format tricks, but the regex approach is inherently brittle against adversaries who craft novel bypass encodings.
-- **NOT independently evaluated.** The same model generates and judges in D2 (n=5). The classifier trains on data from the same generator. Benchmark B is exact-string-only. No independent red-team or human evaluation has been conducted.
-- **NOT a stable release.** The commit history shows rapid sanitizer fixes over 2 days (mixed-case tokens, Unicode bypasses, timing leaks, false positives). The code is still stabilizing.
+## Epistemic status
 
-Read all benchmark results as **"under a constrained synthetic threat model"**, not as general production claims.
-
-## Caveats
-
-**This is a research prototype, not an audit-complete privacy tool.**
-
-- **Sanitizer coverage is format-bounded**: Input normalization handles Unicode bypasses and joined tokens, but the completeness audit covers 14 base symbols. Novel tokens not in the known-token list and not matching the broad pattern (all-lowercase, no crypto suffix) can leak. Natural-language quantities ("three quarters of my portfolio") and semantic leakage ("near liquidation") are not caught
-- **C2 at 40% (15 points above random)**: The deployed pipeline is more detectable than template-filled sets (C at 20%) because genericized sub-queries retain natural phrasing that differs from template-filled covers. This is an engineering gap, not a fundamental one
-- **Classifier validation is partially external**: DistilBERT trains on data from the same `cover_generator` (AUC 0.507, effectively random). Train/test text overlap is removed but the generator artifacts are shared
-- **Benchmark B uses string-matching only**: Misses paraphrases, abstractions, and derived disclosures. "0% leakage" means no exact-string copies, not no semantic leakage
-- **Benchmarks E and F are simulations**: E assumes per-set unlinkability (best case). F models param-dependent attacks only — topic-only attacks not modeled
-- **D2 uses same model for answering and judging** (blinded A/B, n=5). D2 refuses cloud backends by default (requires ALLOW_CLOUD_D2=1 to override)
-- **Local model capability gap**: 7B models leak private parameters 30% during decomposition. Need 14B+ for production
-- **Small sample sizes**: n=5-20 for most benchmarks. Directionally correct but not statistically robust
-- **No real user queries**: 216-query synthetic benchmark. Real DeFi position queries are inherently private (0.004% hit rate in 1M WildChat conversations)
+Each guard's heuristics are **CLAIMs** (evidence-grounded patterns), not
+**THEOREMs** (formally proved). Profile schemas mark `validation_status`
+per domain (draft / reviewed / accepted). Sample data is synthetic
+(≥5 incidents per domain); production deployment requires real-incident
+labeled corpora — which is exactly what the meta-framework is designed to
+ingest.
 
 ## Contributing
 
-**All contributions protect your privacy by design.** The benchmark dataset is synthetic. Real queries are private by definition. Every contribution path below ensures no private data leaves your machine.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) and
+[`docs/adding_a_domain.md`](docs/adding_a_domain.md). The framework is
+designed for extension: a new domain takes ~1 day for someone who has read
+the docs once. The 11-check validation engine catches structural failures
+before runtime; the per-domain demo template ensures any new guard ships
+with a runnable PoC.
 
-### Sanitizer & Privacy
+For R&D directions where the framework benefits most from external help —
+real-incident labeled corpora to calibrate the analyzers, new
+integration surfaces (mobile, hardware wallet), composition with
+adjacent ecosystems (Blockaid, Helios, CoW, Kohaku) — see the *How others
+can expand or upgrade* section of
+[`docs/access_layer_context.md`](docs/access_layer_context.md).
 
-**1. Sanitizer bypass bounty (highest value)**
-Find queries where exploitable information survives sanitization. Report the *pattern*, not your query:
-```bash
-python -c "
-from cover_generator import sanitize_query
-q = input('Paste query (stays local): ')
-print(f'Sanitized: {sanitize_query(q)}')
-# Report ONLY the pattern: 'worded fractions like half a million bypass'
-"
-```
-Open a GitHub issue with the pattern class. Past bounty finds: Unicode bypasses, locale-formatted numbers, truncated addresses, split-token amounts.
+## License + provenance
 
-**2. Local-only validation**
-Run the sanitizer on your actual queries locally. Report only the binary result (leaked/clean), never the query:
-```bash
-python test_sanitizer_fuzz.py --rounds 5000  # adversarial mutations
-python test_sanitizer_audit.py               # 2,600 synthetic params
-```
-
-**3. Fuzz corpus expansion**
-Add adversarial test cases to `test_sanitizer_fuzz.py` — Unicode tricks, format mutations, locale variants, novel encoding bypasses. The fuzz test is now blocking in CI at a 5% threshold.
-
-### Profile & Ontology
-
-**4. Profile improvement (safe — profiles contain no private data)**
-Review `domains/defi/profile.json` for:
-- Missing protocol names the genericizer should strip
-- Missing mechanisms, metrics, or vocabulary per subdomain
-- False-positive words that shouldn't be stripped
-Submit as PR. Profiles are domain knowledge, not user data.
-
-**5. Community profiles for new domains**
-Generate a profile for medical, legal, TradFi, or other domains using public datasets:
-```bash
-python generate_profile.py --dataset public_medical_queries.jsonl --domain medical --backend ollama
-```
-Submit the profile (not the dataset). Others validate locally against their private data.
-
-### Benchmarks & Validation
-
-**6. Independent labeling**
-Label 100 queries from `data/benchmark_dataset.jsonl` as sensitive/non_sensitive/borderline. Target: Cohen's kappa > 0.7 inter-annotator agreement.
-
-**7. Benchmark validation on different hardware/models**
-Run benchmarks A-F on your hardware and report results. Helps establish the quality-hardware curve documented in [deployment_guide.md](docs/deployment_guide.md):
-```bash
-python run_benchmarks.py --benchmark all --backend ollama --model qwen2.5:32b
-```
-
-**8. Meta-framework audit**
-Review `meta/` modules for validation gaps, pattern generation bugs, feedback contamination, or privacy side channels. Past audit finds: self-certification attacks, search query privacy leaks, profile sanitizer JSON crashes, feedback global mutation.
-
-### What NOT to share
-- Never share your actual queries, wallet addresses, or position details
-- Never share your private dataset (use it locally only)
-- Profiles and patterns are safe to share — they contain domain knowledge, not user data
+AI-assisted, human-reviewed before merging to `v2`. Per the project's
+epistemic-transparency rule, contributions should mark new claims as
+THEOREM | CLAIM | FRAMING.
