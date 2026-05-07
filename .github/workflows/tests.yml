@@ -218,6 +218,19 @@ jobs:
         # eth_call), and other tool routes go to the right RPC method.
         run: python3 tests/test_ai_agent_adapter.py
 
+      - name: Workflow shell-extractor unit tests
+        # Phase 6E (Codex Phase 5 review #7): the regex fallback used to
+        # silently miss inline run: commands. Pin both block and inline
+        # extraction shapes so future edits can't regress.
+        run: python3 -m unittest tests.test_check_workflow_shell -v
+
+      - name: DApp frontend guard smoke test
+        # Phase 6H (Codex Phase 5 review #4): README advertised
+        # examples/dapp_frontend/guard.js as a tested integration
+        # surface, but no CI step exercised it. Smoke-runs the demo and
+        # asserts on each scenario's expected alerts.
+        run: python3 tests/test_dapp_frontend_guard.py
+
       - name: AI-agent demo emits expected warnings
         # Per Codex critical review (additional finding D): the demo's
         # advertised risky scenarios MUST emit warnings. Was previously

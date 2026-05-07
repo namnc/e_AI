@@ -123,8 +123,14 @@ COUNT_PATTERNS = [
     re.compile(r"\b(\d{1,3})\s+v2\s+(?:production\s+)?(?:tx-analysis\s+)?guards?\b", re.I),
     # `ship N guards` — Codex Phase 4 review noted "we ship 8 in cluster A"
     # would false-positive. Tighten by requiring a total-set qualifier
-    # nearby ("all", "total", or no other small number on the line).
-    re.compile(r"\bship\s+(?:all\s+)?(\d{1,3})\s+(?:total\s+)?guards?\b(?=\s*(?:[,.]|today|now|across|via|in v2))", re.I),
+    # after `guards`. Phase 5 #R1 / Phase 6F: the prior lookahead missed
+    # "as of today" / "as of now" because it required the qualifier
+    # IMMEDIATELY after `guards`. Allow optional "as of"/" as of " too.
+    re.compile(
+        r"\bship\s+(?:all\s+)?(\d{1,3})\s+(?:total\s+)?guards?\b"
+        r"(?=\s*(?:[,.]|today|now|across|via|in v2|as\s+of\s+(?:today|now|this)))",
+        re.I,
+    ),
 ]
 
 # Word-form numerals → integer. Phase 3 review #R1.1 noted that
@@ -138,6 +144,16 @@ WORD_NUMS: dict[str, int] = {
 }
 WORD_NUM_PATTERN = re.compile(
     r"\b(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:v2|production|total)\s+(?:production\s+)?guards?\b",
+    re.I,
+)
+
+# Phase 5 review #R1 / Phase 6F: word-form ship-claim with "as of today/now"
+# tail (e.g., "we ship sixteen guards as of today"). Distinct from
+# WORD_NUM_PATTERN because the verb "ship" + total-set tail is itself the
+# total-claim signal — no inner v2/production qualifier required.
+WORD_NUM_SHIP_PATTERN = re.compile(
+    r"\bship\s+(?:all\s+)?(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:total\s+)?guards?\b"
+    r"(?=\s*(?:[,.]|today|now|across|via|in v2|as\s+of\s+(?:today|now|this)))",
     re.I,
 )
 
@@ -256,6 +272,15 @@ def lint() -> int:
                 if n != expected:
                     issues.append(
                         f"{rel}:{line_no}: R1 word-form count drift — claims "
+                        f"'{m.group(0)}' but actual v2 production profiles = {expected}"
+                    )
+
+            # R1 word-form ship-claim (Phase 6F)
+            for m in WORD_NUM_SHIP_PATTERN.finditer(line):
+                n = WORD_NUMS[m.group(1).lower()]
+                if n != expected:
+                    issues.append(
+                        f"{rel}:{line_no}: R1 word-form ship-claim drift — claims "
                         f"'{m.group(0)}' but actual v2 production profiles = {expected}"
                     )
 

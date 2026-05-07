@@ -102,6 +102,51 @@ class TestR1NumericClaims(unittest.TestCase):
         hits = list(lint_docs.WORD_NUM_PATTERN.finditer(line))
         self.assertEqual(hits, [], "cluster phrase must not trip word-form pattern")
 
+    # ---------- Phase 6F: as-of-today + word-form ship false-negatives ----
+
+    def test_numeric_ship_as_of_today_fires(self):
+        """Phase 5 review #R1 / Phase 6F: 'We ship 15 guards as of today'
+        must trip — prior lookahead required 'today/now' immediately after
+        'guards' and missed the 'as of today' tail."""
+        line = "We ship 15 guards as of today."
+        self.assertIn(15, self._matches(line, self.EXPECTED),
+                      "ship-N-guards-as-of-today drift must fire")
+
+    def test_numeric_ship_as_of_now_fires(self):
+        line = "We ship 14 guards as of now"
+        self.assertIn(14, self._matches(line, self.EXPECTED))
+
+    def test_word_form_ship_as_of_today_fires(self):
+        """Phase 5 review #R1 / Phase 6F: 'we ship sixteen guards as of
+        today' was the prompt example. The bare word-form ship-claim
+        without v2/production qualifier must trip when the count drifts."""
+        line = "We ship fifteen guards as of today"
+        hits = [
+            lint_docs.WORD_NUMS[m.group(1).lower()]
+            for m in lint_docs.WORD_NUM_SHIP_PATTERN.finditer(line)
+            if lint_docs.WORD_NUMS[m.group(1).lower()] != self.EXPECTED
+        ]
+        self.assertEqual(hits, [15],
+                         "word-form ship-claim with as-of-today drift must fire")
+
+    def test_word_form_ship_correct_count_passes(self):
+        line = "We ship sixteen guards as of today"
+        hits = [
+            lint_docs.WORD_NUMS[m.group(1).lower()]
+            for m in lint_docs.WORD_NUM_SHIP_PATTERN.finditer(line)
+            if lint_docs.WORD_NUMS[m.group(1).lower()] != self.EXPECTED
+        ]
+        self.assertEqual(hits, [],
+                         "word-form ship-claim with correct count must not fire")
+
+    def test_word_form_ship_without_total_qualifier_passes(self):
+        """'thirteen guards in cluster A' doesn't have 'ship' verb — it's
+        not a ship-claim and shouldn't trip the new ship pattern."""
+        line = "thirteen guards in cluster A"
+        hits = list(lint_docs.WORD_NUM_SHIP_PATTERN.finditer(line))
+        self.assertEqual(hits, [],
+                         "non-ship cluster phrase must not trip ship pattern")
+
 
 # ---------------------------------------------------------------------------
 # R2 — production claim hedging

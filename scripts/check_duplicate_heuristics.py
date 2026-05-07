@@ -83,6 +83,9 @@ def duplicates(d: dict) -> dict:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument("--strict", action="store_true",
+                        help="treat name-overlap as a CI failure too "
+                             "(default: only exact-key duplicates fail)")
     args = parser.parse_args()
 
     raw = collect()
@@ -93,7 +96,13 @@ def main():
             "exact_key_duplicates": dups["by_key"],
             "name_overlap_duplicates": dups["by_name"],
         }, indent=2))
-        sys.exit(1 if (dups["by_key"] or dups["by_name"]) else 0)
+        # Only EXACT-key duplicates fail CI. Name overlap is advisory —
+        # two domains may legitimately analyze the same concept under
+        # different heuristic IDs (e.g., "Timing correlation" exists in
+        # mixing_behavioral H1 and stealth_address_ops H3). Use --strict
+        # to fail on name overlap too.
+        rc = 1 if dups["by_key"] else (1 if (args.strict and dups["by_name"]) else 0)
+        sys.exit(rc)
 
     n_dom = sum(1 for d in DOMAINS.iterdir() if d.is_dir() and (d / "profile.json").exists())
     print(f"Scanned {n_dom} domain profiles.")
@@ -112,7 +121,7 @@ def main():
         print()
 
     if dups["by_name"]:
-        print("Name-overlap duplicates (different keys, same/near name):")
+        print("Name-overlap (different keys, same/near name) — ADVISORY:")
         for nm, hits in sorted(dups["by_name"].items()):
             domains_seen = sorted({t[0] for t in hits})
             if len(domains_seen) <= 1:
@@ -122,7 +131,14 @@ def main():
                 print(f"    - {dom}: {hid}")
         print()
 
-    sys.exit(1)
+    # Exact-key duplicates fail CI (real bug). Name-overlap is advisory.
+    # --strict promotes name-overlap to a CI failure too.
+    if dups["by_key"]:
+        sys.exit(1)
+    if args.strict and dups["by_name"]:
+        sys.exit(1)
+    print("OK (exact-key clean; name-overlaps are advisory)")
+    sys.exit(0)
 
 
 if __name__ == "__main__":

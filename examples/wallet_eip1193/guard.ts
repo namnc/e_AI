@@ -37,10 +37,31 @@ interface Profile {
   [key: string]: unknown;
 }
 
+/**
+ * Closed enumeration of permissible severities. Anything outside this set
+ * is a profile-authoring or alert-construction bug; the profile validator
+ * (`validateProfileSeverities`) and the runtime dispatch path treat
+ * unknown values as fail-closed: they coerce to 'critical' on dispatch
+ * AND fire an out-of-band alert via onAlert so the bug surfaces.
+ *
+ * Codex Phase 5 review #6: prior version typed severity as plain string,
+ * letting a typo like 'critcal' silently fall to a 'warn' action. With
+ * this enum + validator, that path closes.
+ */
+type AlertSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+
+const ALERT_SEVERITIES: ReadonlySet<AlertSeverity> = new Set([
+  'critical', 'high', 'medium', 'low', 'info',
+] as const);
+
+function isKnownSeverity(s: string): s is AlertSeverity {
+  return (ALERT_SEVERITIES as ReadonlySet<string>).has(s);
+}
+
 interface Heuristic {
   id: string;
   name: string;
-  severity: string;
+  severity: AlertSeverity;
   description: string;
   detection: { signals: Signal[] };
   recommendations: Recommendation[];
@@ -61,7 +82,7 @@ interface Recommendation {
 interface Alert {
   profile: string;
   heuristic: string;
-  severity: string;
+  severity: AlertSeverity;
   confidence: number;
   signal: string;
   recommendation: string;
@@ -362,10 +383,49 @@ function analyzeSignature(typedData: unknown): Alert[] {
 
 // --- Main Guard ---
 
+/**
+ * Validate that every heuristic in every profile carries a severity in the
+ * closed enum. Returns the list of (profile, heuristicKey, badSeverity)
+ * tuples. Phase 6D: surfaces profile-authoring bugs at config time rather
+ * than at first dispatch.
+ *
+ * Caller decides whether to throw or log+continue. The default `withEIP1193Guard`
+ * call logs a warning per offender; callers who want strict mode can throw
+ * on a non-empty list.
+ */
+export function validateProfileSeverities(
+  profiles: Profile[],
+): { profile: string; heuristic: string; severity: string }[] {
+  const offenders: { profile: string; heuristic: string; severity: string }[] = [];
+  for (const p of profiles) {
+    const dom = p?.meta?.domain_name ?? '<unknown>';
+    const heur = (p as { heuristics?: Record<string, { severity?: string }> }).heuristics ?? {};
+    for (const [hkey, hval] of Object.entries(heur)) {
+      const sev = hval?.severity ?? '<missing>';
+      if (typeof sev !== 'string' || !isKnownSeverity(sev)) {
+        offenders.push({ profile: dom, heuristic: hkey, severity: String(sev) });
+      }
+    }
+  }
+  return offenders;
+}
+
 export function withEIP1193Guard(
   provider: EIP1193Provider,
   config: GuardConfig,
 ): EIP1193Provider {
+  // Phase 6D: validate severities at config time. We log offenders but
+  // do not throw — callers using `validateProfileSeverities` directly can
+  // enforce strict mode in their own setup.
+  const offenders = validateProfileSeverities(config.profiles ?? []);
+  for (const o of offenders) {
+    console.warn(
+      `[e_AI Guard] profile=${o.profile} heuristic=${o.heuristic} has ` +
+      `unrecognized severity ${JSON.stringify(o.severity)}; ` +
+      `runtime will coerce alerts using this heuristic to 'critical' for safety`,
+    );
+  }
+
   const rpcTracker = config.trackRpcPatterns !== false ? new RpcPatternTracker() : null;
   const blockOnCritical = config.blockOnCritical !== false;
 
@@ -410,6 +470,22 @@ export function withEIP1193Guard(
       // setApprovalForAll(false) revocation note) must NOT trigger a
       // user-facing 'warn' action. They are observability events, not
       // friction. Only alerts at severity ≥ low contribute to 'warn'.
+      //
+      // Phase 5 review #6 / Phase 6D: any alert with an unknown severity
+      // (typo'd 'critcal', new value 'debug', etc.) is fail-closed —
+      // coerced to 'critical' for dispatch decisions so it BLOCKS rather
+      // than silently passing or warning. The unknown value is also
+      // surfaced to onAlert so the profile/alert-construction bug is
+      // observable.
+      for (const a of alerts) {
+        if (!isKnownSeverity(a.severity)) {
+          console.warn(
+            `[e_AI Guard] Unknown severity ${JSON.stringify(a.severity)} ` +
+            `on ${a.profile}/${a.heuristic}; coercing to 'critical' for safety`,
+          );
+          a.severity = 'critical';
+        }
+      }
       const userVisible = alerts.filter(a => a.severity !== 'info');
       if (alerts.length > 0) {
         const hasCritical = alerts.some(a => a.severity === 'critical' && a.confidence > 0.8);

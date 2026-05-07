@@ -391,6 +391,27 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
             })
             return
 
+        # JSON-RPC notification on the normal path: forward fire-and-forget,
+        # do NOT parse the upstream response. Real upstreams may return 204 /
+        # empty body for notifications, which previously caused the proxy to
+        # 502 (Codex Phase 5 review #1). Acknowledge to the caller with HTTP
+        # 204; pre-analysis already ran. Any post-response analysis is
+        # impossible (no response) and skipped.
+        if is_notification:
+            try:
+                self.http_client.post(
+                    self.upstream,
+                    content=body,
+                    headers={"Content-Type": "application/json"},
+                )
+            except httpx.HTTPError as e:
+                # Notification is fire-and-forget at the JSON-RPC layer; we
+                # still log upstream connectivity issues but do not surface
+                # them to the caller (no response slot to fail).
+                log.warning(f"Notification forward to upstream failed: {e}")
+            self._send_no_content()
+            return
+
         try:
             resp = self.http_client.post(
                 self.upstream,
@@ -414,27 +435,42 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
         """Handle JSON-RPC batch requests with id-correlated merge.
 
         Per-item plan slots:
-          - "invalid"      → not a dict; responds with -32600 (id=null).
+          - "invalid"      → not a dict OR duplicate id; responds with -32600.
           - "blocked"      → critical alert; responds with guard-block error.
           - "dryrun"       → dry-run path; synthetic _e_ai_dry_run ack.
           - "forward"      → normal path; sent to upstream, filled by id.
           - "notification" → no id; pre-analysis only, NO response slot.
 
-        Correctness invariants (Codex Phase 4 review #2, #3, #4):
+        Correctness invariants (Codex Phase 4 #2/#3/#4 + Phase 5 #2/#3):
           - Upstream NEVER sees invalid/blocked/dryrun/notification entries.
-            We construct a filtered batch from the forward-with-id slots
-            only. Notifications are ignored entirely on the wire.
+            forward_payload is built from id-bearing forward slots ONLY.
+            Notifications are NOT appended (Phase 5 review #2).
           - Upstream responses are matched to forward slots BY id, not by
-            iterator position. JSON-RPC permits reordering and notifications
-            don't generate responses.
+            iterator position. JSON-RPC permits reordering.
           - Notifications get pre-analysis but produce NO response in the
-            merged output (and we don't put them in the upstream batch
-            either — most upstreams will skip them anyway, but we don't rely
-            on that).
+            merged output AND are not forwarded as part of the response-
+            bearing batch. If the user wants HTTP-batch notification
+            semantics on the wire, they go through `_handle_single` one
+            at a time. (Most upstreams treat HTTP-batch notifications as
+            no-op anyway, so this is a documented simplification.)
+          - Duplicate id-bearing entries are rejected as -32600 for ALL
+            occurrences (Phase 5 review #3). Two requests with the same
+            id is illegal JSON-RPC; failing all of them deterministically
+            is safer than letting one win.
         """
         if not requests:
             self._send_error(400, "Empty batch")
             return
+
+        # First pass: detect duplicate id-bearing entries. Any id appearing
+        # in >1 entry is rejected for ALL occurrences (Phase 5 review #3).
+        # Notifications are not in this set ("id" not in r).
+        from collections import Counter as _Counter
+        id_counts = _Counter(
+            r.get("id") for r in requests
+            if isinstance(r, dict) and "id" in r
+        )
+        dup_ids = {k for k, v in id_counts.items() if v > 1}
 
         n = len(requests)
         plan: list[str] = ["forward"] * n
@@ -466,13 +502,23 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
 
             if is_notification:
                 plan[i] = "notification"
-                # Pre-analysis already ran; no response slot. Critical alerts
-                # on a notification are LOGGED only — we cannot return a
-                # JSON-RPC error to the caller per spec.
-                # Forward the notification to upstream only on the normal
-                # (not dry-run, not critical-block) path; fire-and-forget.
-                if not self.dry_run and not critical:
-                    forward_payload.append(r)
+                # Pre-analysis ran. No response slot. NOT forwarded as part
+                # of the upstream batch (Phase 5 review #2). Critical alerts
+                # on notifications are logged only.
+                continue
+
+            # Duplicate id-bearing entry: reject ALL occurrences as -32600
+            # rather than letting the later one overwrite the earlier in
+            # id_to_slot (Phase 5 review #3).
+            if not is_notification and req_id in dup_ids:
+                plan[i] = "invalid"
+                prebuilt[i] = {
+                    "jsonrpc": "2.0", "id": req_id,
+                    "error": {
+                        "code": -32600,
+                        "message": f"Duplicate id {req_id!r} in batch",
+                    },
+                }
                 continue
 
             if self.dry_run:

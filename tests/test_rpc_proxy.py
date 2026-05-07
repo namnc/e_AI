@@ -37,20 +37,32 @@ from proxy.rpc_proxy import (
 # ---------------------------------------------------------------------------
 
 class _RecordingUpstream(BaseHTTPRequestHandler):
-    """Tiny upstream that records the last body and returns a canned response."""
+    """Tiny upstream that records the last body and returns a canned response.
+
+    The canned response can be a bytes payload (default) or a callable
+    `(body) -> (status, body_bytes)` for tests that need to vary the
+    response per-request (e.g. notification → 204, real request → 200).
+    """
 
     received_bodies: list[bytes] = []
-    canned_response: bytes = b'{"jsonrpc":"2.0","id":1,"result":"0x1"}'
+    canned_response: object = b'{"jsonrpc":"2.0","id":1,"result":"0x1"}'
 
     def do_POST(self):
         n = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(n)
         type(self).received_bodies.append(body)
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(self.canned_response)))
+        cr = type(self).canned_response
+        if callable(cr):
+            status, payload = cr(body)
+        else:
+            status, payload = 200, cr
+        self.send_response(status)
+        if status != 204 and payload:
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
-        self.wfile.write(self.canned_response)
+        if status != 204 and payload:
+            self.wfile.write(payload)
 
     def log_message(self, *a, **kw):
         pass
@@ -518,6 +530,138 @@ class TestProxyHTTP(unittest.TestCase):
         # Synthetic dry-run flag in body
         body_json = resp.json()
         self.assertTrue(body_json.get("_e_ai_dry_run"))
+
+    # ---- Phase 6 notification + duplicate-id edge cases ----
+
+    def test_single_notification_normal_path_returns_204_even_when_upstream_204(self):
+        """Phase 5 review #1 / Phase 6A: in NORMAL (not dry-run) mode, a
+        notification's upstream may return 204 / empty body. The proxy must
+        still return 204 to the caller, NOT 502 from JSONDecodeError."""
+        body = json.dumps({"jsonrpc": "2.0", "method": "eth_chainId", "params": []})
+        # Upstream replies 204 No Content (spec-compliant for notifications)
+        _RecordingUpstream.canned_response = lambda raw: (204, b"")
+        before = len(_RecordingUpstream.received_bodies)
+        resp = self._post(body)
+        self.assertEqual(resp.status_code, 204,
+                         "notification with upstream 204 must NOT 502")
+        self.assertEqual(resp.content, b"")
+        # And upstream WAS forwarded fire-and-forget
+        self.assertEqual(len(_RecordingUpstream.received_bodies), before + 1)
+
+    def test_batch_pure_notification_normal_path_returns_204(self):
+        """Phase 5 review #2 / Phase 6B: pure-notification batch in NORMAL
+        mode must NOT touch upstream and must return 204."""
+        batch = [
+            {"jsonrpc": "2.0", "method": "eth_chainId", "params": []},
+            {"jsonrpc": "2.0", "method": "eth_chainId", "params": []},
+        ]
+        before = len(_RecordingUpstream.received_bodies)
+        resp = self._post(json.dumps(batch))
+        self.assertEqual(resp.status_code, 204)
+        # Pure-notification batch: upstream NOT contacted
+        self.assertEqual(len(_RecordingUpstream.received_bodies), before,
+                         "pure-notification batch must NOT contact upstream")
+
+    def test_batch_mixed_notification_excluded_from_upstream_payload(self):
+        """Phase 5 review #2 / Phase 6B: notifications mixed into a batch
+        with id-bearing requests must NOT appear in the upstream payload."""
+        batch = [
+            {"jsonrpc": "2.0", "method": "eth_chainId", "params": []},  # notification
+            {"jsonrpc": "2.0", "id": 7, "method": "eth_blockNumber", "params": []},
+        ]
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "id": 7, "result": "0xff"},
+        ]).encode()
+        before = len(_RecordingUpstream.received_bodies)
+        resp = self._post(json.dumps(batch))
+        # We get one slot back (for id=7 only)
+        body = resp.json()
+        self.assertEqual(len(body), 1)
+        self.assertEqual(body[0]["id"], 7)
+        # And upstream saw exactly one request — the notification was filtered
+        self.assertEqual(len(_RecordingUpstream.received_bodies), before + 1)
+        upstream_body = json.loads(_RecordingUpstream.received_bodies[-1])
+        self.assertIsInstance(upstream_body, list)
+        self.assertEqual(len(upstream_body), 1,
+                         "notification must NOT be in upstream payload")
+        self.assertEqual(upstream_body[0].get("id"), 7)
+
+    def test_batch_duplicate_ids_rejected_for_all_occurrences(self):
+        """Phase 5 review #3 / Phase 6C: duplicate ids in a batch result in
+        -32600 for ALL occurrences. Defensive against misbehaving clients."""
+        batch = [
+            {"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []},
+            {"jsonrpc": "2.0", "id": 2, "method": "eth_chainId", "params": []},
+            {"jsonrpc": "2.0", "id": 1, "method": "eth_blockNumber", "params": []},  # DUP
+        ]
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "id": 2, "result": "0x2"},
+        ]).encode()
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(len(body), 3)
+        # Both id=1 entries must be -32600 invalid; id=2 forwards.
+        dup_slots = [item for item in body if item.get("id") == 1]
+        self.assertEqual(len(dup_slots), 2,
+                         "both duplicate id slots must be present")
+        for slot in dup_slots:
+            self.assertIn("error", slot)
+            self.assertEqual(slot["error"]["code"], -32600)
+            self.assertIn("Duplicate", slot["error"]["message"])
+        # Upstream must NOT have seen the duplicate — only id=2 was forwarded.
+        upstream_body = json.loads(_RecordingUpstream.received_bodies[-1])
+        self.assertEqual(len(upstream_body), 1)
+        self.assertEqual(upstream_body[0]["id"], 2)
+
+    def test_batch_explicit_id_null_forwarded_normally(self):
+        """Phase 6C: explicit `id: null` is valid JSON-RPC (caller wants no
+        response but acknowledges error responses). It is NOT a notification
+        (which omits the id key entirely). Forward as a normal request."""
+        batch = [
+            {"jsonrpc": "2.0", "id": None, "method": "eth_chainId", "params": []},
+            {"jsonrpc": "2.0", "id": 9, "method": "eth_blockNumber", "params": []},
+        ]
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "id": None, "result": "0x1"},
+            {"jsonrpc": "2.0", "id": 9, "result": "0xff"},
+        ]).encode()
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(len(body), 2)
+        # Upstream WAS contacted with both slots (explicit null is forward-eligible)
+        upstream_body = json.loads(_RecordingUpstream.received_bodies[-1])
+        self.assertEqual(len(upstream_body), 2)
+
+    def test_batch_id_type_mismatch_surfaces_internal_error(self):
+        """Phase 5 #5 / Phase 6: if proxy sends int id 1 but upstream
+        replies string "1", we must NOT cross-wire — return -32603 for the
+        forwarded slot whose id never came back, and log the unknown id."""
+        batch = [
+            {"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []},
+        ]
+        _RecordingUpstream.canned_response = json.dumps([
+            {"jsonrpc": "2.0", "id": "1", "result": "0x1"},  # string, not int
+        ]).encode()
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(len(body), 1)
+        self.assertIn("error", body[0])
+        self.assertEqual(body[0]["error"]["code"], -32603)
+
+    def test_batch_one_forward_item_upstream_returns_dict_normalized_to_list(self):
+        """Phase 6: upstream may return a dict (not list) when forward_payload
+        had only one element. Proxy must normalize to a list and merge."""
+        batch = [
+            {"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []},
+            {"jsonrpc": "2.0", "method": "eth_chainId", "params": []},  # notification
+        ]
+        # Upstream sees only the id-bearing item; replies as a single dict
+        _RecordingUpstream.canned_response = b'{"jsonrpc":"2.0","id":1,"result":"0xdeadbeef"}'
+        resp = self._post(json.dumps(batch))
+        body = resp.json()
+        self.assertEqual(len(body), 1)
+        self.assertEqual(body[0]["id"], 1)
+        self.assertEqual(body[0]["result"], "0xdeadbeef")
 
     # ---- Auth token ----
 
