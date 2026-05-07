@@ -129,7 +129,7 @@ COUNT_PATTERNS = [
     # Phase 7F (Codex Phase 6 review): also catch "by today" tail and
     # "(as of today)" parenthetical, plus past-tense "shipped".
     re.compile(
-        r"\bship(?:ped|s)?\s+(?:all\s+)?(\d{1,3})\s+(?:total\s+)?guards?\b"
+        r"\bship(?:ped|ping|s)?\s+(?:all\s+)?(\d{1,3})\s+(?:total\s+)?guards?\b"
         r"(?=\s*[\.\,\(]?\s*"
         r"(?:today|now|across|via|in v2"
         r"|as\s+of\s+(?:today|now|this)"
@@ -158,7 +158,7 @@ WORD_NUM_PATTERN = re.compile(
 # total-claim signal — no inner v2/production qualifier required.
 WORD_NUM_SHIP_PATTERN = re.compile(
     # Phase 7F: also catch past-tense "shipped" and parenthetical/by-today tails.
-    r"\bship(?:ped|s)?\s+(?:all\s+)?(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:total\s+)?guards?\b"
+    r"\bship(?:ped|ping|s)?\s+(?:all\s+)?(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:total\s+)?guards?\b"
     r"(?=\s*[\.\,\(]?\s*"
     r"(?:today|now|across|via|in v2"
     r"|as\s+of\s+(?:today|now|this)"

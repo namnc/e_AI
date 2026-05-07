@@ -134,12 +134,20 @@ def is_valid_jsonrpc_id(x: Any) -> bool:
     """JSON-RPC 2.0: id MUST be String, Number, or NULL. Booleans, arrays,
     and objects are invalid. We exclude booleans even though Python `bool`
     is a subclass of `int` (so `Counter` would happily key on them) — bool
-    ids are spec-bad and we reject for hygiene. Phase 7B per Codex review."""
+    ids are spec-bad and we reject for hygiene.
+
+    Phase 7B + Phase 8A (Codex Phase 7 #1 narrow companion): non-finite
+    floats (NaN, Infinity, -Infinity) are JSON-non-compliant on the wire
+    even if Python's json module accepts them by default. Reject them too.
+    """
+    import math
     if x is None:
         return True
     if isinstance(x, bool):
         return False  # bool is int subclass; reject explicitly
-    if isinstance(x, (int, float)):
+    if isinstance(x, float):
+        return math.isfinite(x)
+    if isinstance(x, int):
         return True
     if isinstance(x, str):
         return True
@@ -377,6 +385,24 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
         # review #4).
         is_notification = "id" not in request
         req_id = request.get("id")
+
+        # Phase 8A (Codex Phase 7 #1): single-request invalid id types must
+        # be rejected for the same reason batch invalid ids are rejected
+        # (Phase 7B). Without this check, a single dry-run with id:[]
+        # echoed the bad id back; active mode forwarded the malformed
+        # request upstream. Inconsistent JSON-RPC contract.
+        if not is_notification and not is_valid_jsonrpc_id(req_id):
+            self._send_json({
+                "jsonrpc": "2.0", "id": None,
+                "error": {
+                    "code": -32600,
+                    "message": (
+                        f"Invalid id type: {type(req_id).__name__}; "
+                        "must be string, number, or null"
+                    ),
+                },
+            })
+            return
 
         pre_alerts = analyze_request(method, params, self.state)
         for alert in pre_alerts:

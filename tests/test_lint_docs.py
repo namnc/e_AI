@@ -186,6 +186,41 @@ class TestR1NumericClaims(unittest.TestCase):
         ]
         self.assertEqual(hits, [15])
 
+    # ---------- Phase 8B: gerund 'shipping' (Codex Phase 7 #2) ------------
+
+    def test_gerund_shipping_numeric_fires(self):
+        """Phase 8B: 'we are shipping 18 guards as of today' must trip."""
+        line = "we are shipping 18 guards as of today"
+        self.assertIn(18, self._matches(line, self.EXPECTED))
+
+    def test_gerund_shipping_word_form_fires(self):
+        """Phase 8B: 'now shipping eighteen guards by today' (gerund + word)"""
+        line = "now shipping eighteen guards by today"
+        hits = [
+            lint_docs.WORD_NUMS[m.group(1).lower()]
+            for m in lint_docs.WORD_NUM_SHIP_PATTERN.finditer(line)
+            if lint_docs.WORD_NUMS[m.group(1).lower()] != self.EXPECTED
+        ]
+        self.assertEqual(hits, [18])
+
+    def test_gerund_shipping_correct_count_passes(self):
+        """Phase 8B: 'we are shipping sixteen guards as of today' (== EXPECTED)
+        must NOT fire."""
+        line = "we are shipping sixteen guards as of today"
+        hits = [
+            lint_docs.WORD_NUMS[m.group(1).lower()]
+            for m in lint_docs.WORD_NUM_SHIP_PATTERN.finditer(line)
+            if lint_docs.WORD_NUMS[m.group(1).lower()] != self.EXPECTED
+        ]
+        self.assertEqual(hits, [])
+
+    def test_gerund_shipping_cluster_phrase_passes(self):
+        """Phase 8B: 'shipping 8 guards in cluster A' is a cluster claim,
+        not a total — the existing tail-lookahead prevents false positive."""
+        line = "shipping 8 guards in cluster A"
+        self.assertEqual(self._matches(line, self.EXPECTED), [],
+                         "cluster phrase must not trip even with gerund verb")
+
 
 # ---------------------------------------------------------------------------
 # R2 — production claim hedging

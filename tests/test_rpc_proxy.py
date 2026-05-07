@@ -761,6 +761,66 @@ class TestProxyHTTP(unittest.TestCase):
                          "non-duplicate id=2 must succeed via upstream")
         self.assertNotIn("error", slot_2)
 
+    # ---- Phase 8A: single-request id validation (Codex Phase 7 #1) ----
+
+    def test_single_array_id_rejected_with_invalid_request(self):
+        """Phase 8A: prior _handle_single did NOT validate id type. id:[]
+        in a single request would crash dispatch in active mode and echo
+        the bad id back in dry-run. Phase 8A applies is_valid_jsonrpc_id
+        consistently to single-request path."""
+        body = json.dumps({"jsonrpc": "2.0", "id": [], "method": "eth_chainId", "params": []})
+        before = len(_RecordingUpstream.received_bodies)
+        resp = self._post(body)
+        self.assertEqual(resp.status_code, 200)
+        body_json = resp.json()
+        self.assertIn("error", body_json)
+        self.assertEqual(body_json["error"]["code"], -32600)
+        # Upstream NOT contacted
+        self.assertEqual(len(_RecordingUpstream.received_bodies), before,
+                         "single request with invalid id must NOT reach upstream")
+
+    def test_single_object_id_rejected(self):
+        body = json.dumps({"jsonrpc": "2.0", "id": {"x": 1}, "method": "eth_chainId", "params": []})
+        resp = self._post(body)
+        self.assertEqual(resp.json()["error"]["code"], -32600)
+
+    def test_single_boolean_id_rejected(self):
+        body = json.dumps({"jsonrpc": "2.0", "id": True, "method": "eth_chainId", "params": []})
+        resp = self._post(body)
+        self.assertEqual(resp.json()["error"]["code"], -32600)
+
+    def test_single_array_id_rejected_in_dry_run(self):
+        """Phase 8A: invalid id rejection MUST also fire on the dry-run
+        path, not just active. Prior version returned a synthetic dry-run
+        ack echoing the bad id."""
+        RPCProxyHandler.dry_run = True
+        body = json.dumps({"jsonrpc": "2.0", "id": [1, 2], "method": "eth_chainId", "params": []})
+        resp = self._post(body)
+        body_json = resp.json()
+        self.assertIn("error", body_json)
+        self.assertEqual(body_json["error"]["code"], -32600)
+        self.assertNotIn("_e_ai_dry_run", body_json,
+                         "invalid id must short-circuit BEFORE dry-run synthesis")
+
+    def test_is_valid_jsonrpc_id_rejects_non_finite_floats(self):
+        """Phase 8A narrow companion: NaN/Infinity floats fail wire-JSON
+        even though Python's json module accepts them by default. Reject."""
+        from proxy.rpc_proxy import is_valid_jsonrpc_id
+        self.assertFalse(is_valid_jsonrpc_id(float("nan")))
+        self.assertFalse(is_valid_jsonrpc_id(float("inf")))
+        self.assertFalse(is_valid_jsonrpc_id(float("-inf")))
+        self.assertTrue(is_valid_jsonrpc_id(0.0))
+        self.assertTrue(is_valid_jsonrpc_id(1.5))
+        self.assertTrue(is_valid_jsonrpc_id(-3.14))
+
+    def test_is_valid_jsonrpc_id_basic_shape(self):
+        """Phase 8A: pin the validator's accept/reject set."""
+        from proxy.rpc_proxy import is_valid_jsonrpc_id
+        for ok in [None, 0, 1, -1, 1.5, "abc", "", "1"]:
+            self.assertTrue(is_valid_jsonrpc_id(ok), f"must accept {ok!r}")
+        for bad in [True, False, [], [1, 2], {}, {"x": 1}, b"bytes", set()]:
+            self.assertFalse(is_valid_jsonrpc_id(bad), f"must reject {bad!r}")
+
     # ---- Phase 7C: notification fire-and-forget bounded timeout (Codex Phase 6 #3) ----
 
     def test_single_notification_returns_204_promptly_when_upstream_slow(self):
