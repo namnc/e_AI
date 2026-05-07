@@ -61,9 +61,18 @@ def decode_uint256(data: str, byte_offset: int) -> int:
     return int(hex_word, 16)
 
 
-def decode_bool(data: str, byte_offset: int) -> bool:
-    """Match guard.ts decodeBool exactly. Non-zero word = true."""
-    return decode_uint256(data, byte_offset) != 0
+_BOOL_DECODE_MALFORMED = object()
+
+
+def decode_bool_strict(data: str, byte_offset: int):
+    """Match guard.ts decodeBoolStrict exactly. Strict ABI: 0 → False,
+    1 → True, anything else → MALFORMED sentinel (not a silent True)."""
+    word = decode_uint256(data, byte_offset)
+    if word == 0:
+        return False
+    if word == 1:
+        return True
+    return _BOOL_DECODE_MALFORMED
 
 
 def _build_approve_calldata(spender: str, amount: int) -> str:
@@ -159,24 +168,40 @@ class TestSetApprovalForAll(unittest.TestCase):
         self.assertTrue(is_well_formed_calldata(cd, 64))
         self.assertEqual(decode_address(cd, 4).lower(), operator.lower())
 
-    def test_decode_bool_true(self):
+    def test_decode_bool_strict_true(self):
         """Codex Phase 3 review missed-coverage #2: must distinguish
-        approved=true from approved=false. Previously the guard fired the
-        same high-severity alert for both."""
+        approved=true from approved=false."""
         operator_word = "0" * 24 + "ab" * 20
         approved_word = "0" * 63 + "1"
         cd = ERC721_SETAPPROVALFORALL_SELECTOR + operator_word + approved_word
-        self.assertTrue(decode_bool(cd, 4 + 32))
+        self.assertEqual(decode_bool_strict(cd, 4 + 32), True)
 
-    def test_decode_bool_false_revocation(self):
-        """approved=false is a REVOCATION; the helper must distinguish it
-        from a grant. The TS guard now emits low-severity H4_revoke for
-        this case (see guard.ts setApprovalForAll branch)."""
+    def test_decode_bool_strict_false_revocation(self):
+        """approved=false is a REVOCATION; pin that the helper returns
+        exactly False (not just falsy)."""
         operator_word = "0" * 24 + "ab" * 20
         approved_word = "0" * 64
         cd = ERC721_SETAPPROVALFORALL_SELECTOR + operator_word + approved_word
         self.assertTrue(is_well_formed_calldata(cd, 64))
-        self.assertFalse(decode_bool(cd, 4 + 32))
+        self.assertEqual(decode_bool_strict(cd, 4 + 32), False)
+
+    def test_decode_bool_strict_rejects_non_canonical(self):
+        """Codex Phase 4 review #5: strict ABI accepts only 0 or 1.
+        0x...02 / high-bytes-set / max-uint256 must return MALFORMED, not
+        silently classify as True."""
+        operator_word = "0" * 24 + "ab" * 20
+        # Non-canonical: 0x02
+        bad_word = "0" * 63 + "2"
+        cd = ERC721_SETAPPROVALFORALL_SELECTOR + operator_word + bad_word
+        self.assertEqual(decode_bool_strict(cd, 4 + 32), _BOOL_DECODE_MALFORMED)
+        # Non-canonical: high bytes set
+        bad_word2 = "0" * 62 + "ff"  # 0xff
+        cd2 = ERC721_SETAPPROVALFORALL_SELECTOR + operator_word + bad_word2
+        self.assertEqual(decode_bool_strict(cd2, 4 + 32), _BOOL_DECODE_MALFORMED)
+        # Non-canonical: max uint256
+        max_word = "f" * 64
+        cd3 = ERC721_SETAPPROVALFORALL_SELECTOR + operator_word + max_word
+        self.assertEqual(decode_bool_strict(cd3, 4 + 32), _BOOL_DECODE_MALFORMED)
 
 
 class TestIncreaseAllowance(unittest.TestCase):
@@ -225,6 +250,11 @@ class TestGuardTSSourceHasABIHelpers(unittest.TestCase):
         self.assertIn("isWellFormedCalldata", content)
         self.assertIn("decodeAddress", content)
         self.assertIn("decodeUint256", content)
+        # Codex Phase 4 review #5: track decodeBoolStrict (renamed from
+        # decodeBool — strict ABI variant). If a refactor reverts to the
+        # lax helper or drops it, this drift check fails.
+        self.assertIn("decodeBoolStrict", content)
+        self.assertIn("BOOL_DECODE_MALFORMED", content)
 
 
 if __name__ == "__main__":

@@ -27,6 +27,11 @@ function buildSetApprovalForAll(operator, approvedBool) {
   return "0xa22cb465" + operatorWord + approvedWord;
 }
 
+function buildSetApprovalForAllRaw(operator, approvedWord32) {
+  const operatorWord = "0".repeat(24) + operator.toLowerCase().replace("0x", "");
+  return "0xa22cb465" + operatorWord + approvedWord32;
+}
+
 function buildIncreaseAllowance(spender, amountHex) {
   const spenderWord = "0".repeat(24) + spender.toLowerCase().replace("0x", "");
   return "0x39509351" + spenderWord + amountHex.padStart(64, "0");
@@ -45,16 +50,18 @@ function makeMockProvider() {
 
 async function captureAlerts(method, params) {
   const captured = [];
+  const actions = [];
   const guarded = withEIP1193Guard(makeMockProvider(), {
     profiles: [],
-    onAlert: (alerts, _action) => {
+    onAlert: (alerts, action) => {
       for (const a of alerts) captured.push(a);
+      actions.push(action);
     },
     blockOnCritical: false,  // we don't want to throw mid-test
     trackRpcPatterns: false,  // ignore the rpc_leakage path here
   });
   await guarded.request({ method, params });
-  return captured;
+  return { alerts: captured, actions };
 }
 
 async function main() {
@@ -64,7 +71,7 @@ async function main() {
   {
     const spender = "0x" + "ab".repeat(20);
     const data = buildApprove(spender, MAX_UINT256);
-    const alerts = await captureAlerts("eth_sendTransaction", [
+    const { alerts, actions } = await captureAlerts("eth_sendTransaction", [
       { to: "0xtoken00000000000000000000000000000000ff", data, value: "0x0" },
     ]);
     try {
@@ -88,7 +95,7 @@ async function main() {
   {
     const operator = "0x" + "cd".repeat(20);
     const data = buildSetApprovalForAll(operator, true);
-    const alerts = await captureAlerts("eth_sendTransaction", [
+    const { alerts, actions } = await captureAlerts("eth_sendTransaction", [
       { to: "0xcollection00000000000000000000000000000000", data, value: "0x0" },
     ]);
     try {
@@ -106,27 +113,56 @@ async function main() {
     }
   }
 
-  // ---- setApprovalForAll(operator, false) — revocation (Phase 4B) ----
+  // ---- setApprovalForAll(operator, false) — revocation (Phase 4B + 5B) ----
   {
     const operator = "0x" + "ef".repeat(20);
     const data = buildSetApprovalForAll(operator, false);
-    const alerts = await captureAlerts("eth_sendTransaction", [
+    const { alerts, actions } = await captureAlerts("eth_sendTransaction", [
       { to: "0xcollection11111111111111111111111111111111", data, value: "0x0" },
     ]);
     try {
       const revoke = alerts.find((a) => a.heuristic === "H4_revoke");
       assert.ok(revoke, "setApprovalForAll(false) must produce H4_revoke alert");
-      assert.equal(revoke.severity, "low");
-      assert.match(revoke.signal, /REVOKING/);
-      // No high-severity grant alert in this case (the pre-Phase-4B bug)
+      assert.equal(revoke.severity, "info",
+        "Phase 5B: revocation severity must be 'info', not 'low' or higher (Codex Phase 4 #6)");
+      assert.match(revoke.signal, /REVOKED/);
+      // No high-severity grant alert
       const grant = alerts.find((a) => a.heuristic === "H4" && a.severity === "high");
+      assert.ok(!grant, "revocation must NOT produce a high-severity grant alert");
+      // Phase 5B: revocation must NOT trigger a 'warn' user-facing action.
       assert.ok(
-        !grant,
-        "setApprovalForAll(false) must NOT produce a high-severity grant alert (Phase 4B regression test)",
+        !actions.includes("warn"),
+        `revocation must NOT emit 'warn' (got actions=${JSON.stringify(actions)})`,
       );
-      console.log("OK: setApprovalForAll(false) → H4_revoke (no grant)");
+      console.log("OK: setApprovalForAll(false) → H4_revoke@info, no warn");
     } catch (e) {
       console.error("FAIL: setApprovalForAll(false)", e.message);
+      failed++;
+    }
+  }
+
+  // ---- setApprovalForAll with non-canonical bool word — strict-malformed (Phase 5B) ----
+  {
+    const operator = "0x" + "11".repeat(20);
+    // 0x...02 — non-canonical under strict ABI (must be 0 or 1).
+    const data = buildSetApprovalForAllRaw(operator, "0".repeat(63) + "2");
+    const { alerts } = await captureAlerts("eth_sendTransaction", [
+      { to: "0xcollection33333333333333333333333333333333", data, value: "0x0" },
+    ]);
+    try {
+      const malformed = alerts.find(
+        (a) => a.heuristic === "malformed" && /non-canonical/.test(a.signal),
+      );
+      assert.ok(
+        malformed,
+        "non-canonical bool word must produce malformed alert under strict ABI (Phase 5B / Codex Phase 4 #5)",
+      );
+      assert.equal(malformed.severity, "high");
+      const grant = alerts.find((a) => a.heuristic === "H4");
+      assert.ok(!grant, "non-canonical bool must NOT silently classify as grant");
+      console.log("OK: setApprovalForAll(0x02) → strict-malformed alert");
+    } catch (e) {
+      console.error("FAIL: non-canonical bool", e.message);
       failed++;
     }
   }
@@ -135,7 +171,7 @@ async function main() {
   {
     const spender = "0x" + "11".repeat(20);
     const data = buildIncreaseAllowance(spender, MAX_UINT256);
-    const alerts = await captureAlerts("eth_sendTransaction", [
+    const { alerts, actions } = await captureAlerts("eth_sendTransaction", [
       { to: "0xtoken22222222222222222222222222222222ee", data, value: "0x0" },
     ]);
     try {
@@ -152,7 +188,7 @@ async function main() {
   // ---- approve with malformed calldata ----
   {
     const data = "0x095ea7b3" + "00".repeat(32);  // only 32 bytes after selector, not 64
-    const alerts = await captureAlerts("eth_sendTransaction", [
+    const { alerts, actions } = await captureAlerts("eth_sendTransaction", [
       { to: "0xtoken", data, value: "0x0" },
     ]);
     try {

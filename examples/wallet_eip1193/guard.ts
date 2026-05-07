@@ -174,10 +174,20 @@ function decodeUint256(data: string, byteOffset: number): bigint {
   return BigInt(hex);
 }
 
-function decodeBool(data: string, byteOffset: number): boolean {
-  // Solidity ABI: bool is encoded in a 32-byte word; non-zero word = true.
-  // We read as uint256 and compare against zero.
-  return decodeUint256(data, byteOffset) !== BigInt(0);
+// Sentinel returned by decodeBoolStrict for malformed bool encodings.
+// We surface this to callers so they can emit a malformed alert rather
+// than silently coercing 0x...02 to true (Codex Phase 4 review #5).
+const BOOL_DECODE_MALFORMED = Symbol("bool-decode-malformed");
+
+function decodeBoolStrict(data: string, byteOffset: number): boolean | typeof BOOL_DECODE_MALFORMED {
+  // Strict Solidity ABI: bool is encoded as 0x00...00 (false) or 0x00...01
+  // (true). Any other value (high bytes set, padding bytes non-zero, value
+  // > 1) is malformed. The lax "non-zero = true" reading silently passed
+  // adversarial calldata that didn't match canonical ABI encoding.
+  const word = decodeUint256(data, byteOffset);
+  if (word === BigInt(0)) return false;
+  if (word === BigInt(1)) return true;
+  return BOOL_DECODE_MALFORMED;
 }
 
 function analyzeTx(to: string, data: string, value: bigint, profiles: Profile[]): Alert[] {
@@ -246,25 +256,39 @@ function analyzeTx(to: string, data: string, value: bigint, profiles: Profile[])
       return alerts;
     }
     let operator: string;
-    let approved: boolean;
+    let approvedRaw: boolean | typeof BOOL_DECODE_MALFORMED;
     try {
       operator = decodeAddress(data, 4);
-      approved = decodeBool(data, 4 + 32);
+      approvedRaw = decodeBoolStrict(data, 4 + 32);
     } catch {
       operator = '<decode-failed>';
-      approved = true;  // fail closed: alert if we can't tell
+      approvedRaw = BOOL_DECODE_MALFORMED;
     }
 
-    // Codex Phase 3 review missed-coverage #2: setApprovalForAll(false) is
-    // a REVOCATION, not a grant — emit an info-level note rather than the
-    // high-severity grant alert. Previously fired the same alert for both.
-    if (!approved) {
+    if (approvedRaw === BOOL_DECODE_MALFORMED) {
+      // Strict ABI failure: bool word was neither 0 nor 1. Codex Phase 4
+      // review #5 — fail closed with a malformed alert rather than
+      // silently classifying as grant.
+      alerts.push({
+        profile: 'approval_phishing',
+        heuristic: 'malformed',
+        severity: 'high',
+        confidence: 0.9,
+        signal: `setApprovalForAll() bool word is non-canonical (not 0 or 1). Refusing to silently classify.`,
+        recommendation: 'Reject the transaction; calldata is not strict-ABI conformant.',
+      });
+    } else if (approvedRaw === false) {
+      // setApprovalForAll(false) is a REVOCATION — defensive, not noisy.
+      // Codex Phase 4 review #6: do NOT emit a wallet warning for this
+      // path. We log it via onAlert at severity:"info" so observability
+      // pipelines can capture it, but the dispatch logic in
+      // withEIP1193Guard now treats info as pass (no warn).
       alerts.push({
         profile: 'approval_phishing',
         heuristic: 'H4_revoke',
-        severity: 'low',
-        confidence: 0.9,
-        signal: `setApprovalForAll(false) — REVOKING operator approval, collection=${to}, operator=${operator}`,
+        severity: 'info',
+        confidence: 0.95,
+        signal: `setApprovalForAll(false) — operator approval REVOKED, collection=${to}, operator=${operator}`,
         recommendation: 'No action needed; revocation is a defensive operation.',
       });
     } else {
@@ -382,9 +406,18 @@ export function withEIP1193Guard(
       }
 
       // --- Dispatch alerts ---
+      // Codex Phase 4 review #6: severity 'info' alerts (e.g., the
+      // setApprovalForAll(false) revocation note) must NOT trigger a
+      // user-facing 'warn' action. They are observability events, not
+      // friction. Only alerts at severity ≥ low contribute to 'warn'.
+      const userVisible = alerts.filter(a => a.severity !== 'info');
       if (alerts.length > 0) {
         const hasCritical = alerts.some(a => a.severity === 'critical' && a.confidence > 0.8);
-        const action = hasCritical && blockOnCritical ? 'block' : alerts.length > 0 ? 'warn' : 'pass';
+        const action = hasCritical && blockOnCritical
+          ? 'block'
+          : userVisible.length > 0
+          ? 'warn'
+          : 'pass';
 
         if (config.onAlert) {
           await config.onAlert(alerts, action);
