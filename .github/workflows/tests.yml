@@ -223,11 +223,10 @@ jobs:
         # Per Codex Phase 3 review #3: kohaku_integration is one of the
         # advertised integration surfaces but its package's tsc was
         # broken (rootDir/include mismatch). Now fixed; CI must keep
-        # it that way.
+        # it that way. Use `npm ci` strictly — a lockfile drift should
+        # fail CI rather than silently switching to `npm install`
+        # (Codex Phase 4 review #1).
         run: |
           cd examples/kohaku_integration
-          npm ci || npm install
+          npm ci
           npm run typecheck
-          else
-            echo "::warning::node not available; skipping TS parse check."
-          fi

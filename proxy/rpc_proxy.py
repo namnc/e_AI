@@ -346,7 +346,13 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
     def _handle_single(self, request: dict, body: bytes):
         method = request.get("method", "")
         params = request.get("params", [])
-        req_id = request.get("id", 1)
+        # JSON-RPC notifications omit "id" and expect NO response. Preserve
+        # absence here (don't coerce to 1, which the prior version did);
+        # the dry-run / block paths skip the synthetic JSON body for
+        # notifications and reply with HTTP 204 instead (per Codex Phase 4
+        # review #4).
+        is_notification = "id" not in request
+        req_id = request.get("id")
 
         pre_alerts = analyze_request(method, params, self.state)
         for alert in pre_alerts:
@@ -354,6 +360,10 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
 
         critical = [a for a in pre_alerts if a.severity == "critical" and a.confidence > 0.8]
         if critical and not self.dry_run:
+            if is_notification:
+                # Notification: no JSON-RPC response. Acknowledge at HTTP layer.
+                self._send_no_content()
+                return
             error_msg = "; ".join(f"[{a.heuristic}] {a.signal}" for a in critical)
             self._send_json({
                 "jsonrpc": "2.0",
@@ -363,6 +373,9 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
             return
 
         if self.dry_run:
+            if is_notification:
+                self._send_no_content()
+                return
             # Don't forward in dry-run; return a synthetic acknowledgment so
             # the caller sees the proxy ran the analysis without touching
             # the upstream.
@@ -398,18 +411,26 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
         self._send_json(response)
 
     def _handle_batch(self, requests: list, body: bytes):
-        """Handle JSON-RPC batch requests.
+        """Handle JSON-RPC batch requests with id-correlated merge.
 
         Per-item plan slots:
-          - "invalid"  → not a dict; responds with -32600.
-          - "blocked"  → critical alert above the confidence floor; responds
-                         with the guard-block error.
-          - "dryrun"   → dry-run path; responds with synthetic _e_ai_dry_run
-                         acknowledgement carrying the per-item pre-alerts.
-          - "forward"  → normal path; placeholder filled from the upstream
-                         response after the upstream call.
-        Per-item slots are filled in order so per-item ids are preserved
-        (Codex Phase 3 review #4 + #5).
+          - "invalid"      → not a dict; responds with -32600 (id=null).
+          - "blocked"      → critical alert; responds with guard-block error.
+          - "dryrun"       → dry-run path; synthetic _e_ai_dry_run ack.
+          - "forward"      → normal path; sent to upstream, filled by id.
+          - "notification" → no id; pre-analysis only, NO response slot.
+
+        Correctness invariants (Codex Phase 4 review #2, #3, #4):
+          - Upstream NEVER sees invalid/blocked/dryrun/notification entries.
+            We construct a filtered batch from the forward-with-id slots
+            only. Notifications are ignored entirely on the wire.
+          - Upstream responses are matched to forward slots BY id, not by
+            iterator position. JSON-RPC permits reordering and notifications
+            don't generate responses.
+          - Notifications get pre-analysis but produce NO response in the
+            merged output (and we don't put them in the upstream batch
+            either — most upstreams will skip them anyway, but we don't rely
+            on that).
         """
         if not requests:
             self._send_error(400, "Empty batch")
@@ -418,7 +439,10 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
         n = len(requests)
         plan: list[str] = ["forward"] * n
         prebuilt: list[dict | None] = [None] * n
-        per_item_pre_alerts: list[list] = [[] for _ in range(n)]
+        # For forward slots, map id → slot index for the merge step.
+        id_to_slot: dict[Any, int] = {}
+        # Forward items to actually send upstream (id-bearing only).
+        forward_payload: list[dict] = []
 
         for i, r in enumerate(requests):
             if not isinstance(r, dict):
@@ -431,14 +455,25 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
 
             method = r.get("method", "")
             params = r.get("params", [])
-            req_id = r.get("id", None)
+            is_notification = "id" not in r
+            req_id = r.get("id")
 
             pre_alerts = analyze_request(method, params, self.state)
-            per_item_pre_alerts[i] = pre_alerts
             for alert in pre_alerts:
                 self._log_alert(alert)
 
             critical = [a for a in pre_alerts if a.severity == "critical" and a.confidence > 0.8]
+
+            if is_notification:
+                plan[i] = "notification"
+                # Pre-analysis already ran; no response slot. Critical alerts
+                # on a notification are LOGGED only — we cannot return a
+                # JSON-RPC error to the caller per spec.
+                # Forward the notification to upstream only on the normal
+                # (not dry-run, not critical-block) path; fire-and-forget.
+                if not self.dry_run and not critical:
+                    forward_payload.append(r)
+                continue
 
             if self.dry_run:
                 plan[i] = "dryrun"
@@ -457,22 +492,28 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
                     "jsonrpc": "2.0", "id": req_id,
                     "error": {"code": -32000, "message": f"e_AI Guard blocked: {error_msg}"},
                 }
+            else:
+                # Forward slot — track for id-based merge.
+                id_to_slot[req_id] = i
+                forward_payload.append(r)
 
-        # If everything is non-forward (dry-run + invalid + blocked), respond
-        # without contacting the upstream. Preserves per-item ids and emits
-        # invalid-item errors (previously silently dropped on the no-upstream
-        # path; #5 in review).
-        if all(p != "forward" for p in plan):
-            self._send_json([prebuilt[i] for i in range(n)])
+        # If no forward items remain, respond locally without touching upstream.
+        if not forward_payload and not id_to_slot:
+            merged = [prebuilt[i] for i, p in enumerate(plan) if p != "notification"]
+            if merged:
+                self._send_json(merged)
+            else:
+                # Pure notifications batch → no JSON-RPC response.
+                self._send_no_content()
             return
 
-        # Forward the whole batch to upstream when at least one slot is
-        # "forward". Upstream sees the original body so its parser remains
-        # standards-compliant; we then merge in the prebuilt slots.
+        # Build a FILTERED batch body containing only forwardable items.
+        # Crucially we do NOT post the original body, which still contains
+        # invalid / blocked / dryrun entries (Codex Phase 4 review #2).
         try:
             resp = self.http_client.post(
                 self.upstream,
-                content=body,
+                content=json.dumps(forward_payload).encode(),
                 headers={"Content-Type": "application/json"},
             )
             resp.raise_for_status()
@@ -481,41 +522,52 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
             self._send_error(502, f"Upstream error: {e}")
             return
 
-        merged: list[dict] = []
-        if isinstance(upstream_responses, list):
-            up_iter = iter(upstream_responses)
-            for i, slot in enumerate(plan):
-                if slot == "forward":
-                    try:
-                        r_out = next(up_iter)
-                    except StopIteration:
-                        # Upstream returned fewer items than we forwarded; surface
-                        # an explicit slot-fill error rather than silently dropping.
-                        merged.append({
-                            "jsonrpc": "2.0",
-                            "id": (requests[i].get("id") if isinstance(requests[i], dict) else None),
-                            "error": {"code": -32603, "message": "Upstream truncated batch response"},
-                        })
-                        continue
-                    if isinstance(requests[i], dict) and isinstance(r_out, dict):
-                        result = r_out.get("result")
-                        post_alerts = analyze_response(
-                            requests[i].get("method", ""),
-                            requests[i].get("params", []),
-                            result,
-                            self.state,
-                        )
-                        for alert in post_alerts:
-                            self._log_alert(alert)
-                    merged.append(r_out if isinstance(r_out, dict) else {"jsonrpc": "2.0", "id": None, "result": r_out})
-                else:
-                    merged.append(prebuilt[i])
-        else:
-            # Non-list upstream response — pass through but keep prebuilt slots.
-            self._send_json(upstream_responses)
+        # Upstream may return a list (batch) OR a single dict if forward_payload
+        # had only one item. Normalize to a list.
+        if isinstance(upstream_responses, dict):
+            upstream_responses = [upstream_responses]
+        if not isinstance(upstream_responses, list):
+            self._send_error(502, "Upstream returned non-list, non-dict response to a batch")
             return
 
-        self._send_json(merged)
+        # Merge by id — notifications generate no upstream response, so the
+        # response list is permitted to be shorter than forward_payload.
+        for r_out in upstream_responses:
+            if not isinstance(r_out, dict):
+                continue
+            r_id = r_out.get("id")
+            slot = id_to_slot.get(r_id)
+            if slot is None:
+                # Unknown id — log and drop. JSON-RPC servers should not
+                # invent ids, so this is anomalous.
+                log.warning(f"Upstream returned response for unknown id={r_id!r}; dropping")
+                continue
+            # Run post-response analysis against the original request.
+            req = requests[slot]
+            if isinstance(req, dict):
+                result = r_out.get("result")
+                post_alerts = analyze_response(
+                    req.get("method", ""), req.get("params", []), result, self.state
+                )
+                for alert in post_alerts:
+                    self._log_alert(alert)
+            prebuilt[slot] = r_out
+
+        # Any forward slot whose id never came back gets an explicit
+        # truncation error rather than silently disappearing.
+        for r_id, slot in id_to_slot.items():
+            if prebuilt[slot] is None:
+                prebuilt[slot] = {
+                    "jsonrpc": "2.0", "id": r_id,
+                    "error": {"code": -32603, "message": "Upstream omitted response for this id"},
+                }
+
+        # Build the final response: every slot EXCEPT notifications.
+        merged = [prebuilt[i] for i, p in enumerate(plan) if p != "notification"]
+        if merged:
+            self._send_json(merged)
+        else:
+            self._send_no_content()
 
     # ------------------------------------------------------------------
     # Response helpers
@@ -530,6 +582,15 @@ class RPCProxyHandler(BaseHTTPRequestHandler):
         self._set_cors_headers(origin)
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_no_content(self):
+        """HTTP 204 — used for JSON-RPC notifications, which by spec do
+        NOT receive a JSON-RPC response. The HTTP layer still needs an
+        acknowledgement (Codex Phase 4 review #4)."""
+        origin = self.headers.get("Origin", "")
+        self.send_response(204)
+        self._set_cors_headers(origin)
+        self.end_headers()
 
     def _send_error(self, code: int, message: str):
         body = json.dumps({
