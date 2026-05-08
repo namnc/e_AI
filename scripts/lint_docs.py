@@ -141,8 +141,11 @@ COUNT_PATTERNS = [
     # above. Match `our` (possessive) + count + guards + ship-verb +
     # today/now tail. Cluster prose like "our 8 guards in cluster A"
     # doesn't fire because the tail requires a release-claim verb.
+    # Phase 10A (Codex Phase 9 review): allow optional parenthetical/
+    # appositive between `guards` and `ship` so `our 18 guards (the v2
+    # set) ship today` fires too.
     re.compile(
-        r"\bour\s+(\d{1,3})\s+guards?\s+ship(?:s|ped|ping)?\b"
+        r"\bour\s+(\d{1,3})\s+guards?\s+(?:\([^)]*\)\s+)?ship(?:s|ped|ping)?\b"
         r"(?=\s*[\.\,\(]?\s*"
         r"(?:today|now|across|via|in v2"
         r"|as\s+of\s+(?:today|now|this)"
@@ -183,8 +186,11 @@ WORD_NUM_SHIP_PATTERN = re.compile(
 # "our eighteen guards ship today" is the word-form analogue of the
 # numeric subject-first pattern above. Same release-verb tail required
 # to avoid cluster prose false positives.
+# Phase 10A (Codex Phase 9 review): parenthetical/appositive between
+# `guards` and `ship` allowed (e.g. "our eighteen guards (the v2 set)
+# ship today").
 WORD_NUM_SUBJECT_FIRST_SHIP_PATTERN = re.compile(
-    r"\bour\s+(" + "|".join(WORD_NUMS.keys()) + r")\s+guards?\s+ship(?:s|ped|ping)?\b"
+    r"\bour\s+(" + "|".join(WORD_NUMS.keys()) + r")\s+guards?\s+(?:\([^)]*\)\s+)?ship(?:s|ped|ping)?\b"
     r"(?=\s*[\.\,\(]?\s*"
     r"(?:today|now|across|via|in v2"
     r"|as\s+of\s+(?:today|now|this)"
