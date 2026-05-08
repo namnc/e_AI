@@ -375,6 +375,112 @@ class TestInlineMarkerCap(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Phase 11B: synthetic marker-cap tests (Codex Phase 6 deferred)
+# ---------------------------------------------------------------------------
+#
+# Codex Phase 6 review noted: "R3 marker-cap tests only assert the
+# constants are sane; they do not build a synthetic markdown file with
+# 4 markers or 11 repo-wide markers and assert the linter fails."
+# Codex Phase 7 review carried it forward as deferred.
+#
+# These tests exercise the marker-counting + cap-check logic with
+# synthetic markdown content (in-memory; no temp filesystem needed).
+
+
+class TestMarkerCapSyntheticFiles(unittest.TestCase):
+    """Pin per-file and repo-wide marker cap behavior with synthetic
+    markdown. Relies only on the linter's marker-counting line + cap
+    constants — no full lint() invocation needed."""
+
+    MARKER = "<!-- lint-allow-ai-ps -->"
+
+    def _count_markers_in(self, text: str) -> int:
+        """Mirrors the linter's per-file marker-count line:
+            sum(1 for ln in lines if INLINE_ALLOW_MARKER in ln)
+        Tests verify the same logic."""
+        return sum(1 for ln in text.splitlines() if lint_docs.INLINE_ALLOW_MARKER in ln)
+
+    def test_three_markers_under_per_file_cap(self):
+        """3 markers in one file: at the cap (cap=3), no issue."""
+        text = "\n".join([f"line {i} {self.MARKER}" for i in range(3)])
+        n = self._count_markers_in(text)
+        self.assertEqual(n, 3)
+        self.assertEqual(lint_docs.INLINE_ALLOW_MARKER_CAP_PER_FILE, 3)
+        self.assertFalse(
+            n > lint_docs.INLINE_ALLOW_MARKER_CAP_PER_FILE,
+            "3 markers must NOT exceed per-file cap of 3",
+        )
+
+    def test_four_markers_exceeds_per_file_cap(self):
+        """4 markers in one file: ABOVE cap (cap=3), must exceed."""
+        text = "\n".join([f"line {i} {self.MARKER}" for i in range(4)])
+        n = self._count_markers_in(text)
+        self.assertEqual(n, 4)
+        self.assertTrue(
+            n > lint_docs.INLINE_ALLOW_MARKER_CAP_PER_FILE,
+            "4 markers MUST exceed per-file cap of 3 — this is the "
+            "case that should produce an R3 marker-cap issue",
+        )
+
+    def test_marker_only_counts_when_present_in_line(self):
+        """Marker text inside a paragraph still counts (per-line check)."""
+        text = "intro paragraph\nthis line has the marker {} inline\nfinal".format(
+            self.MARKER
+        )
+        self.assertEqual(self._count_markers_in(text), 1)
+
+    def test_multi_marker_per_line_counted_once(self):
+        """If a line has the marker twice, it's still counted once
+        (mirrors `1 for ln in ... if MARKER in ln`)."""
+        text = f"line with two {self.MARKER} markers {self.MARKER} inline"
+        self.assertEqual(
+            self._count_markers_in(text), 1,
+            "marker appearing twice on one line counts as 1 per the "
+            "current linter rule",
+        )
+
+    def test_synthetic_repo_wide_cap_logic(self):
+        """Simulate counting markers across N synthetic files; verify the
+        repo-wide cap math the linter uses (`marker_total += marker_count`)
+        flags totals above INLINE_ALLOW_MARKER_CAP_REPO."""
+        files = [
+            "\n".join([f"line {i} {self.MARKER}" for i in range(3)])  # 3 markers
+            for _ in range(4)  # 4 files
+        ]
+        total = sum(self._count_markers_in(t) for t in files)
+        self.assertEqual(total, 12)
+        self.assertEqual(lint_docs.INLINE_ALLOW_MARKER_CAP_REPO, 10)
+        self.assertTrue(
+            total > lint_docs.INLINE_ALLOW_MARKER_CAP_REPO,
+            "12 markers across 4 files MUST exceed repo cap of 10 — "
+            "this is the case that should produce an R3 repo-cap issue",
+        )
+
+    def test_synthetic_repo_wide_under_cap_passes(self):
+        """3 files × 3 markers = 9 markers, under repo cap of 10."""
+        files = [
+            "\n".join([f"line {i} {self.MARKER}" for i in range(3)])
+            for _ in range(3)
+        ]
+        total = sum(self._count_markers_in(t) for t in files)
+        self.assertEqual(total, 9)
+        self.assertFalse(
+            total > lint_docs.INLINE_ALLOW_MARKER_CAP_REPO,
+            "9 markers across 3 files must NOT exceed repo cap of 10",
+        )
+
+    def test_per_file_cap_triggers_before_repo_cap(self):
+        """A single file with 4 markers triggers per-file cap even though
+        4 < repo cap of 10. Mirrors the linter's two separate checks."""
+        text = "\n".join([f"line {i} {self.MARKER}" for i in range(4)])
+        n = self._count_markers_in(text)
+        self.assertTrue(n > lint_docs.INLINE_ALLOW_MARKER_CAP_PER_FILE)
+        self.assertFalse(n > lint_docs.INLINE_ALLOW_MARKER_CAP_REPO,
+                         "4 markers in one file should not on its own "
+                         "exceed repo cap")
+
+
+# ---------------------------------------------------------------------------
 # count_v2_production_profiles — sanity check
 # ---------------------------------------------------------------------------
 

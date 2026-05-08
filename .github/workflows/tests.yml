@@ -279,3 +279,18 @@ jobs:
           cd examples/kohaku_integration
           npm ci
           npm run typecheck
+
+      - name: Wallet EIP-1193 strict typecheck (tsc --noEmit on guard.ts)
+        # Phase 11C (Codex Phase 7 deferred follow-up): the existing
+        # "Wallet EIP-1193 TypeScript parse" step uses Node's
+        # --experimental-strip-types which only validates syntactic
+        # parse, NOT strict TS types. Codex Phase 7 noted this as a
+        # coverage gap. This step uses Kohaku's installed TypeScript
+        # + @types/node (already brought down by Kohaku's npm ci above)
+        # to run a real `tsc --noEmit` against guard.ts.
+        run: |
+          cd examples/wallet_eip1193
+          NODE_PATH=../kohaku_integration/node_modules \
+            ../kohaku_integration/node_modules/.bin/tsc \
+            --noEmit -p tsconfig.json \
+            --typeRoots ../kohaku_integration/node_modules/@types
