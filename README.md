@@ -148,22 +148,22 @@ matrix below.
 
 | Guard | Schema | Tests | Rule analyzer | Per-domain demo | Real-incident fixtures | Live registry / data integration | Externally reviewed | Production candidate |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `approval_phishing` | ✓ | ✓ | ✓ | ✓ | ✗ (synthetic) | ✗ (scam-DB hard-coded) | partial (Codex) | no |
-| `backup_security` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
-| `behavioral_drift` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
-| `builder_censorship` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ (relay set hard-coded) | partial (Codex) | no |
-| `cross_protocol_risk` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
-| `governance_proposal` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
-| `l2_anonymity_set` | ✓ | ✓ | ✓ | ✓ | partial (soispoke 0xbow) | ✗ | partial (Codex) | no |
-| `l2_bridge_linkage` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS WITH HEDGE (Codex) | no |
-| `mev_vulnerability` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
-| `mixing_behavioral` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | PARTIALLY HOLDS (Codex) | no |
-| `offchain_signature` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
-| `pq_readiness` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
-| `rpc_leakage` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS WITH HEDGE (Codex) | no |
-| `sequencer_privacy` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ (registry hard-coded) | partial (Codex) | no |
-| `stealth_address_ops` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | PARTIALLY HOLDS (Codex) | no |
-| `wrong_chain_address` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | partial (Codex) | no |
+| `approval_phishing` | ✓ | ✓ | ✓ | ✓ | ✗ (synthetic) | ✗ (scam-DB hard-coded) | HOLDS (Codex Phase 10) | no |
+| `backup_security` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `behavioral_drift` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `builder_censorship` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ (relay set hard-coded) | HOLDS (Codex Phase 10) | no |
+| `cross_protocol_risk` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `governance_proposal` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `l2_anonymity_set` | ✓ | ✓ | ✓ | ✓ | partial (soispoke 0xbow) | ✗ | HOLDS (Codex Phase 10) | no |
+| `l2_bridge_linkage` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `mev_vulnerability` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `mixing_behavioral` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `offchain_signature` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `pq_readiness` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `rpc_leakage` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `sequencer_privacy` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ (registry hard-coded) | HOLDS (Codex Phase 10) | no |
+| `stealth_address_ops` ⭐ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
+| `wrong_chain_address` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | HOLDS (Codex Phase 10) | no |
 
 **Schema** = 11-check `tx_validation_engine` PASS · **Tests** = `test_profile.py`
 PASS · **Rule analyzer** = `analyzer.py` covering profile heuristics
@@ -172,9 +172,16 @@ runs end-to-end with rule-based + LLM analysis · **Real-incident fixtures**
 = calibrated against captured-incident corpora (not synthetic samples) ·
 **Live registry / data integration** = production data feeds wired (not
 hard-coded in analyzer source) · **Externally reviewed** = a substantive
-external pushback round has been done (Codex adversarial review on the
-four strong-novelty guards is the most recent; lives in the maintainers'
-internal pipeline, not in this public repo) · **Production candidate** = no item ships
+external pushback round has been done. Current status across all 16
+guards: HOLDS (Codex Phase 10) — completed 2026-05-08 after a 7-iteration
+fix-review-fix loop (Phases 4-10) covering proxy semantics, wallet ABI,
+CI workflows, docs linter, and integration tests. Codex Phase 10 verdict:
+GREEN, convergence achieved (no actionable bugs; remaining items are
+multi-week architectural maturity gates, not blockers). Loop notes live
+in the maintainers' internal pipeline, not in this public repo. A
+second pushback round (broader than Codex; e.g., Kohaku-team review or
+trusted external researcher) is queued as a maturity gate before final
+publication · **Production candidate** = no item ships
 with this column ✓ today; closing the prior columns is the path there.
 
 ⭐ = strong-novelty cluster.
