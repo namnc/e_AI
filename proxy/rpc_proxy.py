@@ -785,6 +785,7 @@ def run_proxy(
     dry_run: bool = False,
     allowed_origins: tuple[str, ...] = (),
     auth_token: str | None = None,
+    notification_timeout: float | None = None,
 ):
     """Start the RPC proxy server.
 
@@ -794,7 +795,16 @@ def run_proxy(
         --allow-origin.
       - auth_token=None — no auth required by default. Set --auth-token
         to require Authorization: Bearer <token>.
+      - notification_timeout=None — uses NOTIFICATION_FORWARD_TIMEOUT_S
+        module default (3.0s). Override via --notification-timeout to
+        tune the bounded best-effort forward latency for JSON-RPC
+        notifications (Phase 7C contract). Codex Phase 7 review noted
+        this as "useful tunability"; exposed at CLI per user direction.
     """
+    global NOTIFICATION_FORWARD_TIMEOUT_S
+    if notification_timeout is not None:
+        NOTIFICATION_FORWARD_TIMEOUT_S = float(notification_timeout)
+
     RPCProxyHandler.upstream = upstream
     RPCProxyHandler.state = ProxyState()
     RPCProxyHandler.dry_run = dry_run
@@ -811,6 +821,7 @@ def run_proxy(
     log.info(f"  Mode:      {'dry-run (log only)' if dry_run else 'active (will block critical)'}")
     log.info(f"  CORS:      {'allowlist=' + str(list(allowed_origins)) if allowed_origins else 'DISABLED (default)'}")
     log.info(f"  Auth:      {'bearer-token required' if auth_token else 'NONE (default)'}")
+    log.info(f"  Notif fwd timeout: {NOTIFICATION_FORWARD_TIMEOUT_S}s (best-effort bounded)")
     log.info(f"  Profiles:  rpc_leakage, cross_protocol_risk, l2_anonymity_set (hard-coded)")
     log.info(f"  Point your wallet RPC to: http://127.0.0.1:{port}")
     log.info(f"")
@@ -853,6 +864,13 @@ if __name__ == "__main__":
     parser.add_argument("--auth-token", default=None,
                         help="Require 'Authorization: Bearer <token>' on requests. "
                              "Default: no auth required.")
+    parser.add_argument("--notification-timeout", type=float, default=None,
+                        help="Bounded best-effort forward timeout (seconds) for JSON-RPC "
+                             "notifications. Default: %s (NOTIFICATION_FORWARD_TIMEOUT_S). "
+                             "Tune lower if upstream is fast and proxy thread responsiveness "
+                             "matters; higher if upstream is slow but you still want bounded "
+                             "blocking. Phase 7C contract is bounded best-effort, not full async."
+                             % NOTIFICATION_FORWARD_TIMEOUT_S)
     parser.add_argument("--profiles", default=None,
                         help="Reserved for future profile-driven runtime; currently "
                              "the proxy hard-codes rpc_leakage / cross_protocol_risk / "
@@ -873,4 +891,5 @@ if __name__ == "__main__":
         dry_run=args.dry_run,
         allowed_origins=tuple(args.allow_origin),
         auth_token=args.auth_token,
+        notification_timeout=args.notification_timeout,
     )

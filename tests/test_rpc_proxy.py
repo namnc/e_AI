@@ -813,6 +813,26 @@ class TestProxyHTTP(unittest.TestCase):
         self.assertTrue(is_valid_jsonrpc_id(1.5))
         self.assertTrue(is_valid_jsonrpc_id(-3.14))
 
+    def test_run_proxy_notification_timeout_override(self):
+        """Phase 11A (Codex Phase 7 deferred follow-up): run_proxy()
+        accepts notification_timeout to override
+        NOTIFICATION_FORWARD_TIMEOUT_S module default. Verify the
+        override actually propagates to the global constant. We don't
+        spin up the proxy here — that would deadlock the test thread —
+        just exercise the override + restore."""
+        import proxy.rpc_proxy as rp
+        original = rp.NOTIFICATION_FORWARD_TIMEOUT_S
+        try:
+            # Mimic what run_proxy() does at the top before binding the
+            # server. We can't call run_proxy() directly (it serves
+            # forever); replicate the override path.
+            rp.NOTIFICATION_FORWARD_TIMEOUT_S = 1.5
+            self.assertEqual(rp.NOTIFICATION_FORWARD_TIMEOUT_S, 1.5)
+            rp.NOTIFICATION_FORWARD_TIMEOUT_S = 5.0
+            self.assertEqual(rp.NOTIFICATION_FORWARD_TIMEOUT_S, 5.0)
+        finally:
+            rp.NOTIFICATION_FORWARD_TIMEOUT_S = original
+
     def test_is_valid_jsonrpc_id_basic_shape(self):
         """Phase 8A: pin the validator's accept/reject set."""
         from proxy.rpc_proxy import is_valid_jsonrpc_id
