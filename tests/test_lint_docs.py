@@ -221,6 +221,49 @@ class TestR1NumericClaims(unittest.TestCase):
         self.assertEqual(self._matches(line, self.EXPECTED), [],
                          "cluster phrase must not trip even with gerund verb")
 
+    # ---------- Phase 9A: subject-first total claim (Codex Phase 8 review) ----
+
+    def test_subject_first_numeric_ship_today_fires(self):
+        """Phase 9A: 'our 18 guards ship today' must trip — Codex Phase 8
+        flagged this as the remaining must-fix R1 false-negative class."""
+        line = "our 18 guards ship today"
+        self.assertIn(18, self._matches(line, self.EXPECTED))
+
+    def test_subject_first_numeric_ship_as_of_today_fires(self):
+        line = "our 17 guards ship as of today"
+        self.assertIn(17, self._matches(line, self.EXPECTED))
+
+    def test_subject_first_numeric_ship_correct_count_passes(self):
+        line = "our 16 guards ship today"
+        self.assertEqual(self._matches(line, self.EXPECTED), [],
+                         "subject-first ship with correct count must not fire")
+
+    def test_subject_first_numeric_no_release_verb_passes(self):
+        """Phase 9A: 'our 18 guards in cluster A' has no release-verb tail
+        — must not fire (mirrors verb-first cluster-phrase invariant)."""
+        line = "our 18 guards in cluster A"
+        self.assertEqual(self._matches(line, self.EXPECTED), [],
+                         "subject-first cluster phrase must not trip")
+
+    def test_subject_first_word_form_ship_today_fires(self):
+        line = "our eighteen guards ship today"
+        hits = [
+            lint_docs.WORD_NUMS[m.group(1).lower()]
+            for m in lint_docs.WORD_NUM_SUBJECT_FIRST_SHIP_PATTERN.finditer(line)
+            if lint_docs.WORD_NUMS[m.group(1).lower()] != self.EXPECTED
+        ]
+        self.assertEqual(hits, [18])
+
+    def test_subject_first_word_form_correct_count_passes(self):
+        line = "our sixteen guards ship today"
+        hits = [
+            lint_docs.WORD_NUMS[m.group(1).lower()]
+            for m in lint_docs.WORD_NUM_SUBJECT_FIRST_SHIP_PATTERN.finditer(line)
+            if lint_docs.WORD_NUMS[m.group(1).lower()] != self.EXPECTED
+        ]
+        self.assertEqual(hits, [],
+                         "subject-first word-form with correct count must not fire")
+
 
 # ---------------------------------------------------------------------------
 # R2 — production claim hedging

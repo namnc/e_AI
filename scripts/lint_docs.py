@@ -136,6 +136,19 @@ COUNT_PATTERNS = [
         r"|by\s+today))",
         re.I,
     ),
+    # Phase 9A (Codex Phase 8 review): subject-first total claim
+    # "our N guards ship today" was missed by the verb-first pattern
+    # above. Match `our` (possessive) + count + guards + ship-verb +
+    # today/now tail. Cluster prose like "our 8 guards in cluster A"
+    # doesn't fire because the tail requires a release-claim verb.
+    re.compile(
+        r"\bour\s+(\d{1,3})\s+guards?\s+ship(?:s|ped|ping)?\b"
+        r"(?=\s*[\.\,\(]?\s*"
+        r"(?:today|now|across|via|in v2"
+        r"|as\s+of\s+(?:today|now|this)"
+        r"|by\s+today))",
+        re.I,
+    ),
 ]
 
 # Word-form numerals → integer. Phase 3 review #R1.1 noted that
@@ -159,6 +172,19 @@ WORD_NUM_PATTERN = re.compile(
 WORD_NUM_SHIP_PATTERN = re.compile(
     # Phase 7F: also catch past-tense "shipped" and parenthetical/by-today tails.
     r"\bship(?:ped|ping|s)?\s+(?:all\s+)?(" + "|".join(WORD_NUMS.keys()) + r")\s+(?:total\s+)?guards?\b"
+    r"(?=\s*[\.\,\(]?\s*"
+    r"(?:today|now|across|via|in v2"
+    r"|as\s+of\s+(?:today|now|this)"
+    r"|by\s+today))",
+    re.I,
+)
+
+# Phase 9A (Codex Phase 8 review): subject-first word-form total claim
+# "our eighteen guards ship today" is the word-form analogue of the
+# numeric subject-first pattern above. Same release-verb tail required
+# to avoid cluster prose false positives.
+WORD_NUM_SUBJECT_FIRST_SHIP_PATTERN = re.compile(
+    r"\bour\s+(" + "|".join(WORD_NUMS.keys()) + r")\s+guards?\s+ship(?:s|ped|ping)?\b"
     r"(?=\s*[\.\,\(]?\s*"
     r"(?:today|now|across|via|in v2"
     r"|as\s+of\s+(?:today|now|this)"
@@ -290,6 +316,15 @@ def lint() -> int:
                 if n != expected:
                     issues.append(
                         f"{rel}:{line_no}: R1 word-form ship-claim drift — claims "
+                        f"'{m.group(0)}' but actual v2 production profiles = {expected}"
+                    )
+
+            # R1 subject-first word-form ship-claim (Phase 9A)
+            for m in WORD_NUM_SUBJECT_FIRST_SHIP_PATTERN.finditer(line):
+                n = WORD_NUMS[m.group(1).lower()]
+                if n != expected:
+                    issues.append(
+                        f"{rel}:{line_no}: R1 subject-first word-form ship-claim drift — claims "
                         f"'{m.group(0)}' but actual v2 production profiles = {expected}"
                     )
 
