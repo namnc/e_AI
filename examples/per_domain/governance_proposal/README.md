@@ -35,7 +35,7 @@ Full profile + signal definitions: `domains/governance_proposal/profile.json`
 The sample triggers all five heuristics, producing CRITICAL overall risk
 with `should_block: true`.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured DAO proposal.
 - Bytecode-diff size is supplied as a flag; production would diff bytecode
@@ -43,7 +43,7 @@ with `should_block: true`.
 - Voter concentration is computed from a supplied top-voter share; production
   would query on-chain vote tallies + delegated voting power.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Recipient labels and tx counts are trusted as inputs.
 - Implementation verification status is trusted (e.g., Etherscan).

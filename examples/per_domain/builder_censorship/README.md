@@ -33,7 +33,7 @@ The sample tx triggers H1 (all relays censoring) + H2 (sanctioned destination)
 + H4 (twice: low builder count + dominant builder share) + H5 (compound — no
 available inclusion path), producing CRITICAL risk + `should_block: true`.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured event.
 - Censoring-relay registry and OFAC SDN list are hard-coded in
@@ -42,7 +42,7 @@ available inclusion path), producing CRITICAL risk + `should_block: true`.
 - Builder share figures are inputs, not live measurements; production would
   poll mevboost.org or equivalent.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Local-only execution; LLM via Ollama (qwen2.5:7b) by default.
 - No transaction or routing data leaves the host in this demo.

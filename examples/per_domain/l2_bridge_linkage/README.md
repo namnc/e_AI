@@ -36,14 +36,14 @@ The sample triggers H1 + H2 + H3 + H4 + H5, producing CRITICAL overall risk.
 LLM analysis (when available) recommends fresh receiver addresses,
 randomized amounts, and paymaster-funded gas on the destination side.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured cross-chain incident.
 - Bridge-sequence fingerprinting uses simple structural matches; production
   would consider time spacing, protocol fingerprints, and concurrent CEX
   activity.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Bridge-protocol labels and destination-gas funding metadata are trusted as
   inputs.

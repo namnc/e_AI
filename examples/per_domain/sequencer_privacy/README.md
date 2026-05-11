@@ -36,7 +36,7 @@ The sample triggers H1 (centralized sequencer) + H2 (censorship suspected
 across 3 rollups) + H5 (30-second public preconfirmation), producing
 CRITICAL risk + `should_block: true`.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured incident.
 - Sequencer trust posture is read from `SEQUENCER_REGISTRY` in
@@ -45,9 +45,9 @@ CRITICAL risk + `should_block: true`.
 - Censorship signal relies on `expected_inclusion_by` as a heuristic
   threshold, not a protocol-defined SLA.
 - This guard is largely informational today: actionable mitigation arrives
-  with encrypted mempools and sequencer decentralization (CROPS #15).
+  with encrypted mempools and sequencer decentralization.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Sequencer-model classification and MEV statistics are trusted as inputs.
 - Censorship "expected_inclusion_by" is a heuristic threshold, not protocol-defined.

@@ -82,7 +82,7 @@ auto-run this on every push to `v2`.
 
 Fill in `domains/your_domain/README.md` with: heuristics table, what each
 heuristic catches, detection mechanism (rule-based / LLM-only / both), data
-caveats, trust assumptions (CROPS #13), epistemic status (CROPS #14).
+caveats, trust assumptions, epistemic status.
 
 ### 9. Build a per-domain demo
 

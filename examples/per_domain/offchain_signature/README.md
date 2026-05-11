@@ -35,7 +35,7 @@ Full profile + signal definitions: `domains/offchain_signature/profile.json`
 The sample triggers H1 (unlimited + unknown spender), H2 (UI/payload
 mismatch), and H4 (unverified, homoglyph, fresh dApp) — overall CRITICAL.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured phishing payload.
 - `spender_in_protocol_registry` and `domain_in_protocol_registry` are
@@ -43,7 +43,7 @@ mismatch), and H4 (unverified, homoglyph, fresh dApp) — overall CRITICAL.
   cert lookups.
 - Homoglyph detection is supplied as a flag, not derived from the URL.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Wallet is responsible for surfacing `ui_description` accurately.
 - Protocol registry is trusted.

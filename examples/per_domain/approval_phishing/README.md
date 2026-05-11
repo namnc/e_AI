@@ -34,7 +34,7 @@ Full profile + signal definitions: `domains/approval_phishing/profile.json`
 The sample tx triggers H1 + H2 + H3, producing CRITICAL risk + `should_block: true`.
 LLM behavioral analysis (when available) adds context on the combined risk.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured real-incident transaction.
 - Bytecode-template matching is faked by the `spender_bytecode_match_scam`
@@ -43,7 +43,7 @@ LLM behavioral analysis (when available) adds context on the combined risk.
 - Scam DB lookup (`spender_in_scam_db`) is hard-coded false in the demo;
   production would query Forta / Scam Sniffer / ChainAbuse.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Block-explorer verification status is trusted as input.
 - Protocol registry membership is trusted as input.

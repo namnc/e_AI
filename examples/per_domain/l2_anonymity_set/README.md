@@ -33,15 +33,15 @@ The sample triggers H1 + H2 + H3 (and possibly H4/H5), producing CRITICAL
 overall risk. LLM analysis (when available) recommends waiting for the pool
 to grow and avoiding forced inclusion.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured L2 anonymity-set incident.
 - Pool size is supplied as input; production would query the L2
   privacy-pool contract directly.
 - "Sequencer visibility" is binary here; in practice a decentralized
-  sequencer set has a continuum of trust assumptions (CROPS #13).
+  sequencer set has a continuum of trust assumptions.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Centralized-sequencer model assumed unless the L2 has a published
   decentralized-sequencer roadmap.

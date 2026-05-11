@@ -187,9 +187,8 @@ calibrated against actual access-layer thinness, not synthetic worst-case.
 
 `builder_censorship` was added to validate the extension framework: profile
 + analyzer + tests + per-domain demo, built in 1 week using
-`docs/adding_a_domain.md`. It thread-connects an access-layer thesis we
-work to: protocol provides bounded enabling primitives; the access layer
-composes;
+`docs/adding_a_domain.md`. It thread-connects the access-layer composition view: protocol provides
+bounded enabling primitives; the access layer composes;
 when all submission paths gate on operator policy, CR collapses to
 operator-trust. The guard surfaces this pre-submission so the user can
 reconfigure or use a forced-inclusion escape hatch.
@@ -534,7 +533,7 @@ who's done it once.)
 
 ---
 
-## 7. Where this fits — Access Layer Privacy and Safety thesis
+## 7. Where this fits — at Ethereum's access layer
 
 (2-3 paragraphs.)
 
@@ -543,11 +542,11 @@ the user, composing wallets, services, integrations, and AI agents. It
 does not change protocol behavior. It augments the access path with
 pre-submission analysis.
 
-We work to an access-layer thesis: the protocol should provide bounded
-enabling primitives (auth abstraction via EIP-8141; ordering via
-LUCID-class encrypted mempool; specialized storage per Vitalik's recent
-post on keyed nonces; forced inclusion via FOCIL), with everything else
-composed off-chain at the access layer. This substrate is one such
+The composition view this substrate operates from: the protocol should
+provide bounded enabling primitives (auth abstraction via EIP-8141;
+ordering via LUCID-class encrypted mempool; specialized storage per
+Vitalik's recent post on keyed nonces; forced inclusion via FOCIL), with
+everything else composed off-chain at the access layer. This substrate is one such
 composition: it does not require a new protocol mechanism to function.
 It does benefit from emerging primitives but does not depend on them.
 

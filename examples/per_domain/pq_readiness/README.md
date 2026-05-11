@@ -36,7 +36,7 @@ a low PQ readiness score (well below 1.0). LLM analysis (when available)
 recommends migrating to a PQ-aware smart account module and rotating
 long-term keys.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - "PQ readiness" here is a coarse local check, not a real-world Q-Day timer.
 - ECDH-blob count is supplied; production would derive it by scanning the
@@ -44,7 +44,7 @@ long-term keys.
 - BLS quantum-vulnerability is real but practical break is beyond Q-Day for
   most threat models; H4 is conservative.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Stealth-protocol versioning is trusted as input.
 - Smart-account validation list is trusted as input.

@@ -62,7 +62,7 @@ Each `demo.py` follows the same shape:
 
 ## What this is and isn't
 
-Per the v2 publication's epistemic-status disclaimer (CROPS principle #14):
+Per the v2 publication's epistemic-status disclaimer:
 - These demos use **synthetic** sample transactions, not real captured incidents.
 - The heuristics are CLAIMs (evidence-grounded patterns), not THEOREMs.
 - A production deployment would replace synthetic samples with labeled

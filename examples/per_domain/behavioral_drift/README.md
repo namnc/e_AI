@@ -36,7 +36,7 @@ creep with flat collateral) + H3 (47 unlimited approvals, none revoked) +
 H4 (gas growth + high gas-to-value) + H5 (rigid pattern + low temporal
 variance), producing CRITICAL risk.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not captured user behavior.
 - The analyzer cannot distinguish deliberate strategy (yield farming,
@@ -46,7 +46,7 @@ variance), producing CRITICAL risk.
   inputs the analyzer trusts; production deployment must wire these from
   on-chain RPC + a maintained vulnerability database.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Weekly aggregates are trusted as inputs from the wallet's local history.
 - LLM is local-only (Ollama) by default; behavioral data does not leave the host.

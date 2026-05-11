@@ -23,10 +23,9 @@ censoring builder, relay, or non-circumventable centralized L2 sequencer.
 
 ## Why this guard
 
-The Access Layer Privacy Thesis (CROPS principle #11 + #15) treats censorship
-resistance as a foundational property: protocol provides bounded primitives,
-Access Layer composes. When all available submission paths gate on off-chain
-operator policy, CR collapses to operator-trust. This guard surfaces the
+Censorship resistance is a foundational Ethereum property: protocol provides
+bounded primitives, the access layer composes. When all available submission
+paths gate on off-chain operator policy, CR collapses to operator-trust. This guard surfaces the
 routing risk pre-submission so the user can switch relays, add a private
 mempool, or fall back to a forced-inclusion escape hatch.
 
@@ -56,6 +55,6 @@ if Ollama is offline.
 
 **MEV Watch**, **Censorship.pics**, **Relayscan** are dominant on the *observation* side — they expose builder/relay censorship state. Justin Drake's CR-MEV writeups cover the analysis. No runtime, pre-submission guard wired into the wallet.
 
-**Where this guard differs**: "MEV Watch in your wallet" — pre-submission framing is the contribution. Honest: this is closer to operationalization than novelty. Inclusion is motivated by Access Layer thesis (CROPS #11 + #15) + extension-framework validation, not by detection-novelty.
+**Where this guard differs**: "MEV Watch in your wallet" — pre-submission framing is the contribution. Honest: this is closer to operationalization than novelty. Inclusion is motivated by the access-layer composition view + extension-framework validation, not by detection-novelty.
 
 Full comparison: `docs/prior_art/builder_censorship.md`.

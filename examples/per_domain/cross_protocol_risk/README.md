@@ -35,7 +35,7 @@ Full profile + signal definitions: `domains/cross_protocol_risk/profile.json`
 The sample triggers H1 + H2 + H4 + H5 (and likely H3), producing CRITICAL
 overall risk with a non-trivial estimated maximum loss.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured portfolio.
 - "Correlated oracle" check uses string equality on oracle IDs; production
@@ -43,7 +43,7 @@ overall risk with a non-trivial estimated maximum loss.
 - Approval-chain depth is supplied; production would graph-walk delegate
   permissions across DEX routers and adapters.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Health factors and oracle IDs are trusted as inputs from the lending
   protocols' on-chain state.

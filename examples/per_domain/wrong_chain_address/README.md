@@ -36,7 +36,7 @@ The sample triggers H1 (no Polygon activity) + H2 (contract cannot receive)
 + H3 (poisoned lookalike) + H4 (chain-id mismatch + EIP-55 fail) + H5
 (paused + migrated), producing CRITICAL risk + `should_block: true`.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured event.
 - Lookalike detection here is a boolean flag; production analyzer would
@@ -46,7 +46,7 @@ The sample triggers H1 (no Polygon activity) + H2 (contract cannot receive)
   pause/migration state are inputs the analyzer trusts; production must
   wire these from RPC + block-explorer sources.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Recipient activity counts and contract metadata (paused / migrated) are
   trusted as inputs from explorer or RPC sources.

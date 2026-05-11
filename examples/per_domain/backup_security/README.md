@@ -37,7 +37,7 @@ stale, threshold unrecoverable) + H3 (ECDH-class encryption on permanent
 on-chain blob) + H4 (no deniable layer) + H5 (Tornado Cash notes not
 backed up), producing CRITICAL risk + `should_block: true`.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured user backup configuration.
 - KDF-strength threshold (Argon2id ≥ 64MB / ≥ 3 iter; password ≥ 50 bits)
@@ -47,7 +47,7 @@ backed up), producing CRITICAL risk + `should_block: true`.
   absence of a deniable / honey-encryption layer rather than verifying its
   cryptographic soundness.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Backup-encryption labels and guardian-liveness timestamps are trusted as
   inputs from the wallet itself.

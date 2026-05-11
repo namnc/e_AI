@@ -49,7 +49,7 @@ See `docs/improving_a_domain.md`
 
 ## Prior art
 
-Largely informational. Rollup-team docs disclose the trust-assumption; no runtime guard exists. **LUCID** and adjacent encrypted-mempool work at the protocol level (CROPS #15) is the future actionability.
+Largely informational. Rollup-team docs disclose the trust-assumption; no runtime guard exists. **LUCID** and adjacent encrypted-mempool work at the protocol level is the future actionability.
 
 **Where this guard differs**: Mostly informational until encrypted mempools land at L2. Today's actionability is limited; this guard is a placeholder for the architecture that will matter post-LUCID.
 

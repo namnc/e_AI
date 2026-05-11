@@ -35,7 +35,7 @@ The sample triggers H1 + H2 + H3 (and possibly H5), producing CRITICAL
 overall risk. LLM analysis (when available) recommends Helios / local node
 / batched cover queries.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured RPC trace.
 - Selector lists for lending and price queries are small and Ethereum-mainnet
@@ -43,7 +43,7 @@ overall risk. LLM analysis (when available) recommends Helios / local node
 - "Same user" assumption: queries are grouped by the user_originating_address
   field; in reality the RPC provider correlates by IP / API key / cookie.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - The RPC trace itself is trusted as input (typically captured wallet-side).
 - LLM is local-only (Ollama) by default; query trace does not leave the host.

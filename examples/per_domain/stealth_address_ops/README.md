@@ -36,7 +36,7 @@ The sample triggers H1 + H3 + H4 + H6, producing CRITICAL overall risk and
 `deanonymized: True`. LLM analysis (when available) explains the compound
 linkage.
 
-## Limitations (CROPS #14: epistemic status)
+## Limitations (epistemic status)
 
 - Sample is **synthetic** — not a captured stealth-protocol withdrawal.
 - The address cluster is supplied as input; production would derive it from
@@ -45,7 +45,7 @@ linkage.
 - Block median/std gas defaults are coarse — production would query a
   per-block gas oracle.
 
-## Trust assumptions (CROPS #13)
+## Trust assumptions
 
 - Cluster membership is trusted as input.
 - LLM is local-only (Ollama) by default; transaction details do not leave the host.
