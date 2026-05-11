@@ -105,7 +105,7 @@ each closes a soft spot a reader would push on:
       6 `stealth_address_ops` heuristics map cleanly to / extend
       Wahrstätter's published 4-heuristic set. The "first runtime
       defense" claim depends on this being defensible.
-- [ ] **PIR primitive position-PoC iteration** with Keewoo lands on
+- [ ] **PIR primitive position-PoC iteration** with a co-builder lands on
       shared framing (the McEliece-as-stress-test reframe). The post
       cites this as forward-looking; settling it strengthens the
       reference.
